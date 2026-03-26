@@ -1,7 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
 import { getInitials } from "@/utils/avatar";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { useOrganizationsUnified } from "@/hooks/useOrganizationsUnified";
 import { Camera, Edit, User, FileText, Clock, Calendar, Settings, Shield, ChevronRight, ChevronDown, ChevronUp, ArrowLeft, Info, Loader2, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,15 +11,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Label } from "@/components/ui/label";
 import { MainLayout } from "@/components/MainLayout";
 import { NotionCard } from "@/components/ui/notion-components";
-import { 
-  AlertDialog, 
-  AlertDialogAction, 
-  AlertDialogCancel, 
-  AlertDialogContent, 
-  AlertDialogDescription, 
-  AlertDialogFooter, 
-  AlertDialogHeader, 
-  AlertDialogTitle 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -36,19 +33,18 @@ import { EmployeePlanningConfig } from "@/components/EmployeePlanningConfig";
 import { AccessManagementDialog } from "@/components/AccessManagementDialog";
 import { AvailabilitySheet } from "@/components/AvailabilitySheet";
 import { CompensatoryTimeOffView } from "@/components/CompensatoryTimeOffView";
-import { useCompensatoryTimeOff } from "@/hooks/useCompensatoryTimeOff";
 import { EmployeeAbsenceRequests } from "@/components/EmployeeAbsenceRequests";
 import { LeaveRequestFormContent } from "@/components/LeaveRequestFormContent";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { useUserPermissions } from "@/hooks/useUserPermissions";
-import { useAuth } from "@/hooks/useAuth";
-import { useUserRole } from "@/hooks/useUserRole";
 import { UserSystemManagement } from "@/components/colaboradores/UserSystemManagement";
-import { useColaboradorById } from "@/hooks/useColaboradorFull";
-import { useTeamAssignments } from "@/hooks/useTeamAssignments";
-import { useJobDepartments } from "@/hooks/useJobDepartments";
 import { TeamAssignmentCard } from "@/components/colaboradores/TeamAssignmentCard";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  useColaboradorDetail,
+  isPermissionActive,
+  DIRECTOR_SWITCH_PERMISSIONS,
+  MANAGER_SWITCH_PERMISSIONS,
+} from "@/hooks/useColaboradorDetail";
 
 interface Colaborador {
   id: string;
@@ -68,7 +64,6 @@ interface Colaborador {
   tiempo_trabajo_semanal?: number;
   hora_inicio_contrato?: string;
   disponibilidad_semanal?: string | string[];
-  // establecimiento_por_defecto?: string; // ELIMINADO en Fase 5C
   responsable_directo?: string;
   avatar_url?: string;
   status?: string;
@@ -104,855 +99,106 @@ interface Colaborador {
 }
 
 export default function ColaboradorDetail() {
-  const { user } = useAuth();
-  const { isAdmin, role } = useUserRole();
-  const { currentOrganization, organizations } = useOrganizationsUnified();
-  
-  // Mapeo de códigos de país a códigos telefónicos
-  const countryToPhoneCode = {
-    'ES': '+34',
-    'FR': '+33', 
-    'DE': '+49',
-    'IT': '+39',
-    'GB': '+44'
-  };
-
-  // Función para obtener el código telefónico
-  const getPhoneCode = (countryCode: string) => {
-    return countryToPhoneCode[countryCode as keyof typeof countryToPhoneCode] || '+34';
-  };
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  
-  // Use new hook for colaborador data from unified view
-  const { colaborador, loading, refetch: refetchColaborador } = useColaboradorById(id);
-  
-  // Hook for team assignments - departamentos asignados
-  const { assignments: teamAssignments, loading: teamAssignmentsLoading, refetch: refetchTeamAssignments } = useTeamAssignments(id || '');
-  
-  // Hook for all departments in organization
-  const { departments: allDepartments } = useJobDepartments();
-  
-  // Force refresh state to trigger UI updates
-  const [forceRefresh, setForceRefresh] = useState(0);
-  
-  // Log when colaborador data changes to debug update issues
-  useEffect(() => {
-    if (colaborador) {
-    }
-  }, [colaborador?.updated_at, colaborador?.jobs?.title, colaborador?.jobs?.department, forceRefresh]);
-  
-  // Use memo with force refresh to ensure reactive updates
-  const displayColaborador = useMemo(() => {
-    return colaborador ? {
-      ...colaborador,
-      _refreshKey: forceRefresh // Force dependency update
-    } : null;
-  }, [colaborador, forceRefresh]);
-  
-  const isInactive = displayColaborador?.status === 'inactivo';
-  const [contractHistory, setContractHistory] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState(() => {
-    // Si hay un parámetro 'tab' en la URL, usarlo como tab inicial
-    const tabFromUrl = searchParams.get('tab');
-    return tabFromUrl || "datos-personales";
-  });
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isContractDetailsOpen, setIsContractDetailsOpen] = useState(false);
-  
-  const [isEditContractOpen, setIsEditContractOpen] = useState(false);
-  const [isTerminateContractOpen, setIsTerminateContractOpen] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<string>("empleado");
-  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
-  const [showAbsenceRequestForm, setShowAbsenceRequestForm] = useState(false);
-  const [isRoleManagementOpen, setIsRoleManagementOpen] = useState(false);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
-  const [isInviting, setIsInviting] = useState(false);
-  
-  // Hook para gestionar permisos reales
-  const { 
-    permissions, 
-    loading: permissionsLoading, 
-    updatePermission, 
+  const {
+    user,
+    isAdmin,
+    role,
+    currentOrganization,
+    organizations,
+    id,
+    navigate,
+    colaborador,
+    displayColaborador,
+    loading,
+    refetchColaborador,
+    isInactive,
+    teamAssignments,
+    teamAssignmentsLoading,
+    refetchTeamAssignments,
+    allDepartments,
+    teamNames,
+    permissions,
+    permissionsLoading,
+    updatePermission,
     assignRole,
     hasPermission,
     getPermissionsByCategory,
-    refetch: refetchPermissions
-  } = useUserPermissions(colaborador?.id);
-  
-  // Estados para acceso generalizado
-  const [isAccessMenuExpanded, setIsAccessMenuExpanded] = useState(false);
-  const [generalizedAccess, setGeneralizedAccess] = useState(false);
-  const [isAccessDialogOpen, setIsAccessDialogOpen] = useState(false);
-  const [savingGeneralizedAccess, setSavingGeneralizedAccess] = useState(false);
-  
-  // Cargar estado de acceso generalizado desde la DB
-  useEffect(() => {
-    if (colaborador?.has_generalized_access !== undefined) {
-      setGeneralizedAccess(colaborador.has_generalized_access);
-    }
-  }, [colaborador?.has_generalized_access]);
-  
-  // Estados para turnos en el planning
-  const [isPlanningMenuExpanded, setIsPlanningMenuExpanded] = useState(false);
-  const [employeePlannable, setEmployeePlannable] = useState(true);
-  const [isPlanningConfigOpen, setIsPlanningConfigOpen] = useState(false);
-  
-  // Estados para gestión de accesos
-  const [isAccessManagementOpen, setIsAccessManagementOpen] = useState(false);
-  
-  // Estados para disponibilidad
-  const [isAvailabilityOpen, setIsAvailabilityOpen] = useState(false);
-  const [showCompensatoryTimeOff, setShowCompensatoryTimeOff] = useState(false);
-  const [teamNames, setTeamNames] = useState<string>('');
-  const [userCreatedAt, setUserCreatedAt] = useState<string | null>(null);
-  const [hasUserAccount, setHasUserAccount] = useState<boolean>(false);
-  const [inviteStatus, setInviteStatus] = useState<'none' | 'pending' | 'accepted'>('none');
-  const [pendingInvite, setPendingInvite] = useState<any>(null);
-  
-  // Hook para obtener el balance de compensación de horas extras
-  const { balance: compensatoryBalance, loading: compensatoryLoading } = useCompensatoryTimeOff(id || '');
+    refetchPermissions,
+    compensatoryBalance,
+    compensatoryLoading,
+    activeTab, setActiveTab,
+    showDeleteDialog, setShowDeleteDialog,
+    deleting,
+    isEditDialogOpen, setIsEditDialogOpen,
+    isContractDetailsOpen, setIsContractDetailsOpen,
+    isEditContractOpen, setIsEditContractOpen,
+    isTerminateContractOpen, setIsTerminateContractOpen,
+    showAbsenceRequestForm, setShowAbsenceRequestForm,
+    isRoleManagementOpen, setIsRoleManagementOpen,
+    isAccessMenuExpanded, setIsAccessMenuExpanded,
+    isAccessDialogOpen, setIsAccessDialogOpen,
+    savingGeneralizedAccess,
+    isPlanningMenuExpanded, setIsPlanningMenuExpanded,
+    employeePlannable, setEmployeePlannable,
+    isPlanningConfigOpen, setIsPlanningConfigOpen,
+    isAccessManagementOpen, setIsAccessManagementOpen,
+    isAvailabilityOpen, setIsAvailabilityOpen,
+    showCompensatoryTimeOff, setShowCompensatoryTimeOff,
+    uploadingAvatar,
+    fileInputRef, setFileInputRef,
+    isInviting,
+    selectedRole, setSelectedRole,
+    currentUserRole,
+    inviteStatus,
+    pendingInvite,
+    hasUserAccount,
+    userCreatedAt,
+    generalizedAccess,
+    contractHistory,
+    directorPermissions,
+    managerPermissions,
+    empleadoPermissions,
+    handleDataSync,
+    handleRoleChange,
+    handleAvatarUpload,
+    handleInviteColaborador,
+    handleResendInvite,
+    triggerFileInput,
+    handleDeleteColaborador,
+    handleGeneralizedAccessToggle,
+  } = useColaboradorDetail();
 
-  // Función unificada de sincronización de datos
-  const handleDataSync = async () => {
-    try {
-      // Refrescar en paralelo
-      await Promise.all([
-        refetchTeamAssignments(),
-        refetchColaborador(),
-        fetchTeamNames()
-      ]);
-      
-      // Forzar actualización de UI
-      setForceRefresh(prev => prev + 1);
-      
-    } catch (error) {
-      console.error('❌ Error en sincronización:', error);
-    }
+  // Aliases for JSX backwards-compat
+  const directorSwitchPermissions = DIRECTOR_SWITCH_PERMISSIONS;
+  const managerSwitchPermissions = MANAGER_SWITCH_PERMISSIONS;
+
+  // Mapeo de códigos de país a códigos telefónicos (usado en JSX datos-personales)
+  const countryToPhoneCode = {
+    'ES': '+34',
+    'FR': '+33',
+    'DE': '+49',
+    'IT': '+39',
+    'GB': '+44',
+  };
+  const getPhoneCode = (countryCode: string) => {
+    return countryToPhoneCode[countryCode as keyof typeof countryToPhoneCode] || '+34';
   };
 
-  // Effect para refrescar equipos cuando el colaborador cambie
-  useEffect(() => {
-    if (colaborador?.id) {
-      fetchTeamNames();
-    }
-  }, [colaborador?.id, colaborador?.updated_at, forceRefresh]);
-  const [directorPermissions, setDirectorPermissions] = useState({
-    // Planificación - según imagen
-    acceso_planificacion_publicada_equipos: true, // ✓ verde
-    acceso_planificacion_no_publicada: true, // ✓ verde
-    acceso_planificacion_otros_equipos: false, // ○ rojo
-    visualizacion_alertas: true, // ✓ verde
-    creacion_modificacion_planificacion: true, // ✓ verde
-    editar_planificaciones_publicadas: true, // SWITCH activado
-    visualizacion_ratios: true, // ✓ verde
-    // Gestión de Horas - según imagen
-    guardar_propias_horas: true, // ✓ verde
-    ingresar_horas_equipo: true, // ✓ verde
-    validar_propias_horas: true, // ✓ verde
-    ingresar_horas_todos_equipos: false, // ○ rojo
-    anular_validacion_horas: true, // SWITCH activado
-    revalorizar_ausencias: true, // SWITCH activado
-    // Perfil de Usuario - según imagen
-    acceso_propio_perfil: true, // ✓ verde
-    modificar_informacion_personal: true, // ✓ verde
-    consultar_propias_hojas: true, // ✓ verde
-    acceso_perfil_empleados_equipo: true, // ✓ verde
-    acceso_perfiles_managers: true, // ✓ verde
-    acceso_perfil_todos_empleados: false, // ○ rojo
-    eliminar_perfil_empleado: false, // SWITCH desactivado
-    // Gestión de Ausencias - según imagen
-    modificar_contadores_vacaciones: false // ○ rojo
-  });
-
-  // Define qué permisos del Director tienen switches
-  const directorSwitchPermissions = [
-    'editar_planificaciones_publicadas',
-    'anular_validacion_horas', 
-    'revalorizar_ausencias',
-    'eliminar_perfil_empleado'
-  ];
-
-  // Estado para permisos de Manager - según imagen
-  const [managerPermissions, setManagerPermissions] = useState({
-    // Planificación - según imagen
-    acceso_planificacion_publicada_equipos: true, // ✓ verde
-    acceso_planificacion_no_publicada: true, // ✓ verde
-    acceso_planificacion_otros_equipos: false, // ○ rojo
-    visualizacion_alertas: true, // ✓ verde
-    creacion_modificacion_planificacion: true, // ✓ verde
-    editar_planificaciones_publicadas: true, // SWITCH activado
-    visualizacion_ratios: true, // ✓ verde
-    // Gestión de Horas - según imagen
-    guardar_propias_horas: true, // ✓ verde
-    ingresar_horas_equipo: true, // ✓ verde
-    validar_propias_horas: false, // SWITCH desactivado
-    ingresar_horas_todos_equipos: false, // ○ rojo
-    anular_validacion_horas: true, // SWITCH activado
-    revalorizar_ausencias: true, // SWITCH activado
-    // Perfil de Usuario - según imagen
-    acceso_propio_perfil: true, // ✓ verde
-    modificar_informacion_personal: true, // ✓ verde
-    consultar_propias_hojas: true, // ✓ verde
-    acceso_perfil_empleados_equipo: false, // SWITCH desactivado
-    acceso_perfiles_managers: false, // ○ rojo
-    acceso_perfil_todos_empleados: false, // ○ rojo
-    eliminar_perfil_empleado: false, // ○ rojo
-    // Gestión de Ausencias - según imagen
-    modificar_contadores_vacaciones: false // ○ rojo
-  });
-
-  // Define qué permisos del Manager tienen switches
-  const managerSwitchPermissions = [
-    'editar_planificaciones_publicadas',
-    'validar_propias_horas',
-    'anular_validacion_horas', 
-    'revalorizar_ausencias',
-    'acceso_perfil_empleados_equipo'
-  ];
-
-  // Estado para permisos de Empleado - según imagen
-  const [empleadoPermissions] = useState({
-    // Planificación - según imagen
-    acceso_planificacion_publicada_equipos: true, // ✓ verde
-    acceso_planificacion_no_publicada: false, // ○ rojo
-    acceso_planificacion_otros_equipos: false, // ○ rojo
-    visualizacion_alertas: false, // ○ rojo
-    creacion_modificacion_planificacion: false, // ○ rojo
-    editar_planificaciones_publicadas: false, // ○ rojo
-    visualizacion_ratios: false, // ○ rojo
-    // Gestión de Horas - según imagen
-    guardar_propias_horas: true, // ✓ verde
-    ingresar_horas_equipo: false, // ○ rojo
-    validar_propias_horas: false, // ○ rojo
-    ingresar_horas_todos_equipos: false, // ○ rojo
-    anular_validacion_horas: false, // ○ rojo
-    revalorizar_ausencias: false, // ○ rojo
-    // Perfil de Usuario - según imagen
-    acceso_propio_perfil: true, // ✓ verde
-    modificar_informacion_personal: true, // ✓ verde
-    consultar_propias_hojas: false, // ○ rojo
-    acceso_perfil_empleados_equipo: false, // ○ rojo
-    acceso_perfiles_managers: false, // ○ rojo
-    acceso_perfil_todos_empleados: false, // ○ rojo
-    eliminar_perfil_empleado: false, // ○ rojo
-    // Gestión de Ausencias - según imagen
-    modificar_contadores_vacaciones: false // ○ rojo
-  });
-
-  useEffect(() => {
-    if (id) {
-      fetchContractHistory();
-      fetchCurrentUserRole();
-      fetchTeamNames();
-    }
-  }, [id]);
-
-  // Obtener fecha de creación del perfil del usuario y verificar si el colaborador tiene cuenta
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      if (!user?.id) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('created_at')
-          .eq('id', user.id)
-          .single();
-        
-        if (!error && data) {
-          setUserCreatedAt(data.created_at);
-        }
-      } catch (error) {
-        console.error('Error fetching user profile:', error);
-      }
-    };
-    
-    const checkInviteStatus = async () => {
-      if (!colaborador?.email || !currentOrganization?.id) return;
-      
-      try {
-        // 1. Verificar si tiene cuenta activa
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', colaborador.email.toLowerCase())
-          .maybeSingle();
-        
-        if (profileData) {
-          setInviteStatus('accepted');
-          setHasUserAccount(true);
-          return;
-        }
-        
-        // 2. Verificar si tiene invitación pendiente
-        const { data: inviteData } = await supabase
-          .from('invites')
-          .select('*')
-          .eq('email', colaborador.email.toLowerCase())
-          .eq('org_id', currentOrganization.id)
-          .is('used_at', null)
-          .is('revoked_at', null)
-          .gte('expires_at', new Date().toISOString())
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        if (inviteData) {
-          setInviteStatus('pending');
-          setPendingInvite(inviteData);
-        } else {
-          setInviteStatus('none');
-        }
-      } catch (error) {
-        console.error('Error checking invite status:', error);
-        setInviteStatus('none');
-      }
-    };
-    
-    fetchUserProfile();
-    checkInviteStatus();
-  }, [user?.id, colaborador?.email, currentOrganization?.id, colaborador?.id]);
-
-  // Efecto para cambiar la tab cuando cambie el parámetro URL
-  useEffect(() => {
-    const tabFromUrl = searchParams.get('tab');
-    if (tabFromUrl) {
-      setActiveTab(tabFromUrl);
-      
-      // Si cambiamos a la tab de rol y permisos, forzar refresh de permisos
-      if (tabFromUrl === 'rol-permisos') {
-        // El hook useUserPermissions se actualiza automáticamente cuando cambia colaborador?.id
-      }
-    }
-  }, [searchParams]);
-
-  const fetchCurrentUserRole = async () => {
-    if (!user) return;
-    
-    try {
-      const { data, error } = await supabase.rpc('get_user_role', { _user_id: user.id });
-      if (!error && data) {
-        setCurrentUserRole(data);
-        setSelectedRole(data);
-      }
-    } catch (error) {
-      console.error('Error fetching user role:', error);
-    }
-  };
-
-  const handleRoleChange = async (newRole: string) => {
-    if (!colaborador?.id || !user?.id) return;
-
-    try {
-      // Desactivar roles existentes del colaborador
-      await supabase
-        .from('colaborador_roles')
-        .update({ activo: false })
-        .eq('colaborador_id', colaborador.id);
-
-      // Insertar el nuevo rol
-      const { error } = await supabase
-        .from('colaborador_roles')
-        .insert({
-          colaborador_id: colaborador.id,
-          role: newRole,
-          asignado_por: user.id,
-          activo: true
-        } as any);
-
-      if (error) {
-        console.error('Error updating colaborador role:', error);
-        toast({
-          title: "Error",
-          description: "No se pudo actualizar el rol del colaborador",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      toast({
-        title: "Rol actualizado",
-        description: `El rol del colaborador ha sido cambiado a ${newRole}`,
-      });
-
-      // Refrescar permisos sin recargar la página
-      await refetchPermissions();
-    } catch (error) {
-      console.error('Error in handleRoleChange:', error);
-      toast({
-        title: "Error",
-        description: "Ocurrió un error inesperado",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Contract history is still fetched separately
-  const fetchContractHistory = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('contract_history')
-        .select('*')
-        .eq('colaborador_id', id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (error) {
-        console.error('Error fetching contract history:', error);
-        return;
-      }
-
-      setContractHistory(data || []);
-    } catch (error) {
-      console.error('Error fetching contract history:', error);
-    }
-  };
-
-  const fetchTeamNames = async () => {
-    if (!id) return;
-    
-    try {
-      // Obtener el departamento del job asignado al colaborador usando la relación específica
-      const { data: colaboradorData, error: colaboradorError } = await supabase
-        .from('colaboradores')
-        .select(`
-          job_id,
-          jobs!colaboradores_job_id_fkey (
-            department,
-            job_departments:department_id (
-              value
-            )
-          )
-        `)
-        .eq('id', id)
-        .maybeSingle();
-
-      if (colaboradorError) {
-        console.error('Error fetching colaborador job:', colaboradorError);
-        return;
-      }
-
-      // Usar el departamento del job como equipo principal
-      let departmentName = '';
-      
-      if (colaboradorData?.jobs) {
-        // Los datos vienen como un array, tomar el primer elemento
-        const job = Array.isArray(colaboradorData.jobs) ? colaboradorData.jobs[0] : colaboradorData.jobs;
-        
-        if (job?.job_departments) {
-          const dept = Array.isArray(job.job_departments) ? job.job_departments[0] : job.job_departments;
-          departmentName = dept?.value || '';
-        } else {
-          departmentName = job?.department || '';
-        }
-      }
-      
-      setTeamNames(departmentName);
-    } catch (error) {
-      console.error('Error fetching teams:', error);
-    }
-  };
-
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !colaborador) return;
-
-    setUploadingAvatar(true);
-    try {
-      // Generate unique filename
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${colaborador.id}-${Date.now()}.${fileExt}`;
-
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: true
-        });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName);
-
-      // Update colaborador with new avatar URL
-      const { error: updateError } = await supabase
-        .from('colaboradores')
-        .update({ avatar_url: publicUrl })
-        .eq('id', colaborador.id);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      // Avatar is now handled through the service, no local state update needed
-      toast({
-        title: "Avatar actualizado",
-        description: "La imagen de perfil se ha actualizado correctamente"
-      });
-
-    } catch (error) {
-      console.error('Error uploading avatar:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar el avatar",
-        variant: "destructive"
-      });
-    } finally {
-      setUploadingAvatar(false);
-      // Reset file input
-      if (event.target) {
-        event.target.value = '';
-      }
-    }
-  };
-
-  const handleInviteColaborador = async () => {
-    if (!colaborador?.email || !user) {
-      toast({
-        title: "Error",
-        description: "No se puede enviar la invitación sin email del colaborador",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsInviting(true);
-
-    try {
-      // Obtener la organización del usuario
-      const { data: membership } = await supabase
-        .from('memberships')
-        .select('org_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .single();
-
-      if (!membership?.org_id) {
-        throw new Error('No se encontró la organización del usuario');
-      }
-
-      const { data, error } = await supabase.functions.invoke('create-invite', {
-        body: {
-          orgId: membership.org_id,
-          email: colaborador.email.toLowerCase(),
-          role: 'EMPLOYEE' // Rol por defecto para colaboradores
-        }
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      toast({
-        title: "Invitación enviada",
-        description: `Se ha enviado una invitación a ${colaborador.email} para acceder a TurnoSmart`
-      });
-
-      // Actualizar estado a pendiente
-      setInviteStatus('pending');
-
-    } catch (error: any) {
-      console.error('Error sending invite:', error);
-      toast({
-        title: "Error",
-        description: error.message || 'Error al enviar la invitación',
-        variant: "destructive"
-      });
-    } finally {
-      setIsInviting(false);
-    }
-  };
-
-  const handleResendInvite = async () => {
-    if (!pendingInvite?.id) return;
-
-    setIsInviting(true);
-    try {
-      const { error } = await supabase.functions.invoke('resend-invite', {
-        body: { inviteId: pendingInvite.id }
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Invitación reenviada",
-        description: `Se ha reenviado la invitación a ${colaborador?.email}`
-      });
-    } catch (error: any) {
-      console.error('Error resending invite:', error);
-      toast({
-        title: "Error",
-        description: error.message || 'Error al reenviar la invitación',
-        variant: "destructive"
-      });
-    } finally {
-      setIsInviting(false);
-    }
-  };
-
-  const triggerFileInput = () => {
-    fileInputRef?.click();
-  };
-
-  const handleDeleteColaborador = async () => {
-    if (!id) return;
-    
-    setDeleting(true);
-    try {
-      const { error } = await supabase
-        .from('colaboradores')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        toast({
-          title: "Error",
-          description: "No se pudo eliminar el colaborador",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      toast({
-        title: "Colaborador eliminado",
-        description: "El colaborador ha sido eliminado exitosamente"
-      });
-      
-      // Redireccionar a la lista de colaboradores
-      navigate('/colaboradores');
-    } catch (error) {
-      console.error('Error deleting colaborador:', error);
-      toast({
-        title: "Error",
-        description: "Ocurrió un error inesperado",
-        variant: "destructive"
-      });
-    } finally {
-      setDeleting(false);
-      setShowDeleteDialog(false);
-    }
-  };
-
-  // Función para manejar el toggle de acceso generalizado
-  const handleGeneralizedAccessToggle = async (newValue: boolean) => {
-    if (!id || !currentOrganization?.id) {
-      toast({
-        title: "Error",
-        description: "No se pudo identificar el colaborador u organización",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setSavingGeneralizedAccess(true);
-    try {
-      // Actualizar el flag en la tabla colaboradores
-      const { error: updateError } = await supabase
-        .from('colaboradores')
-        .update({ has_generalized_access: newValue })
-        .eq('id', id);
-
-      if (updateError) throw updateError;
-
-      if (newValue) {
-        // Obtener usuario actual
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        
-        // Si se activa, asignar a TODOS los departamentos disponibles
-        const assignmentsToCreate = allDepartments.map(dept => ({
-          colaborador_id: id,
-          department_id: dept.id,
-          org_id: currentOrganization.id,
-          is_active: true,
-          assigned_by: currentUser?.id
-        }));
-
-        // Usar upsert para crear o actualizar asignaciones
-        if (assignmentsToCreate.length > 0) {
-          const { error: assignError } = await supabase
-            .from('colaborador_departments')
-            .upsert(assignmentsToCreate, {
-              onConflict: 'colaborador_id,department_id',
-              ignoreDuplicates: false
-            });
-
-          if (assignError) throw assignError;
-        }
-
-        toast({
-          title: "Acceso generalizado activado",
-          description: `${colaborador?.nombre} ahora tiene acceso a todos los equipos y rotas`,
-        });
-      } else {
-        // Si se desactiva, solo actualizar el flag (mantener asignaciones existentes)
-        toast({
-          title: "Acceso generalizado desactivado",
-          description: "Las asignaciones individuales se mantienen activas",
-        });
-      }
-
-      // Actualizar estados locales
-      setGeneralizedAccess(newValue);
-      
-      // Refrescar datos
-      refetchTeamAssignments();
-      refetchColaborador();
-
-    } catch (error) {
-      console.error('Error updating generalized access:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar el acceso generalizado",
-        variant: "destructive",
-      });
-      // Revertir el cambio en caso de error
-      setGeneralizedAccess(!newValue);
-    } finally {
-      setSavingGeneralizedAccess(false);
-    }
-  };
-
-  const isPermissionActive = (permission: string, role: string): boolean => {
-    const rolePermissions = {
-      empleado: [
-        // Planificación
-        "acceso_planificacion_publicada_equipos",
-        // Gestión de Horas  
-        "guardar_propias_horas",
-        // Perfil de Usuario
-        "acceso_propio_perfil",
-        "modificar_informacion_personal",
-        "consultar_propias_hojas"
-      ],
-      manager: [
-        // Planificación
-        "acceso_planificacion_publicada_equipos",
-        "acceso_planificacion_no_publicada",
-        "acceso_planificacion_otros_equipos",
-        "visualizacion_alertas",
-        // Gestión de Horas
-        "guardar_propias_horas",
-        "ingresar_horas_equipo",
-        "validar_propias_horas",
-        // Perfil de Usuario
-        "acceso_propio_perfil",
-        "modificar_informacion_personal",
-        "consultar_propias_hojas",
-        "acceso_perfil_empleados_equipo"
-      ],
-      director: [
-        // Planificación
-        "acceso_planificacion_publicada_equipos",
-        "acceso_planificacion_no_publicada",
-        "acceso_planificacion_otros_equipos",
-        "visualizacion_alertas",
-        "creacion_modificacion_planificacion",
-        "editar_planificaciones_publicadas",
-        "visualizacion_ratios",
-        // Gestión de Horas
-        "guardar_propias_horas",
-        "ingresar_horas_equipo",
-        "validar_propias_horas",
-        "ingresar_horas_todos_equipos",
-        "anular_validacion_horas",
-        // Perfil de Usuario
-        "acceso_propio_perfil",
-        "modificar_informacion_personal",
-        "consultar_propias_hojas",
-        "acceso_perfil_empleados_equipo",
-        "acceso_perfiles_managers",
-        "acceso_perfil_todos_empleados"
-      ],
-      administrador: [
-        // Todas las funciones activadas
-        "acceso_planificacion_publicada_equipos",
-        "acceso_planificacion_no_publicada",
-        "acceso_planificacion_otros_equipos",
-        "visualizacion_alertas",
-        "creacion_modificacion_planificacion",
-        "editar_planificaciones_publicadas",
-        "visualizacion_ratios",
-        "guardar_propias_horas",
-        "ingresar_horas_equipo",
-        "validar_propias_horas",
-        "ingresar_horas_todos_equipos",
-        "anular_validacion_horas",
-        "revalorizar_ausencias",
-        "acceso_propio_perfil",
-        "modificar_informacion_personal",
-        "consultar_propias_hojas",
-        "acceso_perfil_empleados_equipo",
-        "acceso_perfiles_managers",
-        "acceso_perfil_todos_empleados",
-        "eliminar_perfil_empleado",
-        "modificar_contadores_vacaciones"
-      ],
-      propietario: [
-        // Todas las funciones activadas
-        "acceso_planificacion_publicada_equipos",
-        "acceso_planificacion_no_publicada",
-        "acceso_planificacion_otros_equipos",
-        "visualizacion_alertas",
-        "creacion_modificacion_planificacion",
-        "editar_planificaciones_publicadas",
-        "visualizacion_ratios",
-        "guardar_propias_horas",
-        "ingresar_horas_equipo",
-        "validar_propias_horas",
-        "ingresar_horas_todos_equipos",
-        "anular_validacion_horas",
-        "revalorizar_ausencias",
-        "acceso_propio_perfil",
-        "modificar_informacion_personal",
-        "consultar_propias_hojas",
-        "acceso_perfil_empleados_equipo",
-        "acceso_perfiles_managers",
-        "acceso_perfil_todos_empleados",
-        "eliminar_perfil_empleado",
-        "modificar_contadores_vacaciones"
-      ]
-    };
-
-    return rolePermissions[role as keyof typeof rolePermissions]?.includes(permission) || false;
-  };
-
+  // Renders a Switch for a specific permission (needs supabase + JSX — stays in component)
   const getCheckmarkComponent = (permission: string) => {
-    // Validar que permissions existe y es un array
     if (!permissions || !Array.isArray(permissions)) {
-      return (
-        <Switch 
-          checked={false}
-          disabled={true}
-        />
-      );
+      return <Switch checked={false} disabled={true} />;
     }
-    
     const currentPermission = permissions.find(p => p.permission_name === permission);
     const isActive = currentPermission?.is_enabled || false;
-    const isConfigurable = currentPermission?.is_configurable || false;
-    
-    // Solo usuarios con rol "administrador" pueden modificar permisos
     const canModifyPermissions = isAdmin && user && colaborador?.id;
-    
-    // TODOS los permisos se muestran como toggles
+
     return (
-      <Switch 
+      <Switch
         checked={isActive}
-        disabled={!canModifyPermissions} // Deshabilitar si no es administrador
+        disabled={!canModifyPermissions}
         onCheckedChange={async (checked) => {
           if (!canModifyPermissions) return;
-          
-          // Crear sobrescritura de permiso específica para este colaborador
           const { data, error } = await supabase
             .from('user_permissions')
             .upsert({
@@ -962,9 +208,7 @@ export default function ColaboradorDetail() {
               is_enabled: checked,
               granted_by: user.id
             });
-
           if (!error) {
-            // Refrescar permisos para mostrar el cambio
             await refetchPermissions();
             toast({
               title: "Permiso actualizado",
