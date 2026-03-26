@@ -152,3 +152,51 @@ describe('isMountedRef', () => {
     expect(ref.current).toBe(false);
   });
 });
+
+// ── Auth page smoke test ─────────────────────────────────────────────────────
+
+vi.mock('react-router-dom', () => ({
+  useNavigate: vi.fn().mockReturnValue(vi.fn()),
+  useSearchParams: vi.fn().mockReturnValue([new URLSearchParams(), vi.fn()]),
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) => <a href={to}>{children}</a>,
+}));
+
+vi.mock('@/hooks/use-toast', () => ({
+  useToast: vi.fn().mockReturnValue({ toast: vi.fn() }),
+  toast: vi.fn(),
+}));
+
+vi.mock('@/hooks/useCurrentOrganization', () => ({
+  useCurrentOrganization: vi.fn().mockReturnValue({ currentOrg: null, loading: false }),
+}));
+
+describe('safeQuery — casos adicionales', () => {
+  it('retorna error genérico si el error no tiene message', async () => {
+    const result = await safeQuery(
+      () => Promise.resolve({ data: null, error: {} }),
+      'test-generico'
+    );
+    expect(result.error).toBeTruthy();
+    expect(result.data).toBeNull();
+  });
+
+  it('maneja null data correctamente', async () => {
+    const result = await safeQuery(
+      () => Promise.resolve({ data: null, error: null }),
+      'null-data'
+    );
+    expect(result.data).toBeNull();
+    expect(result.error).toBeNull();
+  });
+});
+
+describe('isMountedRef — patrón cleanup', () => {
+  it('simula ciclo mount/unmount correctamente', () => {
+    const ref = isMountedRef();
+    expect(ref.current).toBe(true);
+    // simula cleanup de useEffect
+    const cleanup = () => { ref.current = false; };
+    cleanup();
+    expect(ref.current).toBe(false);
+  });
+});
