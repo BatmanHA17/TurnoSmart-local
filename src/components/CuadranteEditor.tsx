@@ -32,32 +32,12 @@ import { getCuadranteData, upsertCuadranteData } from "@/store/cuadranteDataStor
 import { ImportCSVDialog } from './ImportCSVDialog';
 import { CuadranteStats } from '@/components/CuadranteStats';
 import { useAutoSave } from '@/hooks/useAutoSave';
+import { MONTHS, YEARS, STATUS_CODES, getStatusColor } from '@/constants/cuadrante';
+import { CuadranteHeader } from '@/components/cuadrante/CuadranteHeader';
+import { CuadranteLegend } from '@/components/cuadrante/CuadranteLegend';
 
-const MONTHS = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-];
-
-const YEARS = [2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035];
-
-// Códigos de estado disponibles - Notion-inspired monochrome
-const statusCodes = [
-  { code: 'X', label: 'X - Presencial', color: 'bg-foreground/5 text-foreground border-foreground/10' },
-  { code: 'L', label: 'L - Libre', color: 'bg-muted text-muted-foreground border-border' },
-  { code: 'V', label: 'V - Vacaciones', color: 'bg-foreground/8 text-foreground border-foreground/15' },
-  { code: 'E', label: 'E - Enfermedad', color: 'bg-foreground/10 text-foreground border-foreground/20' },
-  { code: 'F', label: 'F - Falta', color: 'bg-foreground/7 text-foreground border-foreground/12' },
-  { code: 'P', label: 'P - Permiso', color: 'bg-foreground/6 text-foreground border-foreground/11' },
-  { code: 'C', label: 'C - Curso', color: 'bg-foreground/9 text-foreground border-foreground/16' },
-  { code: 'H', label: 'H - Horas Sindicales', color: 'bg-foreground/4 text-foreground border-foreground/9' },
-  { code: 'S', label: 'S - Sanción', color: 'bg-foreground/12 text-foreground border-foreground/22' },
-  { code: 'XB', label: 'XB - Banquetes', color: 'bg-foreground/11 text-foreground border-foreground/18' }
-];
-
-const getStatusColor = (code: string) => {
-  const status = statusCodes.find(s => s.code === code);
-  return status ? status.color : 'bg-muted text-muted-foreground border-border';
-};
+// Alias local para compatibilidad con código existente en este archivo
+const statusCodes = STATUS_CODES;
 
 export function CuadranteEditor({ selectedCuadranteId, readOnly = false, onBack }: { selectedCuadranteId?: string | null; readOnly?: boolean; onBack?: () => void }) {
   const [selectedMonth, setSelectedMonth] = useState<number>(1);
@@ -839,52 +819,9 @@ export function CuadranteEditor({ selectedCuadranteId, readOnly = false, onBack 
 
   return (
     <div className="space-y-6 max-w-full">
-      {/* Header - Notion-inspired minimal */}
-      <div className="pb-6 border-b border-border/50">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-foreground tracking-tight">Editor de Cuadrante</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Editor completo para gestionar cuadrantes mensuales con funcionalidades avanzadas
-            </p>
-          </div>
-          {onBack && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onBack}
-                  className="flex items-center gap-2"
-                >
-                  <Users className="h-4 w-4" />
-                  Volver a Cuadrantes
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Volver a la lista de cuadrantes</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </div>
-      </div>
+      <CuadranteHeader onBack={onBack} readOnly={readOnly} />
 
-      {/* Modo solo lectura */}
-      {readOnly && (
-        <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800 p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900 rounded-full flex items-center justify-center">
-              <Eye className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-amber-800 dark:text-amber-200">Modo Solo Lectura</h3>
-              <p className="text-xs text-amber-600 dark:text-amber-400">
-                Este cuadrante se está visualizando en modo solo lectura. No se pueden realizar modificaciones.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modo solo lectura — mantenido para compatibilidad con código existente */}
 
       {/* Estado vacío del cuadrante */}
       {isEmpty && !readOnly && (
@@ -1428,18 +1365,7 @@ export function CuadranteEditor({ selectedCuadranteId, readOnly = false, onBack 
         </div>
       </div>
 
-      {/* Leyenda de códigos - Notion style */}
-      <div className="bg-card rounded-lg border border-border/30 shadow-sm">
-        <div className="px-6 py-4">
-          <div className="flex flex-wrap gap-2">
-            {statusCodes.map(status => (
-              <div key={status.code} className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border ${status.color}`}>
-                {status.label}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <CuadranteLegend />
 
       {/* Cuadrante Principal */}
       {currentCuadrante && (
