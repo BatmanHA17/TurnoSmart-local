@@ -22,16 +22,14 @@ export const InviteColaboradorDialog = () => {
       if (!user) return;
       
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('memberships')
           .select('org_id')
           .eq('user_id', user.id)
           .limit(1)
           .single();
-        
-        if (data) {
-          setOrgId(data.org_id);
-        }
+        if (error) console.error('[InviteColaboradorDialog] Error fetching org ID:', error);
+        else if (data) setOrgId(data.org_id);
       } catch (error) {
         console.error('Error fetching org ID:', error);
       }

@@ -33,23 +33,23 @@ export const useEmployeeUpcomingAbsences = (daysAhead: number = 60) => {
         setError(null);
 
         // Get colaborador from user
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('email')
           .eq('id', user.id)
           .single();
 
-        if (!profile?.email) {
+        if (profileError || !profile?.email) {
           throw new Error('Perfil no encontrado');
         }
 
-        const { data: colaborador } = await supabase
+        const { data: colaborador, error: colaboradorError } = await supabase
           .from('colaboradores')
           .select('id')
           .eq('email', profile.email)
           .single();
 
-        if (!colaborador) {
+        if (colaboradorError || !colaborador) {
           throw new Error('Colaborador no encontrado');
         }
 

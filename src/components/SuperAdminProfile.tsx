@@ -157,17 +157,19 @@ export const SuperAdminProfile = () => {
   const updateRole = async (userId: string, role: Role) => {
     try {
       // Get current role and user details for logging
-      const { data: currentUserRole } = await supabase
+      const { data: currentUserRole, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', userId)
         .single();
+      if (roleError) console.error('[SuperAdminProfile] Error fetching current role:', roleError);
 
-      const { data: targetProfile } = await supabase
+      const { data: targetProfile, error: profileError } = await supabase
         .from('profiles')
         .select('display_name, email')
         .eq('id', userId)
         .single();
+      if (profileError) console.error('[SuperAdminProfile] Error fetching profile:', profileError);
 
       const previousRole = currentUserRole?.role || 'sin rol';
 

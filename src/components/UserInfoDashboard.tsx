@@ -34,23 +34,23 @@ export const UserInfoDashboard = () => {
 
       try {
         // Fetch organization info
-        const { data: orgData } = await supabase
+        const { data: orgData, error: orgError } = await supabase
           .from('organizations')
           .select('*')
           .limit(1)
           .single();
-        
-        setOrganizationInfo(orgData);
+        if (orgError) console.error('[UserInfoDashboard] Error fetching org:', orgError);
+        else setOrganizationInfo(orgData);
 
         // Fetch colaborador info by email
         if (profile?.email) {
-          const { data: colaboradorData } = await supabase
+          const { data: colaboradorData, error: colaboradorError } = await supabase
             .from('colaborador_full')
             .select('*')
             .eq('email', profile.email)
             .single();
-          
-          setColaboradorInfo(colaboradorData);
+          if (colaboradorError) console.error('[UserInfoDashboard] Error fetching colaborador:', colaboradorError);
+          else setColaboradorInfo(colaboradorData);
         }
 
         // Count total colaboradores

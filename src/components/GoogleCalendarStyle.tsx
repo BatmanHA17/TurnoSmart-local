@@ -329,13 +329,13 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     
     try {
       // Buscar la versión por ID
-      const { data: versions } = await supabase
+      const { data: versions, error: versionError } = await supabase
         .from('calendar_versions')
         .select('*')
         .eq('id', confirmRestoreVersion)
         .single();
-      
-      if (!versions) {
+
+      if (versionError || !versions) {
         throw new Error('Versión no encontrada');
       }
       
@@ -1274,11 +1274,12 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   const deleteShiftFromSupabase = async (shiftId: string) => {
     try {
       // Get shift details before deletion for logging
-      const { data: shiftData } = await supabase
+      const { data: shiftData, error: shiftFetchError } = await supabase
         .from('calendar_shifts')
         .select('*')
         .eq('id', shiftId)
         .single();
+      if (shiftFetchError) console.error('[deleteShiftFromSupabase] Error fetching shift for log:', shiftFetchError);
       
       const { error } = await supabase
         .from('calendar_shifts')
