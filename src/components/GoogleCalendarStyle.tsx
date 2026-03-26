@@ -64,6 +64,7 @@ import { useWeekAudit } from "@/hooks/useShiftAudit";
 import { ShiftForAudit } from "@/utils/shiftAudit";
 import { AuditCellHighlight, EmployeeViolationBadge } from "@/components/audit";
 import { AuditViolationTooltip } from "@/components/audit/AuditViolationTooltip";
+import { useSmartGenerate } from "@/hooks/useSmartGenerate";
 import {
   ShiftBlock,
   absenceTypes,
@@ -2620,6 +2621,27 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   
   const sortedEmployees = sortBy ? sortEmployees(activeEmployees, sortBy) : activeEmployees;
 
+  // SMART Schedule Generator
+  const { generate: handleGenerateSchedule, isGenerating } = useSmartGenerate({
+    employees,
+    currentWeek,
+    orgId: currentOrg?.org_id,
+    onResult: (newBlocks) => {
+      // Reemplaza los turnos del mes generado manteniendo los de otros meses
+      const monthStart = new Date(newBlocks[0]?.date ?? currentWeek);
+      monthStart.setDate(1);
+      const year = monthStart.getFullYear();
+      const month = monthStart.getMonth();
+      setShiftBlocksWithHistory((prev) => {
+        const otherMonths = prev.filter((b) => {
+          const d = new Date(b.date);
+          return !(d.getFullYear() === year && d.getMonth() === month);
+        });
+        return [...otherMonths, ...newBlocks];
+      });
+    },
+  });
+
   // Transformar shiftBlocks a formato de auditoría
   const shiftsForAudit: ShiftForAudit[] = useMemo(() => {
     return shiftBlocks.map(shift => {
@@ -2681,6 +2703,8 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           version={publishState.version}
           onPublish={handlePublishCalendar}
           onUnpublish={handleUnpublishCalendar}
+          onGenerate={canEdit && !isPublished ? handleGenerateSchedule : undefined}
+          isGenerating={isGenerating}
           auditResult={auditResult}
           isAuditing={isAuditing}
           onRefreshAudit={runAudit}

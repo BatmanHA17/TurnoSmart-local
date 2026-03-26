@@ -1,17 +1,18 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Save, 
-  Settings, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Save,
+  Settings,
   Trash2,
   History,
   Shield,
   Users,
   Calendar as CalendarIcon,
-  Eraser
+  Eraser,
+  Wand2
 } from "lucide-react";
 import { format, addDays, subDays, addWeeks, subWeeks, startOfWeek, addMonths, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
@@ -80,6 +81,10 @@ interface UnifiedCalendarHeaderProps {
   isAuditing?: boolean;
   onRefreshAudit?: () => void;
   
+  // Generate SMART schedule
+  onGenerate?: () => void;
+  isGenerating?: boolean;
+
   // Badges
   employeeCount?: number;
   dayCount?: number;
@@ -117,6 +122,8 @@ export function UnifiedCalendarHeader({
   auditResult,
   isAuditing = false,
   onRefreshAudit,
+  onGenerate,
+  isGenerating = false,
   employeeCount,
   dayCount,
 }: UnifiedCalendarHeaderProps) {
@@ -188,7 +195,20 @@ export function UnifiedCalendarHeader({
               <span className="hidden sm:inline">Guardar</span>
             </Button>
           )}
-          
+
+          {canEdit && onGenerate && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onGenerate}
+              disabled={isGenerating}
+              className="gap-1.5 h-8 text-violet-600 hover:text-violet-700 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950"
+            >
+              <Wand2 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{isGenerating ? "Generando…" : "Generar"}</span>
+            </Button>
+          )}
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground">
