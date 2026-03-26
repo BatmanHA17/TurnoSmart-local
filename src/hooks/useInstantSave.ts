@@ -27,6 +27,19 @@ interface UseInstantSaveOptions {
 }
 
 /**
+ * Asegura que el ID del turno sea un UUID válido para Supabase.
+ * Los IDs generados por el motor SMART ("smart-..."), arrastre ("shift-..."),
+ * o primer día ("first-day-...") se reemplazan por un UUID nuevo.
+ */
+const ensureUUID = (id: string): string => {
+  const NON_UUID_PREFIXES = ['smart-', 'shift-', 'first-day-'];
+  if (NON_UUID_PREFIXES.some(p => id.startsWith(p))) {
+    return crypto.randomUUID();
+  }
+  return id;
+};
+
+/**
  * Normaliza una fecha que puede venir como Date o string ISO.
  * Retorna siempre un Date válido o lanza error si es inválida.
  */
@@ -115,7 +128,7 @@ export function useInstantSave({ orgId, onOfflineQueue, isOnline = true }: UseIn
       if (!isOnline) {
         if (onOfflineQueue) {
           onOfflineQueue('upsert', {
-            id: shift.id,
+            id: ensureUUID(shift.id),
             employee_id: shift.employeeId,
             date: formattedDate,
             start_time: shift.startTime,
@@ -134,7 +147,7 @@ export function useInstantSave({ orgId, onOfflineQueue, isOnline = true }: UseIn
 
       // Usar upsert para crear o actualizar en una sola operación
       const shiftData = {
-        id: shift.id,
+        id: ensureUUID(shift.id),
         employee_id: shift.employeeId,
         date: formattedDate,
         start_time: shift.startTime || null,
@@ -171,7 +184,7 @@ export function useInstantSave({ orgId, onOfflineQueue, isOnline = true }: UseIn
       // Encolar para reintento si hay cola offline disponible
       if (onOfflineQueue) {
         onOfflineQueue('upsert', {
-          id: shift.id,
+          id: ensureUUID(shift.id),
           employee_id: shift.employeeId,
           date: formattedDate,
           start_time: shift.startTime,
@@ -257,7 +270,7 @@ export function useInstantSave({ orgId, onOfflineQueue, isOnline = true }: UseIn
         shifts.forEach(shift => {
           if (onOfflineQueue) {
             onOfflineQueue('upsert', {
-              id: shift.id,
+              id: ensureUUID(shift.id),
               employee_id: shift.employeeId,
               date: safeFormatDate(shift.date),
               start_time: shift.startTime,
@@ -276,7 +289,7 @@ export function useInstantSave({ orgId, onOfflineQueue, isOnline = true }: UseIn
 
       // Preparar datos para upsert batch - incluir TODOS los turnos (no solo los que tienen horario)
       const shiftDataArray = shifts.map(shift => ({
-        id: shift.id,
+        id: ensureUUID(shift.id),
         employee_id: shift.employeeId,
         date: safeFormatDate(shift.date),
         start_time: shift.startTime || null,

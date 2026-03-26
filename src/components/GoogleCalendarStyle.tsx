@@ -1270,8 +1270,8 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   const persistShiftToSupabase = async (shift: ShiftBlock) => {
     try {
       // Asegurar que tenemos un UUID válido para el ID
-      const shiftId = shift.id.startsWith('first-day-') || shift.id.startsWith('shift-') 
-        ? crypto.randomUUID() 
+      const shiftId = shift.id.startsWith('first-day-') || shift.id.startsWith('shift-') || shift.id.startsWith('smart-')
+        ? crypto.randomUUID()
         : shift.id;
       
       const { data, error } = await supabase

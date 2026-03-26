@@ -207,21 +207,40 @@ function anchorPhase(
 }
 
 // ---------------------------------------------------------------------------
-// FASE 2 — ASIGNAR DÍAS LIBRES (D-D consecutivos, rotación equitativa)
+// FASE 2 — ASIGNAR DÍAS LIBRES (D-D consecutivos, semanas reales Lun-Dom)
 // ---------------------------------------------------------------------------
 
 /**
- * Para cada empleado, por cada semana del mes, asigna sus días libres
- * de forma consecutiva y rotando equitativamente por el calendario.
- *
- * Patrón de rotación (para fairWeekendDistribution):
- *   Semana 0: libra L-M  (índices 0-1)
- *   Semana 1: libra Mi-J (índices 2-3)
- *   Semana 2: libra V-S  (índices 4-5)
- *   Semana 3: libra D-L  (índices 6,0)
- *
- * Cada empleado tiene un offset inicial distinto → distribución justa.
+ * Obtiene las semanas reales (Lun-Dom) que caen dentro del mes.
+ * Devuelve un array de { start: day, end: day } con días del mes (1-based).
  */
+function getCalendarWeeks(year: number, month: number, totalDays: number): Array<{ start: number; end: number }> {
+  const weeks: Array<{ start: number; end: number }> = [];
+  let day = 1;
+
+  while (day <= totalDays) {
+    const dow = dayOfWeek(year, month, day); // 0=Lun, 6=Dom
+    // Esta semana acaba en Domingo o fin del mes
+    const daysUntilSunday = 6 - dow;
+    const weekEnd = Math.min(day + daysUntilSunday, totalDays);
+    weeks.push({ start: day, end: weekEnd });
+    day = weekEnd + 1;
+  }
+
+  return weeks;
+}
+
+/**
+ * Patrones de descanso consecutivo por DOW (0=Lun ... 6=Dom).
+ * 4 patrones rotativos que dan equidad de fines de semana.
+ */
+const REST_PATTERNS: number[][] = [
+  [0, 1], // Lun-Mar
+  [2, 3], // Mié-Jue
+  [4, 5], // Vie-Sáb
+  [5, 6], // Sáb-Dom
+];
+
 function assignRestDays(
   employees: ScheduleEmployee[],
   schedules: Record<string, EmployeeSchedule>,
@@ -230,97 +249,95 @@ function assignRestDays(
   totalDays: number,
   constraints: OrganizationConstraints
 ): void {
-  const rotationPatterns = [
-    [0, 1], // L-M
-    [2, 3], // Mi-J
-    [4, 5], // V-S
-    [6, 0], // D-L (domingo + lunes siguiente semana — se simplifica a D + primer día semana siguiente)
-  ];
+  const weeks = getCalendarWeeks(year, month, totalDays);
 
   employees.forEach((emp, empIndex) => {
-    const freeDays = freeDaysPerWeek(emp.weeklyHours);
-    // Iteramos semana a semana dentro del mes
-    let day = 1;
-    let weekNum = 0;
+    const freeDaysNeeded = freeDaysPerWeek(emp.weeklyHours);
 
-    while (day <= totalDays) {
-      const weekStart = day;
-      const weekEnd = Math.min(day + 6, totalDays);
+    weeks.forEach((week, weekIdx) => {
+      const weekLength = week.end - week.start + 1;
 
-      // Días de esta semana que no están ya asignados (vacaciones, bajas)
-      const freeDaysThisWeek: number[] = [];
-      for (let d = weekStart; d <= weekEnd; d++) {
-        if (!schedules[emp.id][d]) {
-          freeDaysThisWeek.push(d);
-        }
+      // Recoger días disponibles (no vacaciones/bajas)
+      const available: number[] = [];
+      for (let d = week.start; d <= week.end; d++) {
+        if (!schedules[emp.id][d]) available.push(d);
       }
 
-      // Elegir qué días de esta semana serán libres
-      // Rotación: empIndex desplaza el patrón inicial
-      const patternIndex = constraints.fairWeekendDistribution
-        ? (weekNum + empIndex) % rotationPatterns.length
-        : weekNum % rotationPatterns.length;
+      // Para semanas parciales (inicio/fin de mes < 7 días), ajustar
+      if (weekLength < 4 || available.length < freeDaysNeeded) {
+        // Semana parcial: poner máximo 1 descanso si hay espacio
+        if (available.length > 1) {
+          schedules[emp.id][available[available.length - 1]] = { code: "D" };
+        }
+        return;
+      }
 
-      const preferredDowPair = rotationPatterns[patternIndex]; // [dow1, dow2]
+      // Elegir patrón de descanso con rotación equitativa
+      const patternIdx = constraints.fairWeekendDistribution
+        ? (weekIdx + empIndex) % REST_PATTERNS.length
+        : weekIdx % REST_PATTERNS.length;
 
-      // Buscar días del mes en esta semana que coincidan con esos DOW
-      const candidateDays: number[] = [];
-      for (let d = weekStart; d <= weekEnd; d++) {
-        if (schedules[emp.id][d]) continue; // ya asignado
+      const preferredDows = REST_PATTERNS[patternIdx];
+
+      // Buscar días de esta semana cuyo DOW coincida con el patrón
+      const candidates: number[] = [];
+      for (let d = week.start; d <= week.end; d++) {
+        if (schedules[emp.id][d]) continue;
         const dow = dayOfWeek(year, month, d);
-        if (preferredDowPair.includes(dow)) {
-          candidateDays.push(d);
+        if (preferredDows.includes(dow)) {
+          candidates.push(d);
         }
       }
 
-      // Si no hay suficientes candidatos con ese patrón, tomamos los últimos días libres de la semana
-      let daysToFree =
-        candidateDays.length >= freeDays
-          ? candidateDays.slice(0, freeDays)
-          : freeDaysThisWeek.slice(-freeDays);
-
-      // Garantizar consecutividad: si tenemos candidatos no consecutivos, corregir
-      if (daysToFree.length === 2 && daysToFree[1] - daysToFree[0] !== 1) {
-        // Buscar par consecutivo en los días libres de la semana
-        let found = false;
-        for (let i = 0; i < freeDaysThisWeek.length - 1; i++) {
-          if (freeDaysThisWeek[i + 1] - freeDaysThisWeek[i] === 1) {
-            daysToFree = [freeDaysThisWeek[i], freeDaysThisWeek[i + 1]];
-            found = true;
+      // Si encontramos el par exacto, usarlo
+      let chosen: number[];
+      if (candidates.length >= freeDaysNeeded) {
+        chosen = candidates.slice(0, freeDaysNeeded);
+      } else {
+        // Fallback: buscar cualquier par consecutivo en los disponibles
+        chosen = [];
+        for (let i = 0; i < available.length - 1; i++) {
+          if (available[i + 1] - available[i] === 1) {
+            chosen = available.slice(i, i + freeDaysNeeded);
             break;
           }
         }
-        if (!found) {
-          // Tomar los últimos disponibles aunque no sean consecutivos (se marcará como warning)
-          daysToFree = freeDaysThisWeek.slice(-freeDays);
+        if (chosen.length < freeDaysNeeded) {
+          // Último recurso: últimos días disponibles de la semana
+          chosen = available.slice(-freeDaysNeeded);
         }
       }
 
-      for (const d of daysToFree) {
-        schedules[emp.id][d] = { code: "D" };
+      // Verificar y forzar consecutividad
+      if (chosen.length === 2 && chosen[1] - chosen[0] !== 1) {
+        // Buscar par consecutivo
+        for (let i = 0; i < available.length - 1; i++) {
+          if (available[i + 1] - available[i] === 1) {
+            chosen = [available[i], available[i + 1]];
+            break;
+          }
+        }
       }
 
-      day = weekEnd + 1;
-      weekNum++;
-    }
+      for (const d of chosen) {
+        schedules[emp.id][d] = { code: "D" };
+      }
+    });
   });
 }
 
 // ---------------------------------------------------------------------------
-// FASE 3 — ASIGNAR TURNOS (M/T/N)
+// FASE 3 — ASIGNAR TURNOS (bloques semanales, no rotación diaria)
 // ---------------------------------------------------------------------------
 
 /**
- * Secuencia de rotación ergonómica: M→T→N→M (hacia adelante).
- * Nunca asignamos T si el anterior fue N (ya cubierto por FASE 4 audit).
+ * En hostelería real, cada empleado trabaja el MISMO turno toda la semana.
+ * La rotación es semanal: Semana 1=M, Semana 2=T, Semana 3=N, Semana 4=M...
+ *
+ * Esto evita violaciones de descanso entre jornadas (T→M = solo 8h)
+ * y es más ergonómico para los trabajadores.
  */
 const ROTATION_SEQUENCE: ShiftCode[] = ["M", "T", "N"];
-
-function nextRotationShift(lastCode: ShiftCode | undefined): ShiftCode {
-  if (!lastCode || !ROTATION_SEQUENCE.includes(lastCode)) return "M";
-  const idx = ROTATION_SEQUENCE.indexOf(lastCode as ShiftCode);
-  return ROTATION_SEQUENCE[(idx + 1) % ROTATION_SEQUENCE.length];
-}
 
 function assignShifts(
   employees: ScheduleEmployee[],
@@ -330,40 +347,35 @@ function assignShifts(
   totalDays: number,
   constraints: OrganizationConstraints
 ): void {
-  for (const emp of employees) {
-    let lastWorkCode: ShiftCode | undefined;
+  const weeks = getCalendarWeeks(year, month, totalDays);
 
-    // Para preference=morning/afternoon/night_fixed asignamos siempre el mismo turno
+  for (const [empIdx, emp] of employees.entries()) {
+    // Turno fijo: siempre el mismo, todas las semanas
     const fixedCode: ShiftCode | null =
       emp.preference === "morning" ? "M"
       : emp.preference === "afternoon" ? "T"
       : emp.preference === "night_fixed" ? "N"
       : null;
 
-    for (let day = 1; day <= totalDays; day++) {
-      if (schedules[emp.id][day]) {
-        // Ya asignado (vacación, descanso, baja)
-        const existing = schedules[emp.id][day].code;
-        if (existing !== "D" && ROTATION_SEQUENCE.includes(existing as ShiftCode)) {
-          lastWorkCode = existing as ShiftCode;
-        }
-        continue;
-      }
+    // Offset inicial por empleado para que no todos empiecen en M
+    // Con 16 empleados: ~5 empiezan en M, ~5 en T, ~5 en N
+    const startRotation = empIdx % ROTATION_SEQUENCE.length;
 
-      // Determinar el turno a asignar
-      let code: ShiftCode;
-      if (fixedCode) {
-        code = fixedCode;
-      } else if (constraints.ergonomicRotation && lastWorkCode) {
-        code = nextRotationShift(lastWorkCode);
-      } else {
-        code = "M"; // default
-      }
+    weeks.forEach((week, weekIdx) => {
+      // Turno de esta semana
+      const weekShift: ShiftCode = fixedCode
+        ? fixedCode
+        : constraints.ergonomicRotation
+          ? ROTATION_SEQUENCE[(startRotation + weekIdx) % ROTATION_SEQUENCE.length]
+          : "M";
 
-      const times = SHIFT_TIMES[code] ?? {};
-      schedules[emp.id][day] = { code, ...times };
-      lastWorkCode = code;
-    }
+      const times = SHIFT_TIMES[weekShift] ?? {};
+
+      for (let day = week.start; day <= week.end; day++) {
+        if (schedules[emp.id][day]) continue; // Ya asignado (D, V, E)
+        schedules[emp.id][day] = { code: weekShift, ...times };
+      }
+    });
   }
 }
 
