@@ -307,6 +307,32 @@ serve(async (req) => {
 
     console.log("Onboarding completed successfully");
 
+    // Notificar al admin — fire & forget, no bloquea la respuesta
+    try {
+      const notifyUrl = `${supabaseUrl}/functions/v1/notify-admin-signup`;
+      await fetch(notifyUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${supabaseServiceKey}`,
+        },
+        body: JSON.stringify({
+          email: user.email,
+          user_id: user.id,
+          action: "signup",
+          metadata: {
+            org_name: organization.name,
+            industry: organization.industry,
+            country: organization.country,
+            departments: departments.length,
+            jobs: jobs.length,
+          },
+        }),
+      });
+    } catch (notifyError) {
+      console.error("Error notifying admin (non-critical):", notifyError);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useColaboradorOrganizations } from './useColaboradorOrganizations';
 import { toast } from './use-toast';
@@ -25,20 +25,22 @@ export const useRotasMultiOrg = (colaboradorId: string | null) => {
   const [colaboradorRotas, setColaboradorRotas] = useState<ColaboradorRotaAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const { accesses } = useColaboradorOrganizations(colaboradorId);
+  const mountedRef = useRef(true);
 
   const fetchRotasFromOrgs = async () => {
     if (!colaboradorId || accesses.length === 0) {
-      setRotas([]);
-      setLoading(false);
+      if (mountedRef.current) {
+        setRotas([]);
+        setLoading(false);
+      }
       return;
     }
 
     try {
-      setLoading(true);
-      
-      // Obtener todas las rotas de todas las organizaciones del colaborador
+      if (mountedRef.current) setLoading(true);
+
       const orgIds = accesses.map(a => a.org_id);
-      
+
       const { data: allRotas, error: rotasError } = await supabase
         .from('teams')
         .select(`
@@ -54,7 +56,6 @@ export const useRotasMultiOrg = (colaboradorId: string | null) => {
 
       if (rotasError) throw rotasError;
 
-      // Contar miembros para cada rota
       const rotasWithCounts = await Promise.all(
         (allRotas || []).map(async (rota) => {
           const { count } = await supabase
@@ -68,24 +69,24 @@ export const useRotasMultiOrg = (colaboradorId: string | null) => {
             name: rota.name,
             member_count: count || 0,
             org_id: rota.org_id,
-            org_name: (rota.organizations as any)?.name || 'Sin nombre',
+            org_name: (rota.organizations as { name?: string })?.name || 'Sin nombre',
             is_active: rota.is_active,
           };
         })
       );
 
-      setRotas(rotasWithCounts);
+      if (mountedRef.current) setRotas(rotasWithCounts);
     } catch (error) {
       if (import.meta.env.DEV) console.error('[useRotasMultiOrg] fetchRotasFromOrgs:', error);
-      setRotas([]);
+      if (mountedRef.current) setRotas([]);
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   };
 
   const fetchColaboradorRotas = async () => {
     if (!colaboradorId) {
-      setColaboradorRotas([]);
+      if (mountedRef.current) setColaboradorRotas([]);
       return;
     }
 
@@ -109,8 +110,8 @@ export const useRotasMultiOrg = (colaboradorId: string | null) => {
 
       const rotasWithCounts = await Promise.all(
         (data || []).map(async (tm) => {
-          const team = tm.teams as any;
-          
+          const team = tm.teams as { id: string; name: string; org_id: string; is_active: boolean; organizations?: { name?: string } };
+
           const { count } = await supabase
             .from('team_members')
             .select('*', { count: 'exact', head: true })
@@ -127,10 +128,10 @@ export const useRotasMultiOrg = (colaboradorId: string | null) => {
         })
       );
 
-      setColaboradorRotas(rotasWithCounts);
+      if (mountedRef.current) setColaboradorRotas(rotasWithCounts);
     } catch (error) {
       if (import.meta.env.DEV) console.error('[useRotasMultiOrg] fetchColaboradorRotas:', error);
-      setColaboradorRotas([]);
+      if (mountedRef.current) setColaboradorRotas([]);
     }
   };
 
@@ -146,10 +147,7 @@ export const useRotasMultiOrg = (colaboradorId: string | null) => {
       if (error) throw error;
 
       if (data) {
-        toast({
-          title: "Éxito",
-          description: "Colaborador asignado a la rota correctamente",
-        });
+        toast({ title: "Éxito", description: "Colaborador asignado a la rota correctamente" });
         await fetchColaboradorRotas();
         await fetchRotasFromOrgs();
         return true;
@@ -157,11 +155,7 @@ export const useRotasMultiOrg = (colaboradorId: string | null) => {
       return false;
     } catch (error) {
       if (import.meta.env.DEV) console.error('[useRotasMultiOrg] assignToRota:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo asignar el colaborador a la rota",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "No se pudo asignar el colaborador a la rota", variant: "destructive" });
       return false;
     }
   };
@@ -178,10 +172,7 @@ export const useRotasMultiOrg = (colaboradorId: string | null) => {
       if (error) throw error;
 
       if (data) {
-        toast({
-          title: "Éxito",
-          description: "Colaborador removido de la rota correctamente",
-        });
+        toast({ title: "Éxito", description: "Colaborador removido de la rota correctamente" });
         await fetchColaboradorRotas();
         await fetchRotasFromOrgs();
         return true;
@@ -189,22 +180,16 @@ export const useRotasMultiOrg = (colaboradorId: string | null) => {
       return false;
     } catch (error) {
       if (import.meta.env.DEV) console.error('[useRotasMultiOrg] removeFromRota:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo remover el colaborador de la rota",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "No se pudo remover el colaborador de la rota", variant: "destructive" });
       return false;
     }
   };
 
   useEffect(() => {
-    let active = true;
-    if (active) {
-      fetchRotasFromOrgs();
-      fetchColaboradorRotas();
-    }
-    return () => { active = false; };
+    mountedRef.current = true;
+    fetchRotasFromOrgs();
+    fetchColaboradorRotas();
+    return () => { mountedRef.current = false; };
   }, [colaboradorId, accesses.length]);
 
   return {
