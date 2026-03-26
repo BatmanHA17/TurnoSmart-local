@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,740 +10,68 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { createOrUpdateColaborador, mapLegacyFormData } from "@/services/colaboradorService";
-import { useNavigate } from "react-router-dom";
-import { useOrganizations } from "@/hooks/useOrganizations";
-import { useActivityLog } from "@/hooks/useActivityLog";
-import { useJobDepartments } from "@/hooks/useJobDepartments";
-import { useTeamAssignments } from "@/hooks/useTeamAssignments";
 import { Badge } from "@/components/ui/badge";
 import { X, Plus } from "lucide-react";
-
-// Función para generar ID único - movida fuera del componente
-const generateEmployeeId = () => {
-  const timestamp = Date.now().toString().slice(-6);
-  const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `EMP${timestamp}${randomNum}`;
-};
+import {
+  useAddColaboradorForm,
+  TIPOS_CONTRATO,
+  COUNTRY_PHONE_CODES,
+} from "@/hooks/useAddColaboradorForm";
 
 interface AddColaboradorSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onColaboradorAdded?: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   colaboradorData?: any;
   isEditMode?: boolean;
   onColaboradorUpdated?: () => void;
-  showOnlyPersonalInfo?: boolean; // Nueva prop para mostrar solo "Información Personal"
+  showOnlyPersonalInfo?: boolean;
 }
 
-export const AddColaboradorSheet = ({ 
-  open, 
-  onOpenChange, 
-  onColaboradorAdded, 
-  colaboradorData, 
-  isEditMode = false, 
+export const AddColaboradorSheet = ({
+  open,
+  onOpenChange,
+  onColaboradorAdded,
+  colaboradorData,
+  isEditMode = false,
   onColaboradorUpdated,
-  showOnlyPersonalInfo = false
+  showOnlyPersonalInfo = false,
 }: AddColaboradorSheetProps) => {
-  const navigate = useNavigate();
-  const { logActivity } = useActivityLog();
-  const { organizations, currentOrganizationName } = useOrganizations();
-  const { departments } = useJobDepartments();
-  const { assignments, loading: loadingAssignments, refetch: refetchAssignments } = useTeamAssignments(colaboradorData?.id);
-  const [jobs, setJobs] = useState<any[]>([]);
-  const [managers, setManagers] = useState<any[]>([]);
-  const [selectedDepartment, setSelectedDepartment] = useState<string>('');
-  const [selectedDepartments, setSelectedDepartments] = useState<{id: string, name: string}[]>([]);
-  const [tempJobWarningAccepted, setTempJobWarningAccepted] = useState(false);
-  const [activeTab, setActiveTab] = useState("datos-personales");
-  const [formData, setFormData] = useState({
-    nombre: "",
-    apellidos: "",
-    apellidosUso: "",
-    empleadoId: "", // Se inicializa vacío y se genera en useEffect
-    fechaNacimiento: "",
-    email: "",
-    telefonoMovil: "",
-    paisMovil: "ES",
-    telefonoFijo: "",
-    paisFijo: "ES",
-    fechaInicioContrato: "",
-    horaInicioContrato: "09:00", // Valor por defecto
-    tipoContrato: "Contrato indefinido",
-    fechaFinContrato: "",
-    tiempoTrabajoSemanal: "",
-    jobId: "", // Nuevo campo para el puesto de trabajo
-    // establecimientoPorDefecto: "", // ELIMINADO en Fase 5C - usar org_id
-    responsableDirecto: "",
-    esExtranjero: false,
-    // Campos adicionales para la sección Contacto
-    direccion: "",
-    complementoDireccion: "",
-    codigoPostal: "",
-    ciudad: "",
-    pais: "España",
-    // Información bancaria
-    nombreTitularCuenta: "",
-    iban: "",
-    bic: "",
-    numeroIdentificacionInterna: "",
-    // Información de salud
-    numeroSeguridadSocial: "",
-    personaConDiscapacidad: false,
-    ultimaRevisionMedica: "",
-    reconocimientoMedicoReforzado: false,
-    exentoSeguroMedico: false,
-    nombreContactoEmergencia: "",
-    apellidoContactoEmergencia: "",
-    relacionContactoEmergencia: "",
-    telefonoMovilEmergencia: "",
-    telefonoFijoEmergencia: "",
-    codigoPaisMovilEmergencia: "+34",
-    codigoPaisFijoEmergencia: "+34",
-    // Campos adicionales del formulario de edición
-    genero: "",
-    apellidosNacimiento: "",
-    nacionalidad: "",
-    provincia: "",
-    ciudadNacimiento: "",
-    estadoCivil: "",
-    numeroPersonasDependientes: "",
-    fechaAntiguedad: "",
-    trabajadorExtranjeroPermiso: false
+  const {
+    formData,
+    setFormData,
+    jobs,
+    managers,
+    selectedDepartment,
+    setSelectedDepartment,
+    selectedDepartments,
+    setSelectedDepartments,
+    activeTab,
+    setActiveTab,
+    handlePaisMovilChange,
+    handlePaisFijoChange,
+    handleCodigoPaisMovilEmergenciaChange,
+    handleCodigoPaisFijoEmergenciaChange,
+    handleSubmit,
+    handleOpenChange,
+    handleDepartmentSelectCreate,
+    handleDepartmentSelectEdit,
+    organizations,
+    departments,
+    currentOrganizationName,
+  } = useAddColaboradorForm({
+    open,
+    isEditMode,
+    colaboradorData,
+    onOpenChange,
+    onColaboradorAdded,
+    onColaboradorUpdated,
   });
 
-  // Mapeo de códigos de país a códigos telefónicos
-  const countryToPhoneCode = {
-    'ES': '+34',
-    'FR': '+33', 
-    'DE': '+49',
-    'IT': '+39',
-    'GB': '+44'
-  };
-
-  // Función para actualizar código de teléfono móvil cuando cambia el país
-  const handlePaisMovilChange = (value: string) => {
-    setFormData(prev => ({ 
-      ...prev, 
-      paisMovil: value,
-      telefonoMovil: prev.telefonoMovil.replace(/^\+\d+\s?/, '') // Remover código anterior si existe
-    }));
-  };
-
-  // Función para actualizar código de teléfono fijo cuando cambia el país
-  const handlePaisFijoChange = (value: string) => {
-    setFormData(prev => ({ 
-      ...prev, 
-      paisFijo: value,
-      telefonoFijo: prev.telefonoFijo.replace(/^\+\d+\s?/, '') // Remover código anterior si existe
-    }));
-  };
-
-  // Función para actualizar código de teléfono móvil de emergencia
-  const handleCodigoPaisMovilEmergenciaChange = (value: string) => {
-    setFormData(prev => ({ 
-      ...prev, 
-      codigoPaisMovilEmergencia: value,
-      telefonoMovilEmergencia: prev.telefonoMovilEmergencia.replace(/^\+\d+\s?/, '') // Remover código anterior si existe
-    }));
-  };
-
-  // Función para actualizar código de teléfono fijo de emergencia
-  const handleCodigoPaisFijoEmergenciaChange = (value: string) => {
-    setFormData(prev => ({ 
-      ...prev, 
-      codigoPaisFijoEmergencia: value,
-      telefonoFijoEmergencia: prev.telefonoFijoEmergencia.replace(/^\+\d+\s?/, '') // Remover código anterior si existe
-    }));
-  };
-
-  // useEffect para establecimiento eliminado en Fase 5C - usar org_id en su lugar
-
-  // Cargar jobs disponibles - filtrados por departamentos seleccionados
-  useEffect(() => {
-    const loadJobs = async () => {
-      try {
-        let query = supabase
-          .from('jobs')
-          .select('*');
-        
-        // Si hay departamentos seleccionados, filtrar jobs por esos departamentos
-        if (selectedDepartments.length > 0) {
-          const departmentIds = selectedDepartments.map(dept => dept.id);
-          query = query.in('department_id', departmentIds);
-        }
-        
-        const { data, error } = await query.order('title');
-        
-        if (!error && data) {
-          setJobs(data);
-        }
-      } catch (error) {
-        console.error('Error loading jobs:', error);
-      }
-    };
-    
-    if (open) {
-      loadJobs();
-    }
-   }, [open, selectedDepartments]);
-
-  // Cargar managers y roles superiores para el dropdown de Responsable Directo
-  useEffect(() => {
-    const loadManagers = async () => {
-      try {
-        const { data: currentOrgData } = await supabase
-          .from('organizations')
-          .select('id')
-          .limit(1)
-          .maybeSingle();
-        
-        if (!currentOrgData?.id) return;
-
-        const { data, error } = await supabase
-          .from('colaborador_roles')
-          .select(`
-            colaborador_id,
-            role,
-            colaboradores!inner (
-              id,
-              nombre,
-              apellidos
-            )
-          `)
-          .eq('org_id', currentOrgData.id)
-          .eq('activo', true)
-          .in('role', ['manager', 'director', 'administrador', 'propietario'])
-          .order('colaboradores(apellidos)');
-
-        if (!error && data) {
-          const uniqueManagers = Array.from(
-            new Map(
-              data.map(item => [
-                item.colaborador_id,
-                {
-                  id: item.colaborador_id,
-                  nombre: item.colaboradores.nombre,
-                  apellidos: item.colaboradores.apellidos,
-                  role: item.role
-                }
-              ])
-            ).values()
-          );
-          setManagers(uniqueManagers);
-        }
-      } catch (error) {
-        console.error('Error loading managers:', error);
-      }
-    };
-
-    if (open) {
-      loadManagers();
-    }
-  }, [open]);
-
-  // Este useEffect ya no es necesario porque usamos useJobDepartments
-
-  // Generar ID automáticamente si no estamos en modo edición
-  useEffect(() => {
-    if (!isEditMode && !formData.empleadoId) {
-      setFormData(prev => ({ ...prev, empleadoId: generateEmployeeId() }));
-    }
-  }, [isEditMode]);
-
-  // Auto-complete apellidosUso with nombre + apellidos
-  useEffect(() => {
-    if (!isEditMode && formData.nombre && formData.apellidos && !formData.apellidosUso) {
-      setFormData(prev => ({ 
-        ...prev, 
-        apellidosUso: `${formData.nombre} ${formData.apellidos}` 
-      }));
-    }
-  }, [formData.nombre, formData.apellidos, isEditMode]);
-
-  // Populate form data when in edit mode
-  useEffect(() => {
-    if (isEditMode && colaboradorData) {
-      
-      // Get the job_id from colaboradorData (which should include jobs data)
-      const jobId = colaboradorData.job_id || colaboradorData.jobs?.id || "";
-      
-      setFormData({
-        nombre: colaboradorData.nombre || "",
-        apellidos: colaboradorData.apellidos || "",
-        apellidosUso: colaboradorData.apellidos_uso || "",
-        empleadoId: colaboradorData.empleado_id || generateEmployeeId(),
-        fechaNacimiento: colaboradorData.fecha_nacimiento || "",
-        email: colaboradorData.email || "",
-        telefonoMovil: colaboradorData.telefono_movil || "",
-        paisMovil: "ES",
-        telefonoFijo: colaboradorData.telefono_fijo || "",
-        paisFijo: "ES",
-        fechaInicioContrato: colaboradorData.fecha_inicio_contrato || "",
-        horaInicioContrato: colaboradorData.hora_inicio_contrato || "",
-        tipoContrato: colaboradorData.tipo_contrato || "",
-        fechaFinContrato: colaboradorData.fecha_fin_contrato || "",
-        tiempoTrabajoSemanal: colaboradorData.tiempo_trabajo_semanal?.toString() || "",
-        jobId: jobId, // Use the properly extracted job_id
-        responsableDirecto: colaboradorData.responsable_directo || "",
-        esExtranjero: colaboradorData.es_extranjero || false,
-        // Campos adicionales mapeados desde la BD
-        direccion: colaboradorData.direccion || "",
-        complementoDireccion: "",
-        codigoPostal: colaboradorData.codigo_postal || "",
-        ciudad: colaboradorData.ciudad || "",
-        pais: colaboradorData.pais_residencia || "España",
-        // Información bancaria
-        nombreTitularCuenta: colaboradorData.banking_titular || "",
-        iban: colaboradorData.banking_iban || "",
-        bic: colaboradorData.banking_bic || "",
-        numeroIdentificacionInterna: colaboradorData.banking_numero_identificacion || "",
-        // Información de salud
-        numeroSeguridadSocial: colaboradorData.numero_seguridad_social || "",
-        personaConDiscapacidad: colaboradorData.minusvalia || false,
-        ultimaRevisionMedica: colaboradorData.ultima_revision_medica || "",
-        reconocimientoMedicoReforzado: colaboradorData.reconocimiento_medico_reforzado || false,
-        exentoSeguroMedico: colaboradorData.exonerado_seguro_medico || false,
-         nombreContactoEmergencia: colaboradorData.emergency_contact_nombre || "",
-         apellidoContactoEmergencia: colaboradorData.emergency_contact_apellidos || "",
-         relacionContactoEmergencia: colaboradorData.emergency_contact_relacion || "",
-         telefonoMovilEmergencia: colaboradorData.emergency_contact_telefono_movil || "",
-         telefonoFijoEmergencia: colaboradorData.emergency_contact_telefono_fijo || "",
-        codigoPaisMovilEmergencia: "+34",
-        codigoPaisFijoEmergencia: "+34",
-        // Campos adicionales del formulario de edición
-        genero: colaboradorData.genero || "",
-        apellidosNacimiento: colaboradorData.apellidos_nacimiento || "",
-        nacionalidad: colaboradorData.nacionalidad || "",
-        provincia: colaboradorData.provincia || "",
-        ciudadNacimiento: colaboradorData.ciudad_nacimiento || "",
-        estadoCivil: colaboradorData.estado_civil || "",
-        numeroPersonasDependientes: colaboradorData.numero_personas_dependientes?.toString() || "",
-        fechaAntiguedad: colaboradorData.fecha_antiguedad || "",
-        trabajadorExtranjeroPermiso: colaboradorData.trabajador_extranjero_permiso || false
-      });
-      
-      // Set selected departments if colaborador has team assignments
-      
-      if (colaboradorData.jobs?.department) {
-        // Find the department ID that matches the job's department
-        const department = departments.find(dept => dept.value === colaboradorData.jobs?.department);
-        if (department) {
-          setSelectedDepartments([{ id: department.id, name: department.value }]);
-        }
-      } else if (colaboradorData.job_id) {
-        // If no department in jobs but there's a job_id, try to find the department via job_departments
-        // This will be handled by useEffect when jobs are loaded
-      }
-    }
-  }, [isEditMode, colaboradorData, departments]);
-
-  // Sincronizar selectedDepartments con los assignments del hook
-  useEffect(() => {
-    if (isEditMode && assignments && assignments.length > 0 && open) {
-      const deptList = assignments.map(a => ({
-        id: a.department_id,
-        name: a.department_name
-      }));
-      setSelectedDepartments(deptList);
-    }
-  }, [assignments, isEditMode, open]);
-
-  // useEffect para cargar departamentos asignados existentes desde colaborador_departments
-  // DEPRECADO - ahora usamos useTeamAssignments hook
-  /*
-  useEffect(() => {
-    const loadExistingDepartments = async () => {
-      if (isEditMode && colaboradorData?.id && open) {
-        
-        try {
-          const { data: assignedDepts, error } = await supabase
-            .from('colaborador_departments')
-            .select(`
-              department_id,
-              job_departments!inner(
-                id,
-                value
-              )
-            `)
-            .eq('colaborador_id', colaboradorData.id)
-            .eq('is_active', true);
-
-          if (error) {
-            console.error('❌ Error cargando departamentos asignados:', error);
-            return;
-          }
-
-          if (assignedDepts && assignedDepts.length > 0) {
-            const deptList = assignedDepts.map(assigned => ({
-              id: assigned.department_id,
-              name: (assigned.job_departments as any).value
-            }));
-            
-            setSelectedDepartments(deptList);
-          } else {
-            // Solo limpiar si no hay departamentos asignados
-            setSelectedDepartments([]);
-          }
-        } catch (error) {
-          console.error('❌ Error inesperado cargando departamentos:', error);
-        }
-      }
-    };
-
-    loadExistingDepartments();
-  }, [isEditMode, colaboradorData?.id, open]);
-  */
-
-  // useEffect adicional para manejar la inicialización del departamento cuando se cargan los trabajos
-  useEffect(() => {
-    if (isEditMode && colaboradorData?.job_id && jobs.length > 0 && selectedDepartments.length === 0 && open) {
-      
-      // Buscar el trabajo específico y obtener su department_id
-      const currentJob = jobs.find(job => job.id === colaboradorData.job_id);
-      if (currentJob?.department_id) {
-        const department = departments.find(dept => dept.id === currentJob.department_id);
-        if (department) {
-          setSelectedDepartments([{ id: department.id, name: department.value }]);
-        }
-      }
-    }
-  }, [isEditMode, colaboradorData?.job_id, jobs, selectedDepartments.length, departments, open]);
-
-  const tiposContrato = [
-    "Sin especificar",
-    "Contrato indefinido",
-    "Contrato temporal", 
-    "Práctica profesional",
-    "Contrato de formación",
-    "Contrato fijo discontinuo",
-    "Extra (colaborador externo)",
-    "Empleado trabajo temporal (ETT)"
-  ];
-
-  const generateEmployeeId = () => {
-    const timestamp = Date.now().toString().slice(-6);
-    const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    return `EMP${timestamp}${randomNum}`;
-  };
-
-  const handleSubmit = async () => {
-    // Validaciones básicas obligatorias
-    const requiredFields = [];
-    
-    if (!formData.nombre) requiredFields.push("nombre");
-    if (!formData.apellidos) requiredFields.push("apellidos");
-    if (!formData.apellidosUso) requiredFields.push("nombre a mostrar");
-    if (!formData.email) requiredFields.push("correo electrónico");
-    if (!formData.fechaInicioContrato) requiredFields.push("fecha de inicio de contrato");
-    if (!formData.horaInicioContrato) requiredFields.push("hora de inicio de contrato");
-    if (!formData.tipoContrato || formData.tipoContrato === "Sin especificar") requiredFields.push("tipo de contrato");
-    if (!formData.tiempoTrabajoSemanal) requiredFields.push("tiempo de trabajo semanal");
-    // Solo requerir equipo si no se ha seleccionado ninguno
-    if (selectedDepartments.length === 0) requiredFields.push("al menos un equipo");
-    
-    // Si el contrato NO es indefinido, fecha de fin es obligatoria
-    if (formData.tipoContrato && formData.tipoContrato !== "Contrato indefinido" && !formData.fechaFinContrato) {
-      requiredFields.push("fecha de fin del contrato");
-    }
-
-    if (requiredFields.length > 0) {
-      toast({
-        title: "Campos obligatorios faltantes",
-        description: `Por favor completa: ${requiredFields.join(", ")}.`,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Puesto de trabajo es opcional, no mostrar warning
-    
-    // Si llegamos aquí, podemos proceder con el submit
-    await doSubmitWithoutWarning();
-  };
-
-  const doSubmitWithoutWarning = async () => {
-    // Validar tiempo de trabajo semanal
-    const horasSemanales = parseInt(formData.tiempoTrabajoSemanal);
-    if (isNaN(horasSemanales) || horasSemanales < 1 || horasSemanales > 40) {
-      toast({
-        title: "Error en tiempo de trabajo",
-        description: "El tiempo de trabajo semanal debe ser entre 1 y 40 horas.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      const finalEmpleadoId = formData.empleadoId || generateEmployeeId();
-
-      // Map form data to normalized structure
-      const { baseData, healthData, emergencyContactData, bankingData } = mapLegacyFormData({
-        ...formData,
-        empleadoId: finalEmpleadoId
-      });
-
-      // Set the org_id - preservar el original en modo edición
-      if (isEditMode && colaboradorData?.org_id) {
-        // En modo edición, SIEMPRE preservar el org_id original del colaborador
-        baseData.org_id = colaboradorData.org_id;
-      } else if (organizations && organizations.length > 0) {
-        // Solo para nuevos colaboradores, usar la primera organización disponible
-        baseData.org_id = organizations[0].id;
-      } else {
-        toast({
-          title: "Error",
-          description: "No se pudo determinar la organización",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Add selected departments to baseData
-      baseData.selectedDepartments = selectedDepartments.map(dept => dept.id);
-
-      if (isEditMode && colaboradorData?.id) {
-        // DETECTAR CAMBIO DE EMAIL
-        const emailHasChanged = colaboradorData.email && 
-                               formData.email && 
-                               colaboradorData.email.toLowerCase() !== formData.email.toLowerCase();
-        
-        if (emailHasChanged) {
-        }
-        
-        // Si se está usando selección por departamento, limpiar job_id del baseData para evitar conflictos
-        if (selectedDepartment) {
-          delete baseData.job_id;
-        }
-        
-        // Update existing colaborador using normalized service
-        await createOrUpdateColaborador(
-          baseData,
-          healthData,
-          emergencyContactData,
-          bankingData,
-          colaboradorData.id
-        );
-
-        // Department assignments are now handled in the service
-
-        toast({
-          title: "Colaborador actualizado",
-          description: `${formData.nombre} ${formData.apellidos} ha sido actualizado exitosamente.`,
-        });
-
-        // Log the activity
-        await logActivity({
-          action: `ha modificado la información de ${formData.nombre} ${formData.apellidos}`,
-          entityType: 'colaborador',
-          entityId: colaboradorData.id,
-          entityName: `${formData.nombre} ${formData.apellidos}`,
-          establishment: currentOrganizationName || 'GOTHAM'
-        });
-
-        // Si el email cambió, registrar un log específico para reactivar el botón Invitar
-        if (emailHasChanged) {
-          await logActivity({
-            action: 'email_changed',
-            entityType: 'colaborador',
-            entityId: colaboradorData.id,
-            entityName: `${formData.nombre} ${formData.apellidos}`,
-            establishment: currentOrganizationName || 'GOTHAM',
-            details: {
-              old_email: colaboradorData.email,
-              new_email: formData.email
-            }
-          });
-          
-          toast({
-            title: "Email actualizado",
-            description: "El email ha sido modificado. Puedes enviar una nueva invitación desde el perfil del colaborador.",
-          });
-        }
-
-      } else {
-        // Create new colaborador using normalized service
-        baseData.status = 'activo';
-        
-        const insertedColaborador = await createOrUpdateColaborador(
-          baseData,
-          healthData,
-          emergencyContactData,
-          bankingData
-        );
-
-        toast({
-          title: "Colaborador creado",
-          description: `${formData.nombre} ${formData.apellidos} ha sido creado exitosamente con ID: ${finalEmpleadoId}`,
-        });
-
-        // Log the activity
-        await logActivity({
-          action: `ha añadido un nuevo colaborador: ${formData.nombre} ${formData.apellidos}`,
-          entityType: 'colaborador',
-          entityId: insertedColaborador.id,
-          entityName: `${formData.nombre} ${formData.apellidos}`,
-          establishment: currentOrganizationName || 'GOTHAM'
-        });
-
-        // Department assignments are handled in the service now
-
-        // Assign specific job if selected
-        if (formData.jobId) {
-          const { error: jobError } = await supabase
-            .from('colaboradores')
-            .update({ job_id: formData.jobId })
-            .eq('id', insertedColaborador.id);
-
-          if (jobError) {
-            console.error('Error assigning job:', jobError);
-          }
-        }
-
-        // 3. Auto-add to calendar based on start date
-        if (baseData.fecha_inicio_contrato && insertedColaborador.id) {
-          const startDate = new Date(baseData.fecha_inicio_contrato);
-          const today = new Date();
-          
-          // Solo añadir si la fecha de inicio es dentro de los próximos 30 días
-          const daysDiff = Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-          
-          if (daysDiff >= -7 && daysDiff <= 30) { // Últimos 7 días o próximos 30 días
-            try {
-              const existingEmployees = JSON.parse(localStorage.getItem('calendar-employees') || '[]');
-              const isAlreadyInCalendar = existingEmployees.some(emp => emp.id === insertedColaborador.id);
-              
-              if (!isAlreadyInCalendar) {
-                const calendarEmployee = {
-                  id: insertedColaborador.id,
-                  name: `${baseData.nombre} ${baseData.apellidos}`,
-                  nombre: baseData.nombre,
-                  apellidos: baseData.apellidos,
-                  start_date: baseData.fecha_inicio_contrato
-                };
-                
-                existingEmployees.push(calendarEmployee);
-                localStorage.setItem('calendar-employees', JSON.stringify(existingEmployees));
-                
-                toast({
-                  title: "Añadido al calendario",
-                  description: `${baseData.nombre} ${baseData.apellidos} ha sido añadido automáticamente al calendario de turnos.`,
-                });
-              }
-            } catch (error) {
-              console.error('Error adding to calendar:', error);
-            }
-          }
-        }
-      }
-
-      // Reset the warning state
-      setTempJobWarningAccepted(false);
-
-      // Llamar callback para refrescar los datos ANTES de cerrar el diálogo
-      if (isEditMode && onColaboradorUpdated) {
-            // El componente padre (ColaboradorDetail) se encarga de refrescar todas las asignaciones
-            await onColaboradorUpdated();
-      } else if (!isEditMode && onColaboradorAdded) {
-        await onColaboradorAdded();
-      }
-
-      // Close sheet DESPUÉS de actualizar los datos
-      onOpenChange(false);
-    } catch (error) {
-      console.error('Unexpected error:', error);
-      
-      // Manejo específico de errores de base de datos
-      let errorMessage = "Error inesperado al guardar el colaborador";
-      
-      if (error && typeof error === 'object' && 'code' in error) {
-        switch (error.code) {
-          case '23505':
-            if (error.message?.includes('colaboradores_empleado_id_key')) {
-              errorMessage = `El ID de empleado "${formData.empleadoId}" ya está registrado. Por favor, usa un ID diferente.`;
-            } else if (error.message?.includes('colaboradores_org_email_uniq')) {
-              errorMessage = `El email "${formData.email}" ya está registrado en esta organización. Por favor, usa un email diferente.`;
-            } else {
-              errorMessage = "Ya existe un colaborador con estos datos. Verifica que el ID de empleado y email sean únicos.";
-            }
-            break;
-          default:
-            errorMessage = `Error de base de datos: ${error.message || 'Error desconocido'}`;
-        }
-      }
-      
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Función para resetear el formulario cuando se cierre
-  const handleOpenChange = (isOpen: boolean) => {
-    if (!isOpen && !isEditMode) {
-      // Solo resetear cuando se cierra y NO estamos en modo edición
-      setSelectedDepartments([]);
-      setTempJobWarningAccepted(false);
-      setFormData({
-        nombre: "",
-        apellidos: "",
-        apellidosUso: "",
-        empleadoId: "",
-        fechaNacimiento: "",
-        email: "",
-        telefonoMovil: "",
-        paisMovil: "ES",
-        telefonoFijo: "",
-        paisFijo: "ES",
-        fechaInicioContrato: "",
-        horaInicioContrato: "09:00",
-        tipoContrato: "Contrato indefinido",
-        fechaFinContrato: "",
-        tiempoTrabajoSemanal: "",
-        jobId: "",
-        responsableDirecto: "",
-        esExtranjero: false,
-        direccion: "",
-        complementoDireccion: "",
-        codigoPostal: "",
-        ciudad: "",
-        pais: "España",
-        nombreTitularCuenta: "",
-        iban: "",
-        bic: "",
-        numeroIdentificacionInterna: "",
-        numeroSeguridadSocial: "",
-        personaConDiscapacidad: false,
-        ultimaRevisionMedica: "",
-        reconocimientoMedicoReforzado: false,
-        exentoSeguroMedico: false,
-        nombreContactoEmergencia: "",
-        apellidoContactoEmergencia: "",
-        relacionContactoEmergencia: "",
-        telefonoMovilEmergencia: "",
-        telefonoFijoEmergencia: "",
-        codigoPaisMovilEmergencia: "+34",
-        codigoPaisFijoEmergencia: "+34",
-        genero: "",
-        apellidosNacimiento: "",
-        nacionalidad: "",
-        provincia: "",
-        ciudadNacimiento: "",
-        estadoCivil: "",
-        numeroPersonasDependientes: "",
-        fechaAntiguedad: "",
-        trabajadorExtranjeroPermiso: false
-      });
-    } else if (!isOpen) {
-      // En modo edición, solo resetear las flags temporales
-      setTempJobWarningAccepted(false);
-    }
-    onOpenChange(isOpen);
-  };
+  // Alias for backwards-compatible JSX references
+  const countryToPhoneCode = COUNTRY_PHONE_CODES;
+  const tiposContrato = TIPOS_CONTRATO;
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
@@ -929,14 +257,13 @@ export const AddColaboradorSheet = ({
                       onChange={(e) => setFormData(prev => ({ ...prev, fechaAntiguedad: e.target.value }))}
                     />
                   </FormField>
-
                 </>
               )}
 
               {/* Información de Contacto en la misma pestaña */}
               <div className="pt-4 border-t border-border/20">
                 <h4 className="text-md font-medium text-foreground mb-4">Información de Contacto</h4>
-                
+
                 <div className="space-y-4">
                   <FormField label="Correo electrónico" required>
                     <Input
@@ -998,7 +325,7 @@ export const AddColaboradorSheet = ({
               {/* Información de Contrato en la misma pestaña */}
               <div className="pt-4 border-t border-border/20">
                 <h4 className="text-md font-medium text-foreground mb-4">Información de Contrato</h4>
-                
+
                 <div className="space-y-4">
                    <FormField label="Fecha de inicio de contrato" required>
                      <Input
@@ -1019,13 +346,12 @@ export const AddColaboradorSheet = ({
                    </FormField>
 
                     <FormField label="Tipo de contrato" required>
-                      <Select 
-                        value={formData.tipoContrato} 
+                      <Select
+                        value={formData.tipoContrato}
                         onValueChange={(value) => {
-                          setFormData(prev => ({ 
-                            ...prev, 
+                          setFormData(prev => ({
+                            ...prev,
                             tipoContrato: value,
-                            // Limpiar fecha de fin si se selecciona contrato indefinido
                             fechaFinContrato: value === "Contrato indefinido" ? "" : prev.fechaFinContrato
                           }));
                         }}
@@ -1043,8 +369,8 @@ export const AddColaboradorSheet = ({
                      </Select>
                    </FormField>
 
-                   <FormField 
-                     label="Fecha de fin del contrato" 
+                   <FormField
+                     label="Fecha de fin del contrato"
                      required={formData.tipoContrato !== "Contrato indefinido"}
                    >
                      <Input
@@ -1071,16 +397,9 @@ export const AddColaboradorSheet = ({
                     <FormField label="Equipo" required={true}>
                      <div className="space-y-3">
                        <div data-department-select>
-                         <Select 
-                           value="" 
-                           onValueChange={(value) => {
-                             if (value && !selectedDepartments.find(d => d.id === value)) {
-                               const department = departments.find(d => d.id === value);
-                               if (department) {
-                                 setSelectedDepartments(prev => [...prev, { id: department.id, name: department.value }]);
-                               }
-                             }
-                           }}
+                         <Select
+                           value=""
+                           onValueChange={handleDepartmentSelectEdit}
                          >
                            <SelectTrigger>
                              <SelectValue placeholder="Seleccionar equipo" />
@@ -1102,15 +421,11 @@ export const AddColaboradorSheet = ({
                            {selectedDepartments.map((dept) => (
                              <Badge key={dept.id} variant="secondary" className="flex items-center gap-1">
                                {dept.name}
-                                <X 
-                                  className="h-3 w-3 cursor-pointer hover:text-destructive" 
+                                <X
+                                  className="h-3 w-3 cursor-pointer hover:text-destructive"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setSelectedDepartments(prev => {
-                                      const newDepts = prev.filter(d => d.id !== dept.id);
-                                      return newDepts;
-                                    });
-                                    // Also clear the job when removing department
+                                    setSelectedDepartments(prev => prev.filter(d => d.id !== dept.id));
                                     setFormData(prev => ({ ...prev, jobId: "" }));
                                   }}
                                 />
@@ -1156,7 +471,7 @@ export const AddColaboradorSheet = ({
                       <FormField label="Establecimiento por defecto" required>
                         <div className="p-3 bg-muted rounded-lg">
                           <span className="text-sm text-muted-foreground">
-                            {colaboradorData?.org_id 
+                            {colaboradorData?.org_id
                               ? (organizations.find(org => org.id === colaboradorData.org_id)?.name || 'Organización no encontrada')
                               : (currentOrganizationName || 'Organización actual')
                             }
@@ -1223,7 +538,7 @@ export const AddColaboradorSheet = ({
               {/* CONTACTO */}
               <div className="space-y-4">
                 <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">CONTACTO</h4>
-                
+
                 <FormField label="Correo electrónico">
                   <Input
                     type="email"
@@ -1339,7 +654,7 @@ export const AddColaboradorSheet = ({
               {/* INFORMACIÓN BANCARIA */}
               <div className="space-y-4 pt-6">
                 <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">INFORMACIÓN BANCARIA</h4>
-                
+
                 <FormField label="Nombre del titular de la cuenta">
                   <Input
                     value={formData.nombreTitularCuenta}
@@ -1376,7 +691,6 @@ export const AddColaboradorSheet = ({
                       size="sm"
                       className="h-auto p-0 text-xs text-primary underline"
                       onClick={() => {
-                        // Generar automáticamente un número
                         const autoNumber = Math.floor(Math.random() * 1000000000).toString();
                         setFormData(prev => ({ ...prev, numeroIdentificacionInterna: autoNumber }));
                       }}
@@ -1397,7 +711,7 @@ export const AddColaboradorSheet = ({
               {/* SEGURIDAD SOCIAL */}
               <div className="space-y-4">
                 <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">SEGURIDAD SOCIAL</h4>
-                
+
                 <FormField label="Nº de seguridad social">
                   <Input
                     value={formData.numeroSeguridadSocial}
@@ -1420,7 +734,7 @@ export const AddColaboradorSheet = ({
               {/* EXAMEN MÉDICO */}
               <div className="space-y-4 pt-6">
                 <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">EXAMEN MÉDICO</h4>
-                
+
                 <FormField label="Última revisión médica realizada">
                   <Input
                     type="date"
@@ -1436,8 +750,8 @@ export const AddColaboradorSheet = ({
                     checked={formData.reconocimientoMedicoReforzado}
                     onCheckedChange={(checked) => setFormData(prev => ({ ...prev, reconocimientoMedicoReforzado: checked as boolean }))}
                   />
-                  <Label 
-                    htmlFor="reconocimiento-medico" 
+                  <Label
+                    htmlFor="reconocimiento-medico"
                     className="text-sm text-foreground cursor-pointer"
                   >
                     Reconocimiento médico reforzado
@@ -1470,7 +784,7 @@ export const AddColaboradorSheet = ({
               {/* MUTUALIDAD */}
               <div className="space-y-4 pt-6">
                 <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">MUTUALIDAD</h4>
-                
+
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-medium text-foreground">
                     El empleado está exento de seguro médico
@@ -1485,7 +799,7 @@ export const AddColaboradorSheet = ({
               {/* PERSONA DE CONTACTO EN CASO DE EMERGENCIA */}
               <div className="space-y-4 pt-6">
                 <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">PERSONA DE CONTACTO EN CASO DE EMERGENCIA</h4>
-                
+
                 <FormField label="Nombre del contacto de emergencia">
                   <Input
                     value={formData.nombreContactoEmergencia}
@@ -1728,13 +1042,12 @@ export const AddColaboradorSheet = ({
               </FormField>
 
                <FormField label="Tipo de contrato" required>
-                 <Select 
-                   value={formData.tipoContrato} 
+                 <Select
+                   value={formData.tipoContrato}
                    onValueChange={(value) => {
-                     setFormData(prev => ({ 
-                       ...prev, 
+                     setFormData(prev => ({
+                       ...prev,
                        tipoContrato: value,
-                       // Limpiar fecha de fin si se selecciona contrato indefinido
                        fechaFinContrato: value === "Contrato indefinido" ? "" : prev.fechaFinContrato
                      }));
                    }}
@@ -1752,8 +1065,8 @@ export const AddColaboradorSheet = ({
                 </Select>
               </FormField>
 
-              <FormField 
-                label="Fecha de fin del contrato" 
+              <FormField
+                label="Fecha de fin del contrato"
                 required={formData.tipoContrato !== "Contrato indefinido"}
               >
                 <Input
@@ -1779,49 +1092,7 @@ export const AddColaboradorSheet = ({
 
                  <FormField label="Equipo" required={true}>
                     <div className="space-y-3">
-                       <Select value={selectedDepartment} data-department-select onValueChange={async (value) => {
-                        
-                        // Verificar si el equipo ya está seleccionado
-                        const isAlreadySelected = selectedDepartments.some(dept => dept.id === value);
-                        if (isAlreadySelected) {
-                          toast({
-                            title: "Equipo ya seleccionado",
-                            description: "Este equipo ya está asignado al colaborador",
-                            variant: "destructive"
-                          });
-                          return;
-                        }
-                        
-                        // Verificar si el equipo tiene puestos de trabajo
-                        const { data: jobs, error: jobsError } = await supabase
-                          .from('jobs')
-                          .select('id')
-                          .eq('department_id', value)
-                          .limit(1);
-
-                        const hasJob = !jobsError && jobs && jobs.length > 0;
-                        const departmentName = departments.find(d => d.id === value)?.value || '';
-                        
-                        if (!hasJob) {
-                          // Solo mostrar una advertencia sutil sin bloquear el flujo
-                          console.warn(`⚠️ No hay puestos de trabajo definidos en el equipo "${departmentName}"`);
-                          
-                          // Continuar añadiendo el equipo directamente
-                          setSelectedDepartments(prev => [...prev, { id: value, name: departmentName }]);
-                          setSelectedDepartment('');
-                          
-                          // Mostrar un toast informativo menos intrusivo
-                          toast({
-                            title: "📋 Información",
-                            description: `Equipo "${departmentName}" añadido. Puedes crear puestos de trabajo más tarde si es necesario.`,
-                          });
-                          return;
-                        }
-                        
-                        // Añadir el nuevo equipo a la lista
-                        setSelectedDepartments(prev => [...prev, { id: value, name: departmentName }]);
-                        setSelectedDepartment('');
-                      }}>
+                       <Select value={selectedDepartment} data-department-select onValueChange={handleDepartmentSelectCreate}>
                        <SelectTrigger>
                          <SelectValue placeholder="Seleccionar equipo..." />
                        </SelectTrigger>
@@ -1840,15 +1111,11 @@ export const AddColaboradorSheet = ({
                          {selectedDepartments.map((dept) => (
                            <Badge key={dept.id} variant="secondary" className="flex items-center gap-1">
                              {dept.name}
-                              <X 
-                                className="h-3 w-3 cursor-pointer hover:text-destructive" 
+                              <X
+                                className="h-3 w-3 cursor-pointer hover:text-destructive"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setSelectedDepartments(prev => {
-                                    const newDepts = prev.filter(d => d.id !== dept.id);
-                                    return newDepts;
-                                  });
-                                  // Also clear the job when removing department
+                                  setSelectedDepartments(prev => prev.filter(d => d.id !== dept.id));
                                   setFormData(prev => ({ ...prev, jobId: "" }));
                                 }}
                              />
@@ -1894,7 +1161,7 @@ export const AddColaboradorSheet = ({
                     <FormField label="Establecimiento por defecto" required>
                       <div className="p-3 bg-muted rounded-lg">
                         <span className="text-sm text-muted-foreground">
-                          {colaboradorData?.org_id 
+                          {colaboradorData?.org_id
                             ? (organizations.find(org => org.id === colaboradorData.org_id)?.name || 'Organización no encontrada')
                             : (currentOrganizationName || 'Organización actual')
                           }
