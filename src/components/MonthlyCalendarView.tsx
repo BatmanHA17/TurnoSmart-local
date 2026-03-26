@@ -38,7 +38,6 @@ import { ShiftForAudit } from "@/utils/shiftAudit";
 import { AuditCellHighlight, EmployeeViolationBadge } from "@/components/audit";
 import { AuditViolationTooltip } from "@/components/audit/AuditViolationTooltip";
 
-
 interface Employee {
   id: string;
   name: string;
@@ -230,7 +229,6 @@ export function MonthlyCalendarView() {
         return;
       }
 
-      console.log('📊 [MonthView] Colaboradores cargados:', data?.length || 0);
       
       if (data && data.length > 0) {
         const mappedEmployees: Employee[] = data.map(colaborador => ({
@@ -278,10 +276,8 @@ export function MonthlyCalendarView() {
   // Cargar colaboradores cuando currentOrg esté disponible
   useEffect(() => {
     if (!currentOrg?.org_id) {
-      console.log('⏳ [MonthView] Esperando currentOrg...');
       return;
     }
-    console.log('🚀 [MonthView] Inicializando con org:', currentOrg.org_id);
     loadColaboradores();
   }, [currentOrg?.org_id, loadColaboradores]);
 
@@ -289,7 +285,6 @@ export function MonthlyCalendarView() {
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'manual-employee-order' && currentOrg?.org_id) {
-        console.log('🔄 [MonthView] Orden manual actualizado, recargando...');
         loadColaboradores();
       }
     };
@@ -353,7 +348,6 @@ export function MonthlyCalendarView() {
           };
         });
         
-        console.log('📊 [MonthView] Turnos cargados:', mappedShifts.length);
         setShiftBlocks(mappedShifts);
       } else {
         setShiftBlocks([]);
@@ -369,7 +363,6 @@ export function MonthlyCalendarView() {
       loadShiftsFromSupabase(employees.map(e => e.id));
     }
   }, [employees, currentDate, currentOrg?.org_id, loadShiftsFromSupabase]);
-
 
   // Obtener turnos para un empleado y día
   const getShiftsForCell = useCallback((employeeId: string, day: Date) => {

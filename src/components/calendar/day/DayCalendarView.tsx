@@ -82,7 +82,6 @@ export function DayCalendarView({
 
   // Declarar handlers ANTES de usarlos
   const handleSave = () => {
-    console.log("Guardando cambios...");
   };
 
   const handlePrint = () => {
@@ -90,16 +89,13 @@ export function DayCalendarView({
   };
 
   const handleExport = () => {
-    console.log("Exportando...");
   };
 
   const handleOpenSettings = () => {
-    console.log("Abriendo configuración...");
   };
 
   const handleDelete = () => {
     if (confirm("¿Estás seguro de que deseas eliminar este calendario?")) {
-      console.log("Eliminando calendario...");
     }
   };
 

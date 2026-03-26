@@ -222,7 +222,6 @@ export const Cuadrantes = () => {
   };
 
   const handleSaveCuadrante = (cuadrante: CuadranteMensualType) => {
-    console.log('Guardando cuadrante:', cuadrante);
     
     // Map status correctly
     const mappedStatus = cuadrante.status === 'PUBLISHED' ? 'published' :

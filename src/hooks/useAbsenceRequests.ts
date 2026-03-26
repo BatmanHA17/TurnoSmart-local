@@ -35,8 +35,6 @@ export const useAbsenceRequests = () => {
       const legacyRequests = JSON.parse(localStorage.getItem('leaveRequests') || '[]');
       const newFormatRequests = JSON.parse(localStorage.getItem('absenceRequests') || '[]');
       
-      console.log('Legacy requests from localStorage:', legacyRequests);
-      console.log('New format requests from localStorage:', newFormatRequests);
 
       // Convert localStorage data to our format
       const convertedRequests: AbsenceRequest[] = [];
@@ -85,7 +83,6 @@ export const useAbsenceRequests = () => {
 
       // If localStorage has data, use it
       if (convertedRequests.length > 0) {
-        console.log('Using localStorage data:', convertedRequests);
         setAbsenceRequests(convertedRequests);
         setLoading(false);
         return;
@@ -111,7 +108,6 @@ export const useAbsenceRequests = () => {
         return;
       }
 
-      console.log('Using database data:', data);
       setAbsenceRequests((data || []) as any);
     } catch (err) {
       console.error('Error in fetchAbsenceRequests:', err);

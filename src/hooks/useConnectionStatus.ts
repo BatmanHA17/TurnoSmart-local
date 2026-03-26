@@ -20,14 +20,12 @@ export function useConnectionStatus(): UseConnectionStatusReturn {
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
 
   const handleOnline = useCallback(() => {
-    console.log('🌐 Conexión restaurada');
     setStatus('online');
     setLastOnlineAt(new Date());
     setReconnectAttempts(0);
   }, []);
 
   const handleOffline = useCallback(() => {
-    console.log('📴 Conexión perdida');
     setStatus('offline');
   }, []);
 

@@ -54,18 +54,15 @@ export function ScheduleTable() {
         .order('fecha_inicio_contrato', { ascending: false });
       
       if (!error && data) {
-        console.log('Colaboradores cargados:', data);
         
         // Obtener la fecha actual real (hoy)
         const hoy = new Date();
         const fechaActual = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
         
-        console.log('📅 Fecha actual para filtrado:', fechaActual.toDateString());
         
         // FILTRO ESTRICTO: Solo mostrar colaboradores que ya han comenzado su contrato
         const colaboradoresValidos = data.filter(colaborador => {
           if (!colaborador.fecha_inicio_contrato) {
-            console.log(`❌ ${colaborador.nombre}: SIN fecha de inicio - EXCLUIDO`);
             return false;
           }
           
@@ -75,16 +72,10 @@ export function ScheduleTable() {
           // Solo incluir si la fecha de inicio es HOY o en el pasado
           const yaComenzo = fechaInicioLimpia <= fechaActual;
           
-          console.log(`🔍 ${colaborador.nombre}:`);
-          console.log(`   - Fecha inicio: ${fechaInicioLimpia.toDateString()}`);
-          console.log(`   - Fecha actual: ${fechaActual.toDateString()}`);
-          console.log(`   - Ya comenzó: ${yaComenzo}`);
           
           return yaComenzo;
         });
         
-        console.log(`📊 Colaboradores ANTES del filtro: ${data.length}`);
-        console.log(`📊 Colaboradores DESPUÉS del filtro: ${colaboradoresValidos.length}`);
         
         setColaboradores(colaboradoresValidos);
       }
@@ -95,9 +86,7 @@ export function ScheduleTable() {
 
   // Debug effect para monitorear cambios
   useEffect(() => {
-    console.log('Estado de colaboradores actualizado:', colaboradores.length, colaboradores);
   }, [colaboradores]);
-
 
   // Filter colaboradores by selected rota
   useEffect(() => {
@@ -166,7 +155,6 @@ export function ScheduleTable() {
       // Verificar si el colaborador ya ha comenzado su contrato
       if (colaborador.fecha_inicio_contrato) {
         const startDate = new Date(colaborador.fecha_inicio_contrato);
-        console.log(`Comparando: ${dateToCheck.toDateString()} < ${startDate.toDateString()}`, dateToCheck < startDate);
         
         if (dateToCheck < startDate) {
           schedule.push('-'); // No ha comenzado aún
@@ -212,7 +200,6 @@ export function ScheduleTable() {
         <div className="flex gap-2">
           <Button
             onClick={() => {
-              console.log('🔄 FORCE RELOAD - Recargando colaboradores...');
               
               const fetchColaboradores = async () => {
                 const currentDate = new Date();
@@ -230,12 +217,10 @@ export function ScheduleTable() {
                   .order('fecha_inicio_contrato', { ascending: false });
                 
                 if (!error && data) {
-                  console.log('🔄 Colaboradores recargados desde BD:', data);
                   
                   const hoy = new Date();
                   const fechaActual = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
                   
-                  console.log('🔄 Fecha límite:', fechaActual.toDateString());
                   
                   const colaboradoresValidos = data.filter(colaborador => {
                     if (!colaborador.fecha_inicio_contrato) return false;
@@ -244,12 +229,10 @@ export function ScheduleTable() {
                     const fechaInicioLimpia = new Date(fechaInicio.getFullYear(), fechaInicio.getMonth(), fechaInicio.getDate());
                     
                     const yaComenzo = fechaInicioLimpia <= fechaActual;
-                    console.log(`🔄 ${colaborador.nombre}: ${fechaInicioLimpia.toDateString()} <= ${fechaActual.toDateString()} = ${yaComenzo}`);
                     
                     return yaComenzo;
                   });
                   
-                  console.log(`🔄 Resultado: ${colaboradoresValidos.length}/${data.length} colaboradores válidos`);
                   setColaboradores(colaboradoresValidos);
                 }
               };

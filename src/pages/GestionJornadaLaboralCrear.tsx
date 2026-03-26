@@ -12,11 +12,8 @@ const GestionJornadaLaboralCrear = () => {
 
   useEffect(() => {
     if (editId) {
-      console.log("Edit ID found:", editId);
       const savedPeriods = JSON.parse(localStorage.getItem('gestion-jornada-periods') || '[]');
-      console.log("Saved periods:", savedPeriods);
       const period = savedPeriods.find(p => p.id === editId);
-      console.log("Found period:", period);
       setExistingPeriod(period);
     }
   }, [editId]);

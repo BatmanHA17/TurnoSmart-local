@@ -37,7 +37,6 @@ export default function DevLogin() {
     setError("");
 
     try {
-      console.log('🔐 Intentando login con contraseña...');
       
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase().trim(),
@@ -57,7 +56,6 @@ export default function DevLogin() {
         return;
       }
 
-      console.log('✅ Login exitoso:', data.user?.email);
       toast.success("¡Sesión iniciada!");
       navigate('/turnosmart/day', { replace: true });
       

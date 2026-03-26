@@ -25,14 +25,12 @@ export const TimeSlotRectangles: React.FC<TimeSlotRectanglesProps> = ({ onSlotCl
     // Escuchar cambios en horarios guardados
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'saved-shifts-updated') {
-        console.log('🔄 TimeSlotRectangles: Detectado cambio en horarios, recargando...');
         loadShifts();
       }
     };
     
     // También escuchar evento personalizado para cambios locales
     const handleCustomUpdate = () => {
-      console.log('🔄 TimeSlotRectangles: Evento personalizado de actualización');
       loadShifts();
     };
     

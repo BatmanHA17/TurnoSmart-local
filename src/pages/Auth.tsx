@@ -96,7 +96,6 @@ export default function Auth() {
       
       if (exists) {
         // Usuario existente - mostrar campo de contraseña / enviar magic link
-        console.log('🔑 Usuario existente:', email);
         setFlow('login');
         setStep('password');
       } else {
@@ -115,7 +114,6 @@ export default function Auth() {
 
   const sendVerificationCode = async () => {
     try {
-      console.log('📧 Enviando magic link para registro:', email);
       
       // Usar signInWithOtp con shouldCreateUser para registro passwordless
       const { error } = await supabase.auth.signInWithOtp({
@@ -162,7 +160,6 @@ export default function Auth() {
     setError('');
 
     try {
-      console.log('🔄 Reenviando magic link a:', email);
       
       const redirectTo = flow === 'login' 
         ? `${window.location.origin}/auth/callback`
@@ -202,7 +199,6 @@ export default function Auth() {
     setError('');
 
     try {
-      console.log('🔐 Intentando login con contraseña para:', email);
       
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase().trim(),
@@ -222,7 +218,6 @@ export default function Auth() {
         return;
       }
 
-      console.log('✅ Login exitoso:', data.user?.email);
       toast.success('¡Bienvenido de nuevo!');
       navigate('/dashboard', { replace: true });
     } catch (error: any) {
@@ -287,7 +282,6 @@ export default function Auth() {
     setError('');
 
     try {
-      console.log('🚀 Enviando magic link con datos de registro para:', email);
 
       // Usar signInWithOtp con shouldCreateUser: true para registro 100% passwordless
       const { error: otpError } = await supabase.auth.signInWithOtp({
@@ -316,7 +310,6 @@ export default function Auth() {
         return;
       }
 
-      console.log('✅ Magic link enviado exitosamente');
       setStep('verification');
       toast.success('¡Te hemos enviado un enlace de verificación a tu correo!');
     } catch (error: any) {
@@ -630,7 +623,6 @@ export default function Auth() {
         );
       }
     }
-
 
     // Default - email step
     return (

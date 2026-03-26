@@ -12,7 +12,6 @@ export const CleanupUsersButton: React.FC = () => {
     setIsDeleting(true);
     
     try {
-      console.log('Ejecutando limpieza completa de usuarios...');
       
       const { data, error } = await supabase.functions.invoke('cleanup-all-except-owner');
       
@@ -22,7 +21,6 @@ export const CleanupUsersButton: React.FC = () => {
         return;
       }
       
-      console.log('Resultado de limpieza:', data);
       
       if (data?.success) {
         toast.success(`Limpieza completada: ${data.successCount} usuarios eliminados`);

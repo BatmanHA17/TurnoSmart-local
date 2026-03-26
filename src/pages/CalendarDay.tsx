@@ -48,7 +48,6 @@ export default function CalendarDay() {
       
       if (!error && data) {
         setEmployees(data);
-        console.log('📊 Empleados cargados en /turnosmart/day:', data.length);
       } else if (error) {
         console.error('❌ Error cargando empleados:', error);
         setEmployees([]);

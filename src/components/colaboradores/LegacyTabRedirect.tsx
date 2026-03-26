@@ -37,7 +37,6 @@ export default function LegacyTabRedirect() {
   
   // Log the redirect for analytics/debugging
   useEffect(() => {
-    console.log(`[LEGACY REDIRECT] ?tab=${tab} → /colaboradores/${id}/${canonicalRoute}`);
   }, [tab, id, canonicalRoute]);
 
   return <Navigate to={`/colaboradores/${id}/${canonicalRoute}`} replace />;

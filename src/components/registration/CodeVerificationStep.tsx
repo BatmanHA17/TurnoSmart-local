@@ -45,7 +45,6 @@ export const CodeVerificationStep: React.FC<CodeVerificationProps> = ({
     setError('');
 
     try {
-      console.log('Verifying code:', code, 'for email:', email);
       
       const { data: verifyResponse, error: verifyError } = await supabase.functions.invoke(
         'verify-code',
@@ -56,8 +55,6 @@ export const CodeVerificationStep: React.FC<CodeVerificationProps> = ({
           }
         }
       );
-
-      console.log('Verification response:', { verifyResponse, verifyError });
 
       if (verifyError) {
         console.error('Verification function error:', verifyError);

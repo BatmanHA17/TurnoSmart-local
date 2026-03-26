@@ -170,7 +170,6 @@ export function AdvancedShiftDialog({ isOpen, onClose, employee, date, editingSh
       setBreakType(editingShift.breakType || "");
       setBreakDuration(editingShift.breakDuration || "");
       setSelectedColor(editingShift.color || "#10b981");
-      console.log('Cargando color del turno a editar:', editingShift.color);
       setAccessType(editingShift.accessType || "company");
       setSelectedTeams(parseTeamsFromString(editingShift.selectedTeam || ""));
       // Convertir los breaks del formato guardado al formato temporal para edición
@@ -364,7 +363,6 @@ export function AdvancedShiftDialog({ isOpen, onClose, employee, date, editingSh
             }
           });
           
-          console.log('Shifts combinados en AdvancedShiftDialog:', combined);
           setSavedShifts(combined);
         } catch (error) {
           console.error('Error cargando favoritos en AdvancedShiftDialog:', error);

@@ -28,7 +28,6 @@ export default function HRContractModifications() {
 
   const handleEmpleadoClick = (modificacion: ModificacionContrato) => {
     // TODO: Navegación a página de datos personales del empleado
-    console.log("Navegando a empleado:", modificacion.perfilModificado);
     // Simular navegación como en el tutorial
     alert(`Navegando a datos personales de ${modificacion.perfilModificado}`);
   };

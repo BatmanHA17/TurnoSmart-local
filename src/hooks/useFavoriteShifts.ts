@@ -24,10 +24,8 @@ export const useFavoriteShifts = () => {
         // Si se encontraron duplicados, guardar la versión limpia
         if (cleanedFavorites.length !== parsed.length) {
           saveFavorites(cleanedFavorites);
-          console.log("Duplicados de Descanso Semanal eliminados");
         }
         
-        console.log("Favoritos cargados y limpiados:", cleanedFavorites);
       }
     } catch (error) {
       console.error("Error cargando favoritos:", error);
@@ -38,7 +36,6 @@ export const useFavoriteShifts = () => {
   const saveFavorites = (shifts: SavedShift[]) => {
     try {
       localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(shifts));
-      console.log("Favoritos guardados:", shifts);
     } catch (error) {
       console.error("Error guardando favoritos:", error);
     }

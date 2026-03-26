@@ -78,7 +78,6 @@ export const validateAndCleanCalendarEmployees = (colaboradores: Colaborador[]) 
   // Only update localStorage to remove stale (deleted) employees
   if (removedNotFound.length > 0) {
     localStorage.setItem('calendar-employees', JSON.stringify(validEmployees));
-    console.log("Removed stale calendar references:", removedNotFound);
   }
 
   const incomplete = incompleteEmployees.filter(e => !e.isValid);

@@ -92,11 +92,6 @@ export const EditContractSheet = ({
   useEffect(() => {
     if (colaborador && open) {
       const orgName = organizations.find(org => org.id === colaborador.org_id)?.name;
-      console.log('📥 Sincronizando datos del colaborador en EditContractSheet:', {
-        colaboradorId: colaborador.id,
-        orgId: colaborador.org_id,
-        orgName: orgName
-      });
       
       // Campos de contrato
       setTipoContrato(colaborador.tipo_contrato || "");
@@ -107,11 +102,6 @@ export const EditContractSheet = ({
       
       // IMPORTANTE: Asegurarse de que el establecimiento se setea correctamente
       const newEstablecimientoId = colaborador.org_id || '';
-      console.log('🏢 SETEANDO ESTABLECIMIENTO:', {
-        anterior: establecimientoId,
-        nuevo: newEstablecimientoId,
-        nombreNuevo: orgName
-      });
       setEstablecimientoId(newEstablecimientoId);
       
       setResponsableDirecto(colaborador.responsable_directo || "");
@@ -139,23 +129,19 @@ export const EditContractSheet = ({
   // Cargar jobs, categorías y departamentos disponibles
   useEffect(() => {
     const loadJobsData = async () => {
-      console.log('🔄 useEffect disparado - open:', open, 'currentOrg:', currentOrg);
       
       if (!open) {
-        console.log('⏸️ Diálogo cerrado, no cargar datos');
         return;
       }
 
       try {
         // Cargar jobs de manera simple sin joins complejos
-        console.log('🔄 Cargando jobs...');
         const { data: jobsData, error: jobsError } = await supabase
           .from('jobs')
           .select('*')
           .order('title');
         
         if (!jobsError && jobsData) {
-          console.log('✅ Jobs cargados:', jobsData.length, 'jobs encontrados:', jobsData);
           setJobs(jobsData);
         } else {
           console.error('❌ Error cargando jobs:', jobsError);
@@ -165,14 +151,12 @@ export const EditContractSheet = ({
         // Categorías eliminadas - se gestiona automáticamente desde el job seleccionado
 
         // Cargar departamentos
-        console.log('🔄 Cargando departamentos...');
         const { data: departmentsData, error: departmentsError } = await supabase
           .from('job_departments')
           .select('*')
           .order('value');
         
         if (!departmentsError && departmentsData) {
-          console.log('✅ Departamentos cargados:', departmentsData.length, 'departamentos encontrados');
           setJobDepartments(departmentsData);
         } else {
           console.error('❌ Error cargando departamentos:', departmentsError);
@@ -210,12 +194,6 @@ export const EditContractSheet = ({
     }
   };
   const handleSave = async () => {
-    console.log('🚀 Iniciando actualización de contrato', {
-      colaboradorId: colaborador?.id,
-      jobIdActual: colaborador?.job_id,
-      jobIdNuevo: jobId,
-      puesto: jobId ? jobs.find(job => job.id === jobId)?.title : 'Sin puesto'
-    });
     
     try {
       // Preparar los datos para actualizar
@@ -296,22 +274,11 @@ export const EditContractSheet = ({
       }
 
       // Establecimiento por defecto (org_id)
-      console.log('🔍 Verificando cambio de establecimiento:', {
-        establecimientoIdActual: establecimientoId,
-        colaboradorOrgId: colaborador?.org_id,
-        sonDiferentes: establecimientoId !== colaborador?.org_id
-      });
       
       if (establecimientoId !== colaborador?.org_id) {
         updateData.org_id = establecimientoId;
         const oldOrgName = organizations.find(org => org.id === colaborador?.org_id)?.name || 'No especificado';
         const newOrgName = organizations.find(org => org.id === establecimientoId)?.name || 'No especificado';
-        console.log('✅ Agregando cambio de establecimiento al updateData:', {
-          oldOrgId: colaborador?.org_id,
-          newOrgId: establecimientoId,
-          oldOrgName,
-          newOrgName
-        });
         changes.push({
           field: 'org_id',
           old_value: colaborador?.org_id || '',
@@ -330,11 +297,6 @@ export const EditContractSheet = ({
         });
       }
       if (jobId !== colaborador?.job_id) {
-        console.log('🔄 Actualizando puesto de trabajo:', {
-          colaboradorJobId: colaborador?.job_id,
-          newJobId: jobId,
-          willSetToNull: jobId === "" || jobId === "none"
-        });
         
         const finalJobId = (jobId === "" || jobId === "none") ? null : jobId;
         updateData.job_id = finalJobId;
@@ -354,17 +316,10 @@ export const EditContractSheet = ({
           description: `Puesto de trabajo cambiado de "${oldJobName}" a "${newJobName}"`
         });
         
-        console.log('✅ Cambio de puesto registrado:', {
-          oldJobName,
-          newJobName,
-          finalJobId
-        });
       }
 
       // Solo actualizar si hay cambios
       if (Object.keys(updateData).length > 0) {
-        console.log('💾 Datos a actualizar en colaboradores:', updateData);
-        console.log('🔍 Establecimiento en updateData:', updateData.org_id);
         
         // Actualizar el colaborador
         const { data: updatedData, error } = await supabase
@@ -384,11 +339,8 @@ export const EditContractSheet = ({
           return;
         }
         
-        console.log('✅ Colaborador actualizado en BD:', updatedData);
-        console.log('✅ org_id actualizado a:', updatedData.org_id);
 
         // Sincronizar asignaciones de departamentos
-        console.log('🏢 Sincronizando asignaciones de departamentos:', selectedDepartments);
         
         // Primero, desactivar todas las asignaciones actuales
         const { error: deactivateError } = await supabase
@@ -420,7 +372,6 @@ export const EditContractSheet = ({
           if (assignmentError) {
             console.error('Error guardando asignaciones de departamentos:', assignmentError);
           } else {
-            console.log('✅ Asignaciones de departamentos guardadas exitosamente');
           }
         }
 
@@ -446,19 +397,15 @@ export const EditContractSheet = ({
           tipo_contrato: tipoContrato,
           tiempo_trabajo_semanal: tiempoTrabajoSemanal
         };
-        console.log("🔄 GUARDANDO EN LOCALSTORAGE para calendario:", updatedColaboradorForCalendar);
         localStorage.setItem('updatedEmployeeForCalendar', JSON.stringify(updatedColaboradorForCalendar));
-        console.log("✅ DATOS GUARDADOS en localStorage");
 
         // Verificar que se guardó correctamente
         const stored = localStorage.getItem('updatedEmployeeForCalendar');
-        console.log("🔍 VERIFICACIÓN - datos en localStorage:", stored);
 
         // Disparar evento personalizado para forzar sincronización inmediata
         window.dispatchEvent(new CustomEvent('employeeUpdated', {
           detail: updatedColaboradorForCalendar
         }));
-        console.log("📡 EVENTO DISPARADO: employeeUpdated");
         toast({
           title: "Cambios guardados",
           description: "El contrato ha sido actualizado correctamente"
@@ -484,7 +431,6 @@ export const EditContractSheet = ({
         
         // Refrescar asignaciones de equipos para actualizar el UI
         await refetchAssignments();
-        console.log('🔄 Asignaciones de equipos refrescadas');
         
         // Cerrar el diálogo
         onOpenChange(false);
@@ -723,7 +669,6 @@ export const EditContractSheet = ({
               
                <FormField label="Puesto de trabajo" required>
                  <Select value={jobId || "none"} onValueChange={(value) => {
-                   console.log('🔄 Job seleccionado:', value);
                    setJobId(value === "none" ? "" : value);
                    // Auto-sincronizar categoría cuando se selecciona un puesto
                    if (value && value !== "none") {
@@ -843,19 +788,9 @@ export const EditContractSheet = ({
               <FormField label="Establecimiento por defecto" required>
                 {(() => {
                   const selectedOrg = organizations.find(org => org.id === establecimientoId);
-                  console.log('🏢 RENDER SELECT ESTABLECIMIENTO:', {
-                    establecimientoId,
-                    selectedOrgName: selectedOrg?.name,
-                    allOrganizations: organizations.map(o => ({ id: o.id, name: o.name }))
-                  });
                   return null;
                 })()}
                 <Select value={establecimientoId} onValueChange={(value) => {
-                  console.log('🔄 CAMBIO EN SELECT ESTABLECIMIENTO:', {
-                    anterior: establecimientoId,
-                    nuevo: value,
-                    nuevoNombre: organizations.find(org => org.id === value)?.name
-                  });
                   setEstablecimientoId(value);
                 }}>
                   <SelectTrigger>

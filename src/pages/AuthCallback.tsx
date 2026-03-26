@@ -33,7 +33,6 @@ export default function AuthCallback() {
             
             if (error && error.code === 'PGRST116') {
               // No profile found - new user, redirect to onboarding
-              console.log('New user detected, redirecting to onboarding');
               navigate("/onboarding/wizard", { replace: true });
             } else if (profile) {
               // Check if user has any organizations
@@ -45,13 +44,11 @@ export default function AuthCallback() {
               
               // If no memberships, redirect to onboarding wizard
               if (!memberships || memberships.length === 0) {
-                console.log('User has no organizations, redirecting to onboarding wizard');
                 navigate("/onboarding/wizard", { replace: true });
                 return;
               }
               
               // Existing user with organizations, get their role and redirect to dashboard
-              console.log('Existing user with organizations, getting role for dashboard redirect');
               
               try {
                 const { data: roleData, error: roleError } = await supabase.rpc('get_user_role_canonical', { 
@@ -60,10 +57,8 @@ export default function AuthCallback() {
                 
                 if (!roleError && roleData) {
                   const dashboard = getDashboardByRole(roleData);
-                  console.log(`Redirecting user with role ${roleData} to ${dashboard}`);
                   navigate(dashboard, { replace: true });
                 } else {
-                  console.log('Could not determine role, defaulting to dashboard');
                   navigate("/dashboard", { replace: true });
                 }
               } catch (roleErr) {

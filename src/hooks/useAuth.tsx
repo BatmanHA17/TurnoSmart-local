@@ -18,14 +18,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('🚀 Inicializando sistema de autenticación...');
     
     // Configurar el listener de cambios de autenticación PRIMERO
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('=== CAMBIO DE ESTADO DE AUTH ===');
-        console.log('Evento:', event);
-        console.log('Sesión existe:', session ? 'SÍ' : 'NO');
         
         // Solo actualizaciones síncronas aquí para evitar deadlocks
         setSession(session);
@@ -34,37 +30,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         // Log para debugging
         if (session) {
-          console.log('✅ Usuario autenticado:', session.user.email);
         } else {
-          console.log('❌ Usuario no autenticado');
         }
       }
     );
 
     // DESPUÉS verificar si ya existe una sesión
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('=== VERIFICACIÓN INICIAL DE SESIÓN ===');
-      console.log('Sesión encontrada:', session ? 'SÍ' : 'NO');
       
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
       
       if (session) {
-        console.log('✅ Sesión restaurada para:', session.user.email);
       }
     });
 
     // Limpiar al desmontar
     return () => {
-      console.log('🧹 Limpiando listener de auth');
       subscription.unsubscribe();
     };
   }, []);
 
   const signOut = async () => {
     try {
-      console.log('🚪 Iniciando proceso de logout');
       
       // Limpiar estado local inmediatamente
       setSession(null);

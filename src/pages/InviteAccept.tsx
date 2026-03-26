@@ -45,7 +45,6 @@ export default function InviteAccept() {
     }
 
     try {
-      console.log('Validating token:', token);
       
       const { data, error: invokeError } = await supabase.functions.invoke(
         'accept-invite',
@@ -53,8 +52,6 @@ export default function InviteAccept() {
           body: { token }
         }
       );
-
-      console.log('Validation response:', { data, invokeError });
 
       if (invokeError) {
         console.error('Invoke error:', invokeError);
@@ -65,7 +62,6 @@ export default function InviteAccept() {
 
       // Caso 1: Colaborador existente - requiere vinculación de cuenta
       if (data.requiresAccountLinking) {
-        console.log('🔗 Existing colaborador requires account linking, redirecting...');
         
         // Guardar datos de invitación en sessionStorage para vinculación
         sessionStorage.setItem('invite_data', JSON.stringify(data.inviteData));
@@ -78,7 +74,6 @@ export default function InviteAccept() {
 
       // Caso 2: Usuario nuevo - requiere registro completo
       if (data.requiresRegistration) {
-        console.log('🔄 User requires registration, redirecting...');
         
         // Guardar datos de invitación en sessionStorage para el registro
         sessionStorage.setItem('invite_data', JSON.stringify(data.inviteData));
@@ -97,11 +92,9 @@ export default function InviteAccept() {
       }
 
       // Caso 4: Usuario existente - invitación aceptada exitosamente
-      console.log('✅ Invitation accepted for existing user');
 
       // SIEMPRE usar magic link para usuarios existentes
       if (data.success && data.magicLink) {
-        console.log('🔗 Redirecting to magic link for existing user');
         toast.success('¡Invitación aceptada! Redirigiendo...');
         
         // Pequeño delay para que el usuario vea el mensaje

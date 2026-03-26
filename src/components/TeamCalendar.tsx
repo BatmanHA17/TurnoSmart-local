@@ -29,7 +29,6 @@ export const TeamCalendar = ({ className = "", approvedRequests = [] }: TeamCale
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [loading, setLoading] = useState(true);
 
-  console.log('TeamCalendar received approvedRequests:', approvedRequests);
   
   // Load active colaboradores from database
   useEffect(() => {
@@ -48,7 +47,6 @@ export const TeamCalendar = ({ className = "", approvedRequests = [] }: TeamCale
           return;
         }
 
-        console.log('Loaded colaboradores:', data);
         setColaboradores(data || []);
       } catch (error) {
         console.error('Error loading colaboradores:', error);
@@ -146,15 +144,6 @@ export const TeamCalendar = ({ className = "", approvedRequests = [] }: TeamCale
     const dateToCheck = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDay.dayNumber);
     
     // Debug logging
-    console.log(`Checking absence for ${colaboradorName} on day ${currentDay.dayNumber}`, {
-      dateToCheck,
-      approvedRequestsCount: approvedRequests.length,
-      approvedRequests: approvedRequests.map(req => ({
-        employee: req.employee,
-        startDate: req.startDate,
-        endDate: req.endDate
-      }))
-    });
     
     // Check if this colaborador has an approved absence on this date
     const hasAbsence = approvedRequests.some(request => {
@@ -169,23 +158,15 @@ export const TeamCalendar = ({ className = "", approvedRequests = [] }: TeamCale
                              colaboradorNameLower.includes('batman') && employeeNameLower.includes('batman') ||
                              colaboradorNameLower.includes('super') && employeeNameLower.includes('super');
       
-      console.log(`Name matching for ${colaboradorName} vs ${request.employee}:`, { matchesEmployee });
       
       if (!matchesEmployee) return false;
       
       // Check if current date falls within the absence period
       const isInRange = dateToCheck >= request.startDate && dateToCheck <= request.endDate;
-      console.log(`Date range check for ${colaboradorName}:`, { 
-        dateToCheck, 
-        startDate: request.startDate, 
-        endDate: request.endDate, 
-        isInRange 
-      });
       
       return isInRange;
     });
     
-    console.log(`Final absence result for ${colaboradorName} on day ${currentDay.dayNumber}:`, hasAbsence);
     
     return hasAbsence ? "bg-green-100" : ""; // Verde pastel muy sutil para ausencias
   };

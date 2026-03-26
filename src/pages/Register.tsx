@@ -69,8 +69,6 @@ export const Register = () => {
         return;
       }
 
-      console.log('Starting registration via magic link for new org owner:', email);
-
       // New org owners register via OTP (magic link) — no password needed, no colaborador check
       // Employees use invite links instead
       const { error: otpError } = await supabase.auth.signInWithOtp({
@@ -113,7 +111,6 @@ export const Register = () => {
     setError('');
 
     try {
-      console.log('Verifying code:', verificationCode, 'for email:', email);
       
       const { data, error: verifyError } = await supabase.functions.invoke('verify-code', {
         body: {
@@ -121,8 +118,6 @@ export const Register = () => {
           code: verificationCode
         }
       });
-
-      console.log('Verification response:', { data, verifyError });
 
       if (verifyError) {
         console.error('Verification error:', verifyError);

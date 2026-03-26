@@ -24,7 +24,6 @@ export const cleanAllAbsenceRequests = () => {
     window.dispatchEvent(new CustomEvent('forceEmployeeAbsenceUpdate'));
     window.dispatchEvent(new CustomEvent('forceLeaveRequestUpdate'));
     
-    console.log('✅ All absence requests data has been cleaned successfully');
     return true;
   } catch (error) {
     console.error('❌ Error cleaning absence requests data:', error);
@@ -40,5 +39,4 @@ export const resetAbsenceRequestsToCleanState = () => {
   localStorage.setItem('absenceRequests', JSON.stringify([]));
   localStorage.setItem('leaveRequests', JSON.stringify([]));
   
-  console.log('🧹 Absence requests reset to clean state - ready for testing');
 };

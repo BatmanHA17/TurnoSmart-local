@@ -198,7 +198,6 @@ export const useColaboradorById = (id: string | undefined) => {
 
     setLoading(true);
     try {
-      console.log('🔍 Fetching colaborador with ID:', id);
       
       // Primero obtenemos job_id de la tabla colaboradores
       const { data: colaboradorBase, error: colaboradorBaseError } = await supabase
@@ -235,7 +234,6 @@ export const useColaboradorById = (id: string | undefined) => {
       }
 
       if (!colaboradorData) {
-        console.log('❌ No colaborador data found');
         toast({
           title: "Error",
           description: "Colaborador no encontrado",
@@ -245,13 +243,10 @@ export const useColaboradorById = (id: string | undefined) => {
       }
 
       const jobId = colaboradorBase?.job_id;
-      console.log('✅ Colaborador data:', colaboradorData);
-      console.log('🔍 job_id found:', jobId);
 
       // Si tiene job_id, obtenemos la información del job
       let jobData = null;
       if (jobId) {
-        console.log('🔍 Fetching job with ID:', jobId);
         
         const { data: job, error: jobError } = await supabase
           .from('jobs')
@@ -262,13 +257,10 @@ export const useColaboradorById = (id: string | undefined) => {
         if (jobError) {
           console.error('❌ Error fetching job:', jobError);
         } else if (job) {
-          console.log('✅ Job data found:', job);
           jobData = job;
         } else {
-          console.log('❌ No job found with ID:', jobId);
         }
       } else {
-        console.log('ℹ️ No job_id assigned to colaborador');
       }
 
       // Combinamos los datos
@@ -278,7 +270,6 @@ export const useColaboradorById = (id: string | undefined) => {
         jobs: jobData
       } as any;
       
-      console.log('🎯 Final colaborador with jobs:', finalColaborador);
 
       setColaborador(finalColaborador);
     } catch (error) {

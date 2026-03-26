@@ -41,9 +41,6 @@ export const EmployeeAbsenceRequests = ({ colaboradorName, colaboradorId }: Empl
         const newRequests = JSON.parse(localStorage.getItem('absenceRequests') || '[]');
         const oldRequests = JSON.parse(localStorage.getItem('leaveRequests') || '[]');
         
-        console.log('EmployeeAbsenceRequests - colaboradorName received:', colaboradorName);
-        console.log('EmployeeAbsenceRequests - all new requests:', newRequests);
-        console.log('EmployeeAbsenceRequests - all old requests:', oldRequests);
         
         // Combinar ambas fuentes y eliminar duplicados por ID
         const allRequests = [...newRequests, ...oldRequests];
@@ -57,7 +54,6 @@ export const EmployeeAbsenceRequests = ({ colaboradorName, colaboradorId }: Empl
           const requestEmployee = (request.empleado || request.employee)?.toLowerCase().trim();
           const colaboradorLower = colaboradorName?.toLowerCase().trim();
           
-          console.log(`Comparing: "${requestEmployee}" vs "${colaboradorLower}"`);
           
           const isNotEliminated = request.estado !== 'eliminated' && request.status !== 'eliminated';
           const nameMatch = requestEmployee === colaboradorLower ||
@@ -69,8 +65,6 @@ export const EmployeeAbsenceRequests = ({ colaboradorName, colaboradorId }: Empl
           
           return isNotEliminated && nameMatch;
         });
-
-        console.log('EmployeeAbsenceRequests - filtered employee requests:', employeeRequests);
 
         // Convertir a formato necesario
         const formattedRequests: AbsenceRequest[] = employeeRequests.map((request: any) => {

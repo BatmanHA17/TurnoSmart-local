@@ -65,13 +65,11 @@ export function HorizontalNav() {
 
   const navigateToProfile = async () => {
     if (!user) {
-      console.log('⚠️ No hay usuario logueado');
       navigate('/auth');
       return;
     }
 
     try {
-      console.log('🔍 Buscando colaborador para usuario:', user.id);
       
       // Primero intentar buscar por email del perfil actualizado
       const { data: profile, error: profileError } = await supabase
@@ -92,7 +90,6 @@ export function HorizontalNav() {
       }
 
       const emailToSearch = profile?.email;
-      console.log('📧 Email del perfil:', emailToSearch);
       
       if (!emailToSearch) {
         toast({
@@ -111,8 +108,6 @@ export function HorizontalNav() {
         .eq('email', emailToSearch)
         .maybeSingle();
 
-      console.log('📊 Resultado búsqueda colaborador:', { colaborador, error });
-
       if (error) {
         console.error('❌ Error buscando colaborador:', error);
         toast({
@@ -125,14 +120,10 @@ export function HorizontalNav() {
       }
 
       if (!colaborador) {
-        console.log('⚠️ No se encontró colaborador con email:', emailToSearch);
-        console.log('🎯 Navegando a perfil de usuario en su lugar');
         navigate('/perfil');
         return;
       }
 
-      console.log('✅ Colaborador encontrado:', colaborador.id, colaborador.nombre);
-      console.log('🎯 Navegando a perfil con datos personales');
       navigate(`/colaboradores/${colaborador.id}/profile`);
       
     } catch (error) {
@@ -367,11 +358,8 @@ export function HorizontalNav() {
                   <DropdownMenuItem 
                     className="px-4 py-3 text-sm text-red-600 hover:bg-red-50 cursor-pointer"
                     onClick={() => {
-                      console.log('🔴 LOGOUT BUTTON CLICKED');
-                      console.log('signOut function exists:', typeof signOut === 'function');
                       try {
                         signOut();
-                        console.log('🔴 signOut() called successfully');
                       } catch (error) {
                         console.error('🔴 ERROR calling signOut():', error);
                       }

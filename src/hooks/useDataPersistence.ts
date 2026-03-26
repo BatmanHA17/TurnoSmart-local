@@ -63,7 +63,6 @@ export function useDataPersistence({ orgId, onSyncComplete }: UseDataPersistence
   // Sincronizar automáticamente cuando volvemos a estar online
   useEffect(() => {
     if (isOnline && !previousOnlineState.current && hasPending) {
-      console.log('🌐 Conexión restaurada, sincronizando cambios pendientes...');
       toast({
         title: "Conexión restaurada",
         description: `Sincronizando ${pendingCount} cambios pendientes...`,

@@ -68,7 +68,6 @@ export default function LinkAccount() {
     setError('');
 
     try {
-      console.log('🔗 Linking account with password...');
       
       // Procesar invitación con contraseña para vincular cuenta
       const { data: acceptData, error: acceptError } = await supabase.functions.invoke(
@@ -89,8 +88,6 @@ export default function LinkAccount() {
       if (!acceptData.success) {
         throw new Error(acceptData.error || 'Error vinculando cuenta');
       }
-
-      console.log('✅ Account linked successfully:', acceptData);
 
       // Limpiar datos almacenados
       sessionStorage.removeItem('invite_data');

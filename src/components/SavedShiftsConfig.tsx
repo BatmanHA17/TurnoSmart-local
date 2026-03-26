@@ -63,26 +63,18 @@ export const SavedShiftsConfig = ({ onBack }: SavedShiftsConfigProps) => {
   };
 
   const formatTeamNames = (selectedTeam: string): string => {
-    console.log('🔍 formatTeamNames DEBUG:', { 
-      selectedTeam, 
-      departments: departments.length,
-      departmentsList: departments.map(d => ({ id: d.id, value: d.value }))
-    });
     
     if (!selectedTeam || selectedTeam.trim() === '') return '-';
     if (departments.length === 0) return 'Cargando...'; // Wait for departments to load
     const teamIds = parseTeamsFromString(selectedTeam);
     
-    console.log('🔍 teamIds parsed:', teamIds);
     
     if (teamIds.length === 0) return '-';
     if (teamIds.length === 1) {
       const result = getTeamNameById(teamIds[0]);
-      console.log('🔍 Single team result:', result);
       return result;
     }
     const result = `${teamIds.length} equipos`;
-    console.log('🔍 Multiple teams result:', result);
     return result;
   };
 
@@ -91,8 +83,6 @@ export const SavedShiftsConfig = ({ onBack }: SavedShiftsConfigProps) => {
     const loadSavedShifts = async () => {
       // Forzar recarga desde base de datos para obtener datos actualizados
       const shifts = await getSavedShifts(true);
-      console.log('SavedShiftsConfig - departments loaded:', departments.length);
-      console.log('SavedShiftsConfig - shifts loaded:', shifts.map(s => ({ name: s.name, selectedTeam: s.selectedTeam })));
       setSavedShifts(shifts);
     };
     loadSavedShifts();
@@ -443,7 +433,6 @@ export const SavedShiftsConfig = ({ onBack }: SavedShiftsConfigProps) => {
                         <div className="text-muted-foreground">
                           {(() => {
                             const result = formatTeamNames(shift.selectedTeam);
-                            console.log(`Shift: ${shift.name}, selectedTeam: "${shift.selectedTeam}", formatted: "${result}"`);
                             return result;
                           })()}
                         </div>
@@ -650,7 +639,6 @@ export const SavedShiftsConfig = ({ onBack }: SavedShiftsConfigProps) => {
         date={new Date()} // Fecha actual por defecto
         editingShift={editingShift} // Pasar el horario que se está editando
         onShiftAssigned={(shiftData) => {
-          console.log("Horario guardado:", shiftData);
           setRefreshKey(prev => prev + 1); // Refrescar la lista después de guardar
         }}
       />

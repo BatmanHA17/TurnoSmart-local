@@ -523,7 +523,6 @@ export function DayGrid({ employees, selectedDate, shifts, onUpdate, onDelete, o
             setShowShiftDetails(null);
           } : undefined}
           onDuplicate={permissions.canCreateShifts ? (shift) => {
-            console.log("Duplicate shift", shift);
           } : undefined}
         />
       )}

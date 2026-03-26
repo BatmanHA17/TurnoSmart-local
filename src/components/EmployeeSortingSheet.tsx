@@ -90,7 +90,6 @@ export function EmployeeSortingSheet({
   useEffect(() => {
     if (isOpen) {
       // Siempre mostrar el orden actual del calendario primero
-      console.log('Initializing manual order from current calendar:', employees.map(emp => `${emp.nombre} ${emp.apellidos}`));
       setManualOrderEmployees([...employees]);
       
       // Solo cargar orden guardado si el usuario no ha hecho cambios recientes
@@ -99,7 +98,6 @@ export function EmployeeSortingSheet({
       if (savedManualOrder && currentSortCriteria === 'manual') {
         try {
           const parsedOrder = JSON.parse(savedManualOrder);
-          console.log('Found saved manual order, but showing current calendar order first');
           // No aplicar automáticamente, solo mantener disponible
         } catch (error) {
           console.error('Error parsing saved manual order:', error);
@@ -112,7 +110,6 @@ export function EmployeeSortingSheet({
   // Only sync with employees when explicitly switching back to automatic mode
   useEffect(() => {
     if (!isManualMode && !isOpen) {
-      console.log('Syncing with employees (automatic mode, sheet closed)');
       setManualOrderEmployees([...employees]);
       // Clear saved manual order when switching to automatic
       localStorage.removeItem('manual-employee-order');
@@ -138,7 +135,6 @@ export function EmployeeSortingSheet({
     if (savedManualOrder) {
       try {
         const parsedOrder = JSON.parse(savedManualOrder);
-        console.log('Loading saved manual order on enable:', parsedOrder.map((emp: any) => emp.nombre));
         setManualOrderEmployees(parsedOrder);
         onApplySort(parsedOrder); // Apply the saved order immediately
       } catch (error) {
@@ -158,7 +154,6 @@ export function EmployeeSortingSheet({
   };
 
   const handleDragStart = (e: React.DragEvent, employeeId: string) => {
-    console.log('Drag started for employee:', employeeId);
     setDraggedEmployeeId(employeeId);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', employeeId);
@@ -173,12 +168,8 @@ export function EmployeeSortingSheet({
     e.preventDefault();
     e.stopPropagation();
     
-    console.log('=== DRAG DROP DEBUG ===');
-    console.log('Drop detected - dragged:', draggedEmployeeId, 'target:', targetEmployeeId);
-    console.log('Current manualOrderEmployees before:', manualOrderEmployees.map((emp, idx) => `${idx}: ${emp.nombre} ${emp.apellidos}`));
     
     if (!draggedEmployeeId || draggedEmployeeId === targetEmployeeId) {
-      console.log('Same employee or no dragged employee, cancelling');
       setDraggedEmployeeId(null);
       return;
     }
@@ -188,46 +179,37 @@ export function EmployeeSortingSheet({
     const draggedIndex = currentOrder.findIndex(emp => emp.id === draggedEmployeeId);
     const targetIndex = currentOrder.findIndex(emp => emp.id === targetEmployeeId);
     
-    console.log('Indices - dragged:', draggedIndex, 'target:', targetIndex);
     
     if (draggedIndex === -1 || targetIndex === -1) {
-      console.log('Invalid indices found');
       setDraggedEmployeeId(null);
       return;
     }
 
     // Get the dragged employee
     const draggedEmployee = currentOrder[draggedIndex];
-    console.log('Dragged employee:', draggedEmployee.nombre, draggedEmployee.apellidos);
 
     // Remove from old position and insert at new position
     const newOrder = [...currentOrder];
     newOrder.splice(draggedIndex, 1);
     newOrder.splice(targetIndex, 0, draggedEmployee);
     
-    console.log('New order after reorder:', newOrder.map((emp, idx) => `${idx}: ${emp.nombre} ${emp.apellidos}`));
     
     // Force state update
     setManualOrderEmployees(newOrder);
     
     // Save manual order to localStorage for persistence
     localStorage.setItem('manual-employee-order', JSON.stringify(newOrder));
-    console.log('Saved manual order to localStorage');
     
     // Apply to calendar
-    console.log('Applying to calendar...');
     onApplySort(newOrder);
     
     setDraggedEmployeeId(null);
     
-    console.log('=== END DRAG DROP DEBUG ===');
   };
 
   const handleDragEnd = () => {
-    console.log('Drag end');
     setDraggedEmployeeId(null);
   };
-
 
   const applySortCriteria = (sortId: string) => {
     setSelectedSort(sortId);
@@ -275,9 +257,7 @@ export function EmployeeSortingSheet({
     
     // Apply the sort directly to the calendar
     onApplySort(sorted);
-    console.log('Applied sort directly to calendar:', sortOption.label);
   };
-
 
   const groupedOptions = sortOptions.reduce((acc, option) => {
     if (!acc[option.category]) {

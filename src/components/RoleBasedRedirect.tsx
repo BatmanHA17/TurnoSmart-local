@@ -23,11 +23,9 @@ export default function RoleBasedRedirect() {
 
       try {
         // Adjuntar memberships pendientes de invitaciones por email
-        console.log('Adjuntando memberships pendientes...');
         const { data: attachedMemberships } = await supabase.rpc('attach_memberships_for_current_user');
         
         if (attachedMemberships && attachedMemberships.length > 0) {
-          console.log('Memberships adjuntados:', attachedMemberships);
           // Refrescar datos después de adjuntar memberships
           window.location.reload();
           return;
@@ -39,7 +37,6 @@ export default function RoleBasedRedirect() {
 
       // Check if user needs onboarding (has no organizations)
       if (organizations && organizations.length === 0) {
-        console.log('Usuario sin organizaciones, redirigiendo a onboarding');
         navigate('/onboarding/wizard', { replace: true });
         return;
       }
@@ -47,7 +44,6 @@ export default function RoleBasedRedirect() {
       // User has organizations, redirect based on role
       if (role) {
         const dashboard = getDefaultDashboard();
-        console.log(`Redirecting user with role ${role} to ${dashboard}`);
         navigate(dashboard, { replace: true });
       }
     };

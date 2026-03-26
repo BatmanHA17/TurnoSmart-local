@@ -12,7 +12,6 @@ export default function PaymentPreferencesSettings() {
   const [showBonificationsOnEmployeePage, setShowBonificationsOnEmployeePage] = useState(true);
 
   useEffect(() => {
-    console.log("🔥 PaymentPreferencesSettings - PRENÓMINA PAGE LOADED!");
     document.title = "Prenómina | TurnoSmart";
   }, []);
 

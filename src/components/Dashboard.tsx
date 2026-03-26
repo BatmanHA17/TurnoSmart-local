@@ -16,7 +16,6 @@ export function Dashboard() {
   // Redirect to onboarding if user has no organizations
   useEffect(() => {
     if (!orgLoading && organizations && organizations.length === 0) {
-      console.log('Dashboard: User has no organizations, redirecting to onboarding wizard');
       navigate('/onboarding/wizard', { replace: true });
     }
   }, [organizations, orgLoading, navigate]);

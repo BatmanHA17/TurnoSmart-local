@@ -305,7 +305,6 @@ export function CuadranteEditor({ selectedCuadranteId, readOnly = false, onBack 
     upsertCuadrante(summary);
     upsertCuadranteData(updated);
 
-    console.log('Guardando cuadrante:', updated);
     
     toast({
       title: "Horario guardado",

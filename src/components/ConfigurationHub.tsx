@@ -345,7 +345,6 @@ export function ConfigurationHub() {
   };
 
   const handleConfigurationComplete = (configId: string) => {
-    console.log(`Configuración completada: ${configId}`);
     setCurrentView(null);
     
     // Pequeño delay para asegurar que el DOM se actualice antes del scroll

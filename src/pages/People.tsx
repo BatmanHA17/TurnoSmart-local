@@ -106,7 +106,6 @@ export default function People() {
       if (membershipError) throw membershipError;
       
       if (!memberships || memberships.length === 0) {
-        console.log('No organization found for user');
         return;
       }
 

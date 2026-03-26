@@ -66,7 +66,6 @@ export function useDataProtection() {
         throw insertError;
       }
 
-      console.log(`✅ Backup creado exitosamente: ${data.id} (${operationType})`);
       return data.id;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
@@ -158,7 +157,6 @@ export function useDataProtection() {
         // No es crítico, continuamos
       }
 
-      console.log(`✅ Backup restaurado exitosamente: ${backupId}`);
       toast({
         title: "Backup restaurado",
         description: `Operación "${backup.operation_type}" restaurada correctamente`,
@@ -191,7 +189,6 @@ export function useDataProtection() {
         throw error;
       }
 
-      console.log('✅ Backups expirados limpiados');
     } catch (err) {
       console.error('Error limpiando backups expirados:', err);
     }

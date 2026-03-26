@@ -30,12 +30,10 @@ export default function HROverview() {
   const handleFiltersChange = (newFilters: any) => {
     setFilters(newFilters);
     // TODO: Fetch data based on filters
-    console.log('Filters changed:', newFilters);
   };
 
   const handleExport = async (format: 'csv' | 'excel' | 'pdf') => {
     // TODO: Implement actual export functionality
-    console.log(`Exporting as ${format}`);
     
     // Simulate export process
     return new Promise((resolve) => {

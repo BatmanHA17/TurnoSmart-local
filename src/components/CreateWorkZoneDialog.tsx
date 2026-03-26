@@ -15,7 +15,6 @@ export function CreateWorkZoneDialog({ isOpen, onClose }: CreateWorkZoneDialogPr
 
   const handleSubmit = () => {
     // TODO: Implement zone creation logic
-    console.log("Creating zone:", zoneName);
     onClose();
   };
 

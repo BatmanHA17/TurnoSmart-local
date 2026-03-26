@@ -219,13 +219,6 @@ export const useCalendarPublishState = (currentWeek: Date) => {
             );
 
             isModification = affectedEmployeeIds.length > 0;
-            console.log('🔍 Detección de cambios:', {
-              turnosActuales: currentShiftsNormalized.length,
-              turnosPrevios: prevShiftData.shifts.length,
-              empleadosAfectados: affectedEmployeeIds.length,
-              esModificacion: isModification,
-              ids: affectedEmployeeIds
-            });
           }
         } catch (detectError) {
           console.warn('⚠️ Error detectando cambios, enviando a todos:', detectError);
@@ -340,11 +333,8 @@ export const useCalendarPublishState = (currentWeek: Date) => {
         // Solo incluir affectedEmployeeIds si hay cambios específicos
         if (affectedEmployeeIds && affectedEmployeeIds.length > 0) {
           notificationPayload.affectedEmployeeIds = affectedEmployeeIds;
-          console.log(`📧 Enviando notificaciones a ${affectedEmployeeIds.length} empleados afectados (modificación)`);
         } else if (affectedEmployeeIds && affectedEmployeeIds.length === 0) {
-          console.log('✨ Sin cambios detectados - no se envían notificaciones');
         } else {
-          console.log(`📧 Primera publicación - enviando a todos los empleados`);
         }
 
         const { error: notifyError } = await supabase.functions.invoke('notify-calendar-published', {

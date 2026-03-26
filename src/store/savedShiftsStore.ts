@@ -99,13 +99,10 @@ export async function clearSavedShifts(): Promise<void> {
 
 export async function getSavedShifts(forceReload = false): Promise<SavedShift[]> {
   if (shiftsCache && !forceReload) {
-    console.log('📦 Returning cached shifts:', shiftsCache.length);
     return shiftsCache;
   }
-  console.log('🔄 Loading fresh data from database...');
   shiftsCache = null; // Clear cache to force reload
   const shifts = await read();
-  console.log('✅ Loaded shifts from database:', shifts.length);
   return shifts;
 }
 
@@ -187,7 +184,6 @@ export async function addSavedShift(shift: Omit<SavedShift, 'id' | 'createdAt' |
         if (!exists) {
           favorites.push(newShift);
           localStorage.setItem(favoritesKey, JSON.stringify(favorites));
-          console.log('✅ Horario añadido automáticamente a favoritos:', newShift.name);
         }
       } catch (e) {
         console.warn('No se pudo añadir a favoritos:', e);
@@ -267,7 +263,6 @@ export async function updateSavedShift(id: string, updates: Partial<SavedShift>)
 
     // Si cambió el nombre, actualizar también los registros de calendar_shifts
     if (updates.name && oldShiftName && updates.name !== oldShiftName) {
-      console.log(`🔄 Actualizando calendar_shifts de "${oldShiftName}" a "${updates.name}"`);
       const { error: calendarError } = await supabase
         .from('calendar_shifts')
         .update({ shift_name: updates.name })
@@ -276,7 +271,6 @@ export async function updateSavedShift(id: string, updates: Partial<SavedShift>)
       if (calendarError) {
         console.error('Error updating calendar_shifts:', calendarError);
       } else {
-        console.log('✅ calendar_shifts actualizados correctamente');
       }
     }
     
@@ -320,7 +314,6 @@ function syncLocalStorageFavorites(shiftId: string, oldName?: string, newName?: 
     });
     
     localStorage.setItem('turnosmart-favorite-shifts', JSON.stringify(updatedFavorites));
-    console.log('🧹 localStorage favoritos sincronizados - eliminados duplicados de:', oldName || shiftId);
   } catch (error) {
     console.error('Error syncing localStorage favorites:', error);
   }
@@ -360,7 +353,6 @@ export async function removeSavedShift(id: string): Promise<boolean> {
 
 // Initialize cache on module load - NO AUTO-GENERATION
 read().then(async (shifts) => {
-  console.log('Saved shifts cache initialized with', shifts.length, 'shifts');
   // ❌ ELIMINADO: Auto-generación de turnos por defecto que causaba bucles infinitos
   // El usuario debe crear sus propios turnos manualmente para evitar regeneración automática
 });

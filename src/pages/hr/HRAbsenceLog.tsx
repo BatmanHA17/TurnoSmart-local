@@ -28,7 +28,6 @@ export default function HRAbsenceLog() {
 
   const handleEmpleadoClick = (ausencia: Ausencia) => {
     // TODO: Navegación a página de datos personales del empleado
-    console.log("Navegando a empleado:", ausencia.nombre);
     // Simular navegación como en el tutorial
     alert(`Navegando a datos personales de ${ausencia.nombre}`);
   };

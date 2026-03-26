@@ -101,7 +101,6 @@ export const createOrUpdateColaborador = async (
         
       if (updateError) throw updateError;
       colaboradorResult = updateData;
-      console.log('✅ Colaborador actualizado exitosamente:', colaboradorResult.id);
     } else {
       // Create new colaborador
       const { data: insertData, error: insertError } = await supabase
@@ -112,12 +111,10 @@ export const createOrUpdateColaborador = async (
         
       if (insertError) throw insertError;
       colaboradorResult = insertData;
-      console.log('✅ Colaborador creado exitosamente:', colaboradorResult.id);
     }
 
     // 2. Handle health data in normalized table
     if (healthData) {
-      console.log('💾 Guardando datos de salud:', healthData);
       const healthDataWithIds = {
         ...healthData,
         colaborador_id: colaboradorResult.id,
@@ -134,13 +131,11 @@ export const createOrUpdateColaborador = async (
         console.error('Error saving health data:', healthError);
         // Don't throw - health data is optional
       } else {
-        console.log('✅ Datos de salud guardados exitosamente');
       }
     }
 
     // 3. Handle emergency contact data in normalized table
     if (emergencyContactData && (emergencyContactData.nombre || emergencyContactData.telefono_movil)) {
-      console.log('📞 Guardando datos de contacto de emergencia:', emergencyContactData);
       const emergencyDataWithIds = {
         ...emergencyContactData,
         colaborador_id: colaboradorResult.id,
@@ -157,13 +152,11 @@ export const createOrUpdateColaborador = async (
         console.error('Error saving emergency contact data:', emergencyError);
         // Don't throw - emergency contact data is optional
       } else {
-        console.log('✅ Datos de contacto de emergencia guardados exitosamente');
       }
     }
 
     // 4. Handle banking data in normalized table
     if (bankingData && (bankingData.nombre_titular || bankingData.iban || bankingData.bic)) {
-      console.log('🏦 Guardando datos bancarios:', bankingData);
       const bankingDataWithIds = {
         ...bankingData,
         colaborador_id: colaboradorResult.id,
@@ -180,13 +173,11 @@ export const createOrUpdateColaborador = async (
         console.error('Error saving banking data:', bankingError);
         // Don't throw - banking data is optional
       } else {
-        console.log('✅ Datos bancarios guardados exitosamente');
       }
     }
 
     // Handle department assignments if provided
     if (selectedDepartments && selectedDepartments.length > 0) {
-      console.log('🏢 Handling department assignments:', selectedDepartments);
       
       // First, delete all existing assignments for this colaborador
       const { error: deleteError } = await supabase
@@ -216,7 +207,6 @@ export const createOrUpdateColaborador = async (
         console.error('Error creating department assignments:', assignmentError);
         // Don't throw - department assignments are not critical
       } else {
-        console.log('✅ Department assignments saved successfully');
       }
     }
 

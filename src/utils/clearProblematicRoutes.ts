@@ -7,13 +7,11 @@ export const clearProblematicRoutes = () => {
     const savedRoute = sessionStorage.getItem('lastRoute');
     if (savedRoute && problematicRoutes.some(route => savedRoute.includes(route))) {
       sessionStorage.removeItem('lastRoute');
-      console.log('Cleared problematic route from sessionStorage:', savedRoute);
     }
     
     // Check current URL and redirect if necessary
     const currentPath = window.location.pathname;
     if (problematicRoutes.some(route => currentPath.includes(route))) {
-      console.log('Redirecting from problematic route:', currentPath);
       window.location.replace('/dashboard');
       return true;
     }

@@ -156,13 +156,11 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   
   // Wrapper para undo que marca que es una operación de undo/redo
   const undo = useCallback(() => {
-    console.log('🔙 UNDO operation triggered');
     isUndoRedoOperation.current = true;
     undoBase();
   }, [undoBase]);
   
   const redo = useCallback(() => {
-    console.log('🔜 REDO operation triggered');
     isUndoRedoOperation.current = true;
     redoBase();
   }, [redoBase]);
@@ -170,10 +168,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   // Sincronizar shiftBlocks con undo/redo state SOLO en operaciones de undo/redo
   useEffect(() => {
     if (isUndoRedoOperation.current && undoRedoState !== shiftBlocks) {
-      console.log('🔄 Syncing undo/redo state to shiftBlocks', { 
-        undoRedoCount: undoRedoState.length,
-        currentCount: shiftBlocks.length 
-      });
       
       // CRÍTICO: Actualizar directamente sin pasar por setShiftBlocksWithHistory
       // para evitar guardar este cambio en el historial
@@ -227,7 +221,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   // Wrapper para setShiftBlocks que guarda automáticamente en historial Undo/Redo Y persiste inmediatamente
   const setShiftBlocksWithHistory = useCallback((updater: ShiftBlock[] | ((prev: ShiftBlock[]) => ShiftBlock[])) => {
     setShiftBlocks(prevBlocks => {
-      console.log('🔄 setShiftBlocksWithHistory START - prevBlocks count:', prevBlocks.length);
 
       // CRÍTICO: Guardar el estado ACTUAL (prevBlocks) ANTES de aplicar cualquier cambio
       saveUndoState(prevBlocks);
@@ -242,8 +235,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         }
         return b;
       });
-
-      console.log('🔄 setShiftBlocksWithHistory END - newBlocks count:', newBlocks.length);
 
       // Marcar como cambio no guardado
       setHasUnsavedChanges(true);
@@ -430,10 +421,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   
   // Debug de permisos
   useEffect(() => {
-    console.log("🔍 Debug de permisos del usuario:");
-    console.log("- isAdmin:", isAdmin);
-    console.log("- role:", role);
-    console.log("- roleLoading:", roleLoading);
   }, [isAdmin, role, roleLoading]);
   
   // Punto 8: Por defecto siempre aparece en current week (lunes actual)
@@ -619,7 +606,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         return;
       }
 
-      console.log('📊 Colaboradores activos cargados desde Supabase:', data?.length || 0);
       setColaboradores(data || []);
       
       // Convertir colaboradores a formato Employee y actualizar el estado
@@ -654,7 +640,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
               return a.name.localeCompare(b.name);
             });
             
-            console.log('✅ Orden manual restaurado desde localStorage');
             setSortBy('manual');
             localStorage.setItem('calendar-sort-criteria', 'manual');
           } catch (error) {
@@ -663,7 +648,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           }
         }
         
-        console.log('✅ Empleados mapeados para calendario:', finalEmployees.map(e => e.name));
         setEmployees(finalEmployees);
         
         // Sincronizar con localStorage
@@ -690,13 +674,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     // Recalcular el inicio de la semana basado en currentWeek
     const calculatedWeekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
     
-    console.log('📅 Semana cambió, recargando turnos...', {
-      currentWeek: format(currentWeek, 'yyyy-MM-dd'),
-      weekStart: format(calculatedWeekStart, 'yyyy-MM-dd'),
-      weekEnd: format(addDays(calculatedWeekStart, 6), 'yyyy-MM-dd'),
-      orgId: currentOrg?.org_id,
-      employeeCount: employees.length
-    });
     
     // Solo cargar si tenemos org Y empleados, para evitar cargas innecesarias
     if (currentOrg?.org_id && employees.length > 0) {
@@ -765,16 +742,13 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           };
         });
 
-        console.log('📅 Turnos cargados desde Supabase con sincronización:', mappedShifts.length);
         
         // SIEMPRE recargar desde Supabase para asegurar sincronización
         setShiftBlocks(() => {
-          console.log('🔄 Recargando turnos desde Supabase para sincronización completa');
           localStorage.setItem('calendar-shift-blocks', JSON.stringify(mappedShifts));
           return mappedShifts;
         });
       } else {
-        console.log('📅 No hay turnos en Supabase');
         // Limpiar estado si no hay turnos
         setShiftBlocks([]);
         localStorage.removeItem('calendar-shift-blocks');
@@ -1048,16 +1022,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       ? Math.round(targetColaborador.tiempo_trabajo_semanal / 5) 
       : targetEmployee?.name ? getWeeklyHoursFromColaborador(targetEmployee.name) / 5 : 8;
 
-    console.log('Adaptando shift block:', { 
-      shiftName: shift.name, 
-      originalStart: shift.startTime, 
-      originalEnd: shift.endTime,
-      sourceContractHours,
-      targetContractHours,
-      sourceEmployee: sourceEmployee?.name,
-      targetEmployee: targetEmployee?.name
-    });
-
     // Si ambos tienen las mismas horas de contrato, no adaptar
     if (sourceContractHours === targetContractHours) {
       return {
@@ -1108,13 +1072,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       ? Math.round(targetColaborador.tiempo_trabajo_semanal / 5) // horas diarias
       : targetEmployee?.name ? getWeeklyHoursFromColaborador(targetEmployee.name) / 5 : 8;
     
-    console.log('Adaptando turno:', { 
-      shiftName: shift.name, 
-      originalStart: shift.startTime, 
-      originalEnd: shift.endTime,
-      contractHours,
-      targetEmployee: targetEmployee?.name
-    });
 
     // Si es un turno de ausencia (libre), no adaptarlo
     if (shift.accessType === 'absence' || shift.name === 'Descanso Semanal') {
@@ -1170,22 +1127,16 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       return acc;
     }, []);
     
-    console.log("updateEmployees - antes de duplicados:", newEmployees.map(e => `${e.id}: ${e.name}`));
-    console.log("updateEmployees - después de filtrar duplicados:", uniqueEmployees.map(e => `${e.id}: ${e.name}`));
     
     setEmployees(uniqueEmployees);
     localStorage.setItem('calendar-employees', JSON.stringify(uniqueEmployees));
-    console.log("Empleados guardados en localStorage (sin duplicados):", uniqueEmployees.map(e => `${e.id}: ${e.name}`));
   };
 
   // Función para eliminar empleado del calendario con validación
   const removeEmployeeFromCalendar = (employeeId: string, employeeName: string) => {
-    console.log("🚀 removeEmployeeFromCalendar iniciada:", { employeeId, employeeName });
-    console.log("🚀 isAdmin valor:", isAdmin);
     
     // Verificar permisos: solo admin, super_admin y roles superiores pueden eliminar empleados
     if (!isAdmin) {
-      console.log("❌ Sin permisos - isAdmin es false");
       // toast({
       //   title: "Sin permisos",
       //   description: "No tienes permisos para eliminar empleados del calendario.",
@@ -1193,8 +1144,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       // });
       return;
     }
-
-    console.log("✅ Permisos OK - continuando con validación de horarios");
 
     // Verificar si el empleado tiene horarios asignados (filtrar horarios válidos)
     const employeeShifts = shiftBlocks.filter(shift => 
@@ -1204,18 +1153,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       shift.date
     );
     
-    console.log(`Verificando eliminación de ${employeeName}:`, {
-      employeeId,
-      totalShiftBlocks: shiftBlocks.length,
-      employeeShifts: employeeShifts.length,
-      allShifts: shiftBlocks.map(s => ({ 
-        id: s.id, 
-        employeeId: s.employeeId, 
-        name: s.name,
-        startTime: s.startTime,
-        endTime: s.endTime 
-      }))
-    });
     
     if (employeeShifts.length > 0) {
       // Mostrar confirmación para forzar eliminación
@@ -1262,11 +1199,9 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   // Cargar colaboradores cuando currentOrg esté disponible
   useEffect(() => {
     if (!currentOrg?.org_id) {
-      console.log('⏳ Esperando currentOrg para cargar colaboradores...');
       return;
     }
     
-    console.log('🚀 Inicializando GoogleCalendarStyle con org:', currentOrg.org_id);
     loadColaboradores();
   }, [currentOrg?.org_id]); // Ejecutar cuando currentOrg esté disponible
 
@@ -1299,7 +1234,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           `Limpieza completa del calendario - ${shiftBlocks.length} turnos`,
           shiftBlocks.length
         );
-        console.log('🛡️ Backup de seguridad creado antes de limpiar calendario');
       }
       
       // 1. Eliminar todos los turnos de la organización actual desde Supabase
@@ -1312,7 +1246,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         if (error) {
           console.error('Error eliminando turnos de Supabase:', error);
         } else {
-          console.log('✅ Todos los turnos eliminados de Supabase');
         }
       }
       
@@ -1322,7 +1255,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       // 3. Limpiar estado local
       setShiftBlocks([]);
       
-      console.log("✅ LocalStorage, Supabase y shiftBlocks limpiados completamente");
       
       toast({
         title: "✅ Calendario limpiado",
@@ -1358,7 +1290,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         return false;
       }
       
-      console.log('✅ Turno eliminado de Supabase:', shiftId);
       
       // Log activity
       if (shiftData) {
@@ -1416,7 +1347,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         return false;
       }
 
-      console.log('✅ Turno persistido en Supabase:', data);
       
       // Log activity
       const employee = employees.find(e => e.id === shift.employeeId);
@@ -1459,8 +1389,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       // Normalizar el nombre para evitar problemas de espacios
       const normalizedOldName = oldShiftName.trim();
       
-      console.log(`🔄 INICIANDO actualización EN LOTE de todos los turnos "${normalizedOldName}"`);
-      console.log('📝 Datos nuevos:', updatedShiftData);
       
       // Primero, verificar cuántos turnos hay con este nombre ANTES de actualizar
       const { data: existingShifts, error: countError } = await supabase
@@ -1472,9 +1400,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       if (countError) {
         console.error('❌ Error verificando turnos:', countError);
       } else {
-        console.log(`📊 ANTES DE ACTUALIZAR: Encontrados ${existingShifts?.length || 0} turnos con nombre "${normalizedOldName}":`, 
-          existingShifts?.map(s => ({ id: s.id, employee: s.employee_id, date: s.date, color: s.color }))
-        );
       }
       
       // 1. Actualizar en Supabase usando match EXACTO del nombre - TODOS A LA VEZ
@@ -1502,16 +1427,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         return false;
       }
 
-      console.log(`✅ ACTUALIZACIÓN EN LOTE COMPLETADA: ${updatedRecords?.length || 0} registros actualizados`);
-      console.log('📦 Registros DESPUÉS de actualizar:', updatedRecords?.map(r => ({
-        id: r.id,
-        name: r.shift_name,
-        employee: r.employee_id,
-        date: r.date,
-        color: r.color,
-        start_time: r.start_time,
-        end_time: r.end_time
-      })));
       
       // Verificar que la actualización fue exitosa
       if (updatedRecords && updatedRecords.length !== existingShifts?.length) {
@@ -1522,7 +1437,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       // Esperar un momento para asegurar que la actualización se haya completado en la BD
       await new Promise(resolve => setTimeout(resolve, 200));
       
-      console.log('🔄 Recargando TODOS los turnos desde Supabase DESPUÉS de actualización en lote...');
       const { data: allShifts, error: fetchError } = await supabase
         .from('calendar_shifts')
         .select('*')
@@ -1537,20 +1451,11 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           variant: "destructive",
         });
       } else if (allShifts) {
-        console.log(`📊 Recargados ${allShifts.length} turnos desde Supabase DESPUÉS de actualización`);
         
         // Verificar que los turnos actualizados están presentes
         const verifyUpdated = allShifts.filter(s => 
           s.shift_name === (updatedShiftData.name || normalizedOldName)
         );
-        console.log(`✅ Verificación: ${verifyUpdated.length} turnos con nombre actualizado "${updatedShiftData.name || normalizedOldName}"`);
-        console.log('📋 Turnos verificados:', verifyUpdated.map(s => ({
-          id: s.id,
-          name: s.shift_name,
-          employee: s.employee_id,
-          date: s.date,
-          color: s.color
-        })));
         
         // Convertir TODOS los datos de Supabase al formato ShiftBlock
         const convertedShifts: ShiftBlock[] = allShifts.map((shift: any) => ({
@@ -1575,17 +1480,14 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         // 3. Actualizar el estado local COMPLETAMENTE con los datos de Supabase
         setShiftBlocks(() => {
           localStorage.setItem('calendar-shift-blocks', JSON.stringify(convertedShifts));
-          console.log(`💾 Estado LOCAL actualizado COMPLETAMENTE con ${convertedShifts.length} turnos`);
           
           // Contar cuántos tienen el nombre actualizado
           const updatedNameCount = convertedShifts.filter(s => 
             s.name === (updatedShiftData.name || normalizedOldName)
           ).length;
-          console.log(`✅ Turnos con nombre "${updatedShiftData.name || normalizedOldName}": ${updatedNameCount}`);
           
           // Verificar que NO hay turnos con nombres incorrectos actualizados
           const allShiftNames = new Set(convertedShifts.map(s => s.name));
-          console.log('📋 Nombres de turnos en el estado:', Array.from(allShiftNames));
           
           return convertedShifts;
         });
@@ -1605,7 +1507,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         }
       });
 
-      console.log(`✅✅✅ COMPLETADO: Todos los turnos "${oldShiftName}" actualizados y sincronizados`);
       
       // 5. Esperar un momento adicional para asegurar que no hay operaciones en curso que sobrescriban
       await new Promise(resolve => setTimeout(resolve, 300));
@@ -1617,15 +1518,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         .eq('shift_name', updatedShiftData.name || normalizedOldName)
         .eq('org_id', currentOrg?.org_id || null);
       
-      console.log(`🔍 Verificación FINAL: ${finalCheck?.length || 0} turnos con nombre "${updatedShiftData.name || normalizedOldName}"`);
       if (finalCheck && finalCheck.length > 0) {
-        console.log('✅ Muestra de turnos verificados:', finalCheck.slice(0, 3).map(s => ({
-          id: s.id,
-          name: s.shift_name,
-          color: s.color,
-          start: s.start_time,
-          end: s.end_time
-        })));
       }
       
       toast({
@@ -1647,12 +1540,9 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
 
   // SOLO guardar en localStorage cuando se modifica explícitamente
   const updateShiftBlocks = async (newShiftBlocks: ShiftBlock[]) => {
-    console.log('🔄 Actualizando shiftBlocks:', newShiftBlocks.length, 'turnos');
     setShiftBlocks(newShiftBlocks);
     try {
       localStorage.setItem('calendar-shift-blocks', JSON.stringify(newShiftBlocks));
-      console.log("=== GUARDANDO EN LOCALSTORAGE ===");
-      console.log("Shifts being saved:", newShiftBlocks.length);
       
       // Guardar en Supabase - PREVENIENDO DUPLICADOS
       if (currentOrg?.org_id) {
@@ -1699,11 +1589,9 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         if (error) {
           console.error('Error guardando turno en Supabase:', error);
         } else {
-          console.log(`✅ Turno "${shift.name}" guardado para ${shift.employeeId} en ${format(shift.date, 'yyyy-MM-dd')}`);
         }
       }
       
-      console.log('✅ Todos los turnos guardados en Supabase sin duplicados');
     } catch (error) {
       console.error('Error en saveShiftsToSupabase:', error);
     }
@@ -1712,7 +1600,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   // Función para recargar turnos y sincronizar cambios de horarios guardados
   const reloadAndSyncShifts = async () => {
     if (employees.length > 0) {
-      console.log('🔄 Recargando turnos para sincronizar cambios...');
       await loadShiftsFromSupabase(employees.map(e => e.id));
     }
   };
@@ -1721,7 +1608,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'saved-shifts-updated') {
-        console.log('🔄 Detectado cambio en horarios guardados, sincronizando...');
         reloadAndSyncShifts();
       }
     };
@@ -1732,11 +1618,9 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
 
   // ❌ REMOVED: Debug functionality no longer needed
 
-
   // Inicializar horarios guardados desde la base de datos
   useEffect(() => {
     getSavedShifts().then(() => {
-      console.log('Shifts loaded from database');
     });
   }, []);
 
@@ -1805,7 +1689,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       updateEmployees(updatedEmployees);
       
       // ❌ DISABLED: Auto-generation of "Primer día" for new employees removed
-      console.log(`ℹ️ Auto-generation disabled. Found ${newEmployeesAdded.length} new employees but will not create automatic shifts.`);
       
       // Limpiar empleados seleccionados después de procesarlos
       clearSelectedEmployees();
@@ -1885,36 +1768,19 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     const isDebugEmployee = false; // Disabled debug mode
     
     if (isDebugEmployee) {
-      console.log("=== calculateEmployeeHours DEBUG DETALLADO ===");
-      console.log("EmployeeId:", employeeId);
-      console.log("Total shiftBlocks:", shiftBlocks.length);
-      console.log("All employeeIds in shifts:", shiftBlocks.map(s => s.employeeId));
-      console.log("Filtered shifts for employee:", shifts);
       
       shifts.forEach((shift, index) => {
-        console.log(`--- Shift ${index + 1} ---`);
-        console.log("Shift data:", shift);
-        console.log("Shift name:", shift.name);
-        console.log("Shift type:", shift.type);
-        console.log("Start time:", shift.startTime);
-        console.log("End time:", shift.endTime);
-        console.log("shouldCountHours:", shouldCountHours(shift));
-        console.log("getShiftHours:", getShiftHours(shift));
-        console.log("calculateShiftHours raw:", calculateShiftHours(shift.startTime, shift.endTime));
       });
     }
     
     const totalHours = shifts.reduce((total, shift) => {
       const shiftHours = getShiftHours(shift);
       if (employeeId === "2") {
-        console.log(`Adding ${shiftHours} hours from shift: ${shift.name}`);
       }
       return total + shiftHours;
     }, 0);
     
     if (employeeId === "2") {
-      console.log("TOTAL HOURS CALCULATED:", totalHours);
-      console.log("==================================");
     }
     
     return totalHours;
@@ -1962,7 +1828,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     // Si no tiene horarios asignados, devolver 0h
     const shiftsForEmployee = shiftBlocks.filter(shift => shift.employeeId === employeeId);
     if (shiftsForEmployee.length === 0) {
-      console.log(`=== ${employee.name} SIN HORARIOS ===`);
       return { 
         plannedHours: 0, 
         hoursToPlanned: contractHours, 
@@ -1974,13 +1839,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     const hoursToPlanned = Math.max(0, contractHours - plannedHours);
     
     // DEBUG GENERALIZADO para empleados con turnos
-    console.log(`=== CALCULANDO ${employee.name} ===`);
-    console.log("Employee ID:", employeeId);
-    console.log("Shifts encontrados:", shiftsForEmployee.length);
-    console.log("Horas planificadas calculadas:", plannedHours);
-    console.log("Horas de contrato:", contractHours);
-    console.log("Horas restantes por planificar:", hoursToPlanned);
-    console.log("========================================");
     
     // Simulate contract months remaining (in a real app this would come from contract data)
     const contractMonths = 9; // "9m" as shown in TurnoSmart example
@@ -1995,19 +1853,12 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   const getContractHours = (employeeId: string) => {
     const employee = employees.find(emp => emp.id === employeeId);
     
-    console.log(`=== getContractHours DEBUG para employeeId: ${employeeId} ===`);
-    console.log("Employee encontrado:", employee);
-    console.log("workingHours del employee:", employee?.workingHours);
     
     // Extraer las horas semanales del workingHours (formato: "0h/40h")
     const workingHours = employee?.workingHours || "0h/40h";
     const weeklyHours = workingHours.split('/')[1] || "40h";
     const weeklyHoursNumber = parseInt(weeklyHours.replace('h', ''));
     
-    console.log("workingHours parseadas:", workingHours);
-    console.log("weeklyHours extraídas:", weeklyHours);
-    console.log("weeklyHoursNumber final:", weeklyHoursNumber);
-    console.log("Resultado final:", `${weeklyHoursNumber}h semanales`);
     
     return `${weeklyHoursNumber}h semanales`;
   };
@@ -2183,7 +2034,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     // CRITICAL FIX: Usar callback para mantener estado consistente + Undo/Redo
     setShiftBlocksWithHistory(currentShifts => {
       const updatedShifts = [...currentShifts, newShift];
-      console.log(`🔄 Turno añadido: ${currentShifts.length} -> ${updatedShifts.length} turnos`);
       // Persistir inmediatamente en localStorage
       localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
       return updatedShifts;
@@ -2242,7 +2092,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       
       setShiftBlocksWithHistory(currentShifts => {
         const updatedShifts = [...currentShifts, newShift];
-        console.log(`🔄 Turno ${absenceInfo.name} añadido: ${currentShifts.length} -> ${updatedShifts.length} turnos`);
         localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
         return updatedShifts;
       });
@@ -2285,7 +2134,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       // CRITICAL FIX: Usar callback para mantener estado consistente + Undo/Redo
       setShiftBlocksWithHistory(currentShifts => {
         const updatedShifts = [...currentShifts, newShift];
-        console.log(`🔄 Turno slot añadido: ${currentShifts.length} -> ${updatedShifts.length} turnos`);
         // Persistir inmediatamente en localStorage
         localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
         return updatedShifts;
@@ -2426,18 +2274,15 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     
     // CRITICAL PROTECTION: Solo procesar si realmente se originó de una interacción de usuario válida
     if (!e.isTrusted) {
-      console.log('🚫 Drop event rechazado: no es trusted');
       return;
     }
     
     // PROTECTION: Verificar que existe data válido del drag (text/plain o application/json)
     const dragDataRaw = e.dataTransfer?.getData('text/plain') || e.dataTransfer?.getData('application/json');
     if (!dragDataRaw) {
-      console.log('🚫 Drop event rechazado: no hay data de drag');
       return;
     }
     
-    console.log('handleDrop called', { targetEmployeeId, targetDate, currentDropAction });
     setDragOverCell(null);
     setIsDragging(false);
     setHoveredZone(null);
@@ -2496,12 +2341,9 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         absenceCode: isAbsence ? (draggedFavorite as any).absenceCode || draggedFavorite.name : undefined
       };
       
-      console.log('🎯 DROP: Adding favorite shift to calendar', { employeeId: targetEmployeeId, date: targetDate });
       
       setShiftBlocksWithHistory(currentShifts => {
-        console.log('🎯 DROP: Before adding favorite - shifts count:', currentShifts.length);
         const updatedShifts = [...currentShifts, newShift];
-        console.log('🎯 DROP: After adding favorite - shifts count:', updatedShifts.length);
         localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
         return updatedShifts;
       });
@@ -2547,7 +2389,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     
     try {
       const dragData = JSON.parse(e.dataTransfer.getData('application/json'));
-      console.log('Drag data received:', dragData);
       
       // Manejar si viene desde favoritos a través de dataTransfer
       if (dragData.type === 'favorite' && dragData.shift) {
@@ -2593,12 +2434,10 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       }
       
       const { shift, sourceEmployeeId } = dragData;
-      console.log('Regular shift drag data:', { shift, sourceEmployeeId });
       
       // Si es el mismo empleado y la misma fecha, no hacer nada
       if (sourceEmployeeId === targetEmployeeId && 
           format(new Date(shift.date), 'yyyy-MM-dd') === format(targetDate, 'yyyy-MM-dd')) {
-        console.log('Same position, no action needed');
         return;
       }
       
@@ -2613,13 +2452,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       
       const action = dropAction || currentDropAction || 'move';
       
-      console.log('Drop action determined:', { 
-        dropAction, 
-        currentDropAction, 
-        finalAction: action,
-        targetElement: target.className,
-        targetDataAction: target.getAttribute('data-drop-action')
-      });
       
       if (action === 'duplicate') {
         // Duplicar: crear nuevo horario sin eliminar el original
@@ -2635,12 +2467,9 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           endTime: adaptedTimes.endTime
         };
         
-        console.log('🎯 DROP: Duplicating shift', { from: sourceEmployeeId, to: targetEmployeeId });
         
         setShiftBlocksWithHistory(currentShifts => {
-          console.log('🎯 DROP: Before duplicate - shifts count:', currentShifts.length);
           const updatedShifts = [...currentShifts, newShift];
-          console.log('🎯 DROP: After duplicate - shifts count:', updatedShifts.length);
           localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
           return updatedShifts;
         });
@@ -2652,7 +2481,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         
         // Mostrar información de adaptación si fue necesaria
         if (adaptedTimes.adapted) {
-          console.log(`✅ Turno "${shift.name}" duplicado y adaptado de ${adaptedTimes.originalHours}h a ${adaptedTimes.adaptedHours}h para ${employees.find(e => e.id === targetEmployeeId)?.name}`);
         }
         
         // toast({
@@ -2664,12 +2492,9 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         // Adaptar el turno al contrato del empleado objetivo
         const adaptedTimes = adaptShiftBlockToContract(shift, sourceEmployeeId, targetEmployeeId);
         
-        console.log('🎯 DROP: Moving shift', { from: sourceEmployeeId, to: targetEmployeeId, shiftId: shift.id });
         
         setShiftBlocksWithHistory(currentShifts => {
-          console.log('🎯 DROP: Before move - shifts count:', currentShifts.length);
           const filteredShifts = currentShifts.filter(s => s.id !== shift.id);
-          console.log('🎯 DROP: After removing old - shifts count:', filteredShifts.length);
           
           const newShift: ShiftBlock = {
             ...shift,
@@ -2681,7 +2506,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           };
           
           const updatedShifts = [...filteredShifts, newShift];
-          console.log('🎯 DROP: After adding new - shifts count:', updatedShifts.length);
           localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
           
           // CRÍTICO: Persistir inmediatamente en Supabase y eliminar el original
@@ -2695,7 +2519,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         
         // Mostrar información de adaptación si fue necesaria
         if (adaptedTimes.adapted) {
-          console.log(`✅ Turno "${shift.name}" movido y adaptado de ${adaptedTimes.originalHours}h a ${adaptedTimes.adaptedHours}h para ${employees.find(e => e.id === targetEmployeeId)?.name}`);
         }
         
         // toast({
@@ -3012,19 +2835,15 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         onDrop={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          console.log("DataTransfer:", e.dataTransfer);
           
           // Verificar si hay datos en dataTransfer (desde ShiftCard)
           try {
             const data = e.dataTransfer.getData('application/json');
-            console.log("Raw data from dataTransfer:", data);
             
             if (data) {
               const dragData = JSON.parse(data);
-              console.log("Parsed drag data:", dragData);
               
             if (dragData && dragData.shift) {
-              console.log("Shift encontrado, verificando para añadir a favoritos:", dragData.shift);
               
               // Verificar si es "Descanso Semanal" - no permitir duplicados
               if (dragData.shift.name === "Descanso Semanal" || 
@@ -3051,7 +2870,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
                 updatedAt: new Date()
               };
               
-              console.log("Formato convertido:", savedShiftFormat);
               addToFavorites(savedShiftFormat);
               return;
             }
@@ -3060,13 +2878,11 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
             console.error("Error procesando dataTransfer:", error);
           }
           
-          console.log("No hay datos válidos en dataTransfer");
         }}
         onDragOver={(e) => {
           e.preventDefault();
           e.stopPropagation();
           e.dataTransfer.dropEffect = 'copy';
-          console.log("Drag over área de favoritos");
         }}
         onRemoveFavorite={removeFromFavorites}
       />
@@ -3437,10 +3253,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              console.log("🔥 Intentando eliminar empleado:", employee.name, "ID:", employee.id);
-                              console.log("🔥 isAdmin:", isAdmin);
-                              console.log("🔥 Horarios totales:", shiftBlocks.length);
-                              console.log("🔥 Horarios del empleado:", shiftBlocks.filter(s => s.employeeId === employee.id));
                               removeEmployeeFromCalendar(employee.id, employee.name);
                             }}
                             className="w-3 h-3 sm:w-4 sm:h-4 text-red-500 hover:text-red-700 transition-colors"
@@ -3741,7 +3553,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       <AdvancedShiftDialog
         isOpen={!!showAdvancedOptions}
         onClose={() => {
-          console.log('Cerrando AdvancedShiftDialog');
           setShowAdvancedOptions(null);
           setEditingShift(null);
         }}
@@ -3760,14 +3571,11 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
             );
             
             if (existingShiftIndex !== -1 && editingShift) {
-              console.log('Actualizando turno con datos de descanso:', { hasBreak: shiftData.hasBreak, breaks: shiftData.breaks, totalBreakTime: shiftData.totalBreakTime, color: shiftData.color });
               
               // IMPORTANTE: Normalizar los nombres para evitar problemas de espacios
               const oldShiftName = editingShift.name?.trim() || '';
               const newShiftName = shiftData.name?.trim() || '';
               
-              console.log(`📝 Comparando nombres: "${oldShiftName}" vs "${newShiftName}"`);
-              console.log(`🎨 Comparando colores: "${editingShift.color}" vs "${shiftData.color}"`);
               
               // Verificar si se van a actualizar todos los turnos con el mismo nombre
               const willUpdateAllShifts = oldShiftName && (oldShiftName !== newShiftName || 
@@ -3779,14 +3587,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
               if (willUpdateAllShifts) {
                 // Si vamos a actualizar todos los turnos, NO actualizar localmente primero
                 // porque updateAllShiftsWithSameName ya hace el trabajo completo
-                console.log(`🔄 Detectado cambio en turno "${oldShiftName}" → "${newShiftName}"`);
-                console.log(`📊 Cambios detectados:`, {
-                  nombreCambio: oldShiftName !== newShiftName,
-                  horaInicioCambio: editingShift.startTime !== shiftData.startTime,
-                  horaFinCambio: editingShift.endTime !== shiftData.endTime,
-                  colorCambio: editingShift.color !== shiftData.color,
-                  descansosCambio: JSON.stringify(editingShift.breaks) !== JSON.stringify(shiftData.breaks)
-                });
                 
                 // CRÍTICO: Pasar el nombre EXACTO que está en la base de datos
                 await updateAllShiftsWithSameName(oldShiftName, {
@@ -3819,13 +3619,11 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
                   color: shiftData.color || newBlocks[existingShiftIndex].color
                 };
                 updateShiftBlocks(newBlocks);
-                console.log("Horario actualizado en el calendario (solo este turno)");
               }
               
               // Limpiar el estado de edición
               setEditingShift(null);
             } else {
-              console.log('Creando nuevo turno con datos de descanso:', { hasBreak: shiftData.hasBreak, breaks: shiftData.breaks, totalBreakTime: shiftData.totalBreakTime, color: shiftData.color });
               // Crear nuevo horario si no existe
               const newShift: ShiftBlock = {
                 id: `shift-${Date.now()}`,
@@ -3849,7 +3647,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
                 localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
                 return updatedShifts;
               });
-              console.log("Nuevo horario añadido al calendario:", newShift);
             }
           }
         }}
@@ -3910,7 +3707,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         employees={employees}
         weekDays={weekDays}
         onBulkAssign={(bulkData) => {
-          console.log("Bulk action performed:", bulkData);
           
           if (bulkData.type === "assign") {
             // Create shifts for all selected combinations
@@ -3942,7 +3738,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
             });
           } else if (bulkData.type === "rest") {
             // Add rest days logic here
-            console.log("Adding rest days for bulk selection");
           }
           
           // Clear selections after bulk action
@@ -4012,7 +3807,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         open={showAddEmployeesDialog}
         onOpenChange={setShowAddEmployeesDialog}
         onEmployeesAdded={async (newEmployees, effectiveDate, applyRestDays) => {
-          console.log("Empleados añadidos:", newEmployees, effectiveDate, applyRestDays);
           
           // Convert database employees to calendar employee format
           const calendarEmployees = newEmployees.map(emp => ({
@@ -4049,7 +3843,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
             }
             
             // DISABLED: Auto-generation of "Primer día" for new employees removed
-            console.log(`ℹ️ Auto-generation disabled. Found ${uniqueNewEmployees.length} new employees but will not create automatic shifts.`);
           }
         }}
         existingEmployeeIds={employees.map(emp => emp.id)}
@@ -4102,7 +3895,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
                     `Eliminación masiva de ${shiftsToDelete.length} turnos`,
                     shiftsToDelete.length
                   );
-                  console.log('🛡️ Backup de seguridad creado antes de bulk delete');
                 }
                 
                 setShiftBlocksWithHistory(currentShifts => {
@@ -4158,25 +3950,16 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         }}
         onAdvancedOptions={() => {
           if (showShiftSelector) {
-            console.log('Botón Opciones avanzadas clickeado:', showShiftSelector);
             const employee = employees.find(emp => emp.id === showShiftSelector.employeeId);
-            console.log('Empleado encontrado:', employee);
             if (employee) {
-              console.log('Estableciendo showAdvancedOptions:', {
-                employeeId: showShiftSelector.employeeId,
-                date: showShiftSelector.date
-              });
               setShowAdvancedOptions({
                 employeeId: showShiftSelector.employeeId,
                 date: showShiftSelector.date
               });
-              console.log('showAdvancedOptions actualizado');
             } else {
-              console.log('Empleado no encontrado en la lista de employees');
             }
             setShowShiftSelector(null);
           } else {
-            console.log('showShiftSelector es null');
           }
         }}
       />
@@ -4225,10 +4008,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
             };
           })}
           onApplySort={(sortedEmployees) => {
-            console.log('Applying sort to calendar:', sortedEmployees.map(emp => ({
-              name: `${emp.nombre} ${emp.apellidos}`,
-              tiempo_trabajo_semanal: emp.tiempo_trabajo_semanal
-            })));
             
             // Convert back to Employee format and update the calendar
             const sortedCalendarEmployees = sortedEmployees.map(emp => ({
@@ -4240,10 +4019,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
               startDate: emp.fecha_inicio_contrato
             }));
             
-            console.log('Converted to calendar format:', sortedCalendarEmployees.map(emp => ({
-              name: emp.name,
-              workingHours: emp.workingHours
-            })));
             
             updateEmployees(sortedCalendarEmployees);
             setSortBy(sortedEmployees.some((_, index, arr) => index > 0 && !arr[index-1].apellidos) ? "manual" : "applied"); // Mark as manual if custom order, otherwise applied

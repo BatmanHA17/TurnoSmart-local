@@ -44,9 +44,7 @@ export const useConfigurationState = () => {
     };
   }, []);
 
-
   const saveConfiguration = async (configId: string, config: any) => {
-    console.log(`Guardando configuración para ${configId}:`, config);
     setLoading(true);
     try {
       const newConfigurations = {
@@ -58,12 +56,9 @@ export const useConfigurationState = () => {
         }
       };
       
-      console.log(`Estado antes de actualizar:`, configurations);
-      console.log(`Nuevo estado:`, newConfigurations);
       
       // Actualizar el estado inmediatamente usando callback para forzar re-render
       setConfigurations(prevConfigs => {
-        console.log(`Estado previo en callback:`, prevConfigs);
         return newConfigurations;
       });
       
@@ -90,8 +85,6 @@ export const useConfigurationState = () => {
   const isConfigured = (configId: string) => {
     const config = configurations[configId];
     const result = config && config.status === 'configured';
-    console.log(`Verificando si ${configId} está configurado:`, result, config);
-    console.log('Todas las configuraciones actuales:', configurations);
     return result;
   };
 

@@ -96,8 +96,6 @@ export const LeaveRequestWorkflow = () => {
         const oldRequests = JSON.parse(localStorage.getItem('leaveRequests') || '[]');
         const newRequests = JSON.parse(localStorage.getItem('absenceRequests') || '[]');
         
-        console.log('Loading old format requests:', oldRequests);
-        console.log('Loading new format requests:', newRequests);
         
         // Convert new format to old format for compatibility
         const convertedNewRequests = newRequests.map((req: any) => ({
@@ -121,15 +119,12 @@ export const LeaveRequestWorkflow = () => {
           arr.findIndex(r => r.id === req.id) === index
         );
         
-        console.log('Combined requests:', allRequests);
         
         if (allRequests.length > 0) {
           // Separate pending and processed requests
           const pending = allRequests.filter(req => req.status === 'pending');
           const processed = allRequests.filter(req => req.status === 'approved' || req.status === 'rejected');
           
-          console.log('Pending requests:', pending);
-          console.log('Processed requests:', processed);
           
           setPendingRequests(pending);
           setProcessedRequests(processed);
@@ -252,7 +247,6 @@ export const LeaveRequestWorkflow = () => {
 
   // Convert processed requests to approved requests for calendar
   const getApprovedRequests = (): ApprovedRequest[] => {
-    console.log('Processing requests for calendar:', processedRequests);
     const approved = processedRequests
       .filter(req => req.status === 'approved')
       .map(req => {
@@ -274,7 +268,6 @@ export const LeaveRequestWorkflow = () => {
         };
       });
     
-    console.log('Approved requests for calendar:', approved);
     return approved;
   };
 
@@ -305,7 +298,6 @@ export const LeaveRequestWorkflow = () => {
       };
     });
   };
-
 
   // Team employees for calendar view (Step 5)
   const teamEmployees = [
@@ -348,9 +340,6 @@ export const LeaveRequestWorkflow = () => {
         );
         localStorage.setItem('absenceRequests', JSON.stringify(updatedNewRequests));
         
-        console.log('Updated localStorage with approved request:', requestId);
-        console.log('New pending count:', newPendingRequests.length);
-        console.log('New processed count:', newProcessedRequests.length);
       } catch (error) {
         console.error('Error saving to localStorage:', error);
       }
@@ -403,7 +392,6 @@ export const LeaveRequestWorkflow = () => {
         );
         localStorage.setItem('absenceRequests', JSON.stringify(updatedNewRequests));
         
-        console.log('Updated localStorage with rejected request:', requestId);
       } catch (error) {
         console.error('Error saving to localStorage:', error);
       }
@@ -457,7 +445,6 @@ export const LeaveRequestWorkflow = () => {
     setSelectedRequest(request);
     setShowDetailPanel(true);
   };
-
 
   return (
     <div className="space-y-6">

@@ -83,7 +83,6 @@ export default function CollectiveAgreementSettings() {
           !response.answer.includes('No consta en el convenio aportado');
       });
       
-      console.log('Q&A History loaded:', validQA.length, 'interactions');
       setQaHistory(validQA);
     } catch (error) {
       console.error('Error loading Q&A history:', error);
@@ -196,7 +195,6 @@ export default function CollectiveAgreementSettings() {
   const handleStartProcessing = async (id) => {
     try {
       setIsProcessing(true);
-      console.log(`Iniciando procesamiento para convenio: ${id}`);
       
       // Use supabase.functions.invoke for secure, portable edge function calls
       const { data: responseData, error: invokeError } = await supabase.functions.invoke('process-collective-agreement', {

@@ -36,8 +36,6 @@ export const TurnoSmartHeader = () => {
             <Button 
               className="bg-gray-900 hover:bg-gray-800 text-white font-medium px-6 rounded-full"
               onClick={() => {
-                console.log('🚀 Start your Free Trial button clicked (Header)');
-                console.log('🧭 Navigating to /register');
                 navigate('/register');
               }}
             >

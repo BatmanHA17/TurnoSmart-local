@@ -97,7 +97,6 @@ export function useInstantSave({ orgId, onOfflineQueue, isOnline = true }: UseIn
     
     // Evitar operaciones duplicadas simultáneas
     if (pendingOperationsRef.current.has(operationId)) {
-      console.log(`⏳ Operación ya en progreso: ${operationId}`);
       return true;
     }
 
@@ -160,7 +159,6 @@ export function useInstantSave({ orgId, onOfflineQueue, isOnline = true }: UseIn
 
       setStatus('saved');
       setLastSavedAt(new Date());
-      console.log(`✅ Turno guardado inmediatamente: ${shift.name} para ${shift.employeeId}`);
       
       pendingOperationsRef.current.delete(operationId);
       return true;
@@ -226,7 +224,6 @@ export function useInstantSave({ orgId, onOfflineQueue, isOnline = true }: UseIn
 
       setStatus('saved');
       setLastSavedAt(new Date());
-      console.log(`🗑️ Turno eliminado inmediatamente: ${shiftId}`);
       
       pendingOperationsRef.current.delete(operationId);
       return true;
@@ -306,7 +303,6 @@ export function useInstantSave({ orgId, onOfflineQueue, isOnline = true }: UseIn
 
       setStatus('saved');
       setLastSavedAt(new Date());
-      console.log(`✅ ${shiftDataArray.length} turnos guardados en batch`);
       
       return true;
     } catch (err) {

@@ -49,7 +49,6 @@ interface ProfessionalCategory {
   level?: ProfessionalLevel;
 }
 
-
 interface PredefinedJob {
   id: string;
   job_title: string;
@@ -203,7 +202,6 @@ export default function JobsSettings() {
       console.error('Error loading professional categories:', error);
     }
   };
-
 
   const resetJobForm = () => {
     setFormData({

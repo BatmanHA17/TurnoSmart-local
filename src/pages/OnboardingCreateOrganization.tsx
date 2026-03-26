@@ -38,7 +38,6 @@ export default function OnboardingCreateOrganization() {
     setError("");
 
     try {
-      console.log('🏢 Creando organización:', organizationName.trim());
       
       // Call edge function to create organization
       const { data, error: functionError } = await supabase.functions.invoke('create-organization', {
@@ -67,7 +66,6 @@ export default function OnboardingCreateOrganization() {
         return;
       }
 
-      console.log('✅ Organización creada exitosamente:', data.organization);
       
       toast({
         title: "¡Éxito!",
@@ -75,12 +73,10 @@ export default function OnboardingCreateOrganization() {
       });
       
       // Refresh by getting current session
-      console.log('🔄 Refrescando datos...');
       await supabase.auth.refreshSession();
       
       // Small delay to ensure session is refreshed
       setTimeout(() => {
-        console.log('🎯 Redirigiendo a dashboard-owner');
         navigate('/dashboard-owner', { replace: true });
       }, 500);
 

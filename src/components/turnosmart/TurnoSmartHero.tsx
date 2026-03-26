@@ -26,8 +26,6 @@ export const TurnoSmartHero = () => {
               size="lg"
               className="bg-gray-900 hover:bg-gray-800 text-white font-semibold px-6 py-6 text-lg rounded-full h-16"
               onClick={() => {
-                console.log('🚀 Start your Free Trial button clicked (Hero)');
-                console.log('🧭 Navigating to /register');
                 window.location.href = '/register';
               }}
             >

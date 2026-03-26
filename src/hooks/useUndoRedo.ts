@@ -58,11 +58,6 @@ export function useUndoRedo<T>(initialState: T) {
     // 1. No está inicializado, O
     // 2. El estado externo cambió significativamente
     if (!isInitialized.current || initialStateStr !== presentStr) {
-      console.log('🔄 Undo/Redo: Sincronizando con estado externo', {
-        initialCount: Array.isArray(initialState) ? initialState.length : 'N/A',
-        presentCount: Array.isArray(presentRef.current) ? presentRef.current.length : 'N/A',
-        wasInitialized: isInitialized.current
-      });
       
       setPresent(initialState);
       presentRef.current = initialState;
@@ -93,26 +88,16 @@ export function useUndoRedo<T>(initialState: T) {
         const newStateStr = serializeState(stateToSave);
         
         if (lastStateStr === newStateStr) {
-          console.log('⏭️ Undo/Redo: Estado idéntico al último, no guardando');
           return prev;
         }
       }
       
-      console.log('💾 Undo/Redo: Guardando estado', {
-        savingStateCount: Array.isArray(stateToSave) ? stateToSave.length : 'N/A',
-        pastSize: prev.length
-      });
       
       const newHistory = [
         ...prev,
         { state: stateToSave, timestamp: Date.now() }
       ];
       
-      console.log('📚 Undo/Redo: Historial actualizado', {
-        oldSize: prev.length,
-        newSize: newHistory.length,
-        savedStateCount: Array.isArray(stateToSave) ? stateToSave.length : 'N/A'
-      });
       
       return newHistory.slice(-MAX_HISTORY_SIZE);
     });
@@ -126,20 +111,12 @@ export function useUndoRedo<T>(initialState: T) {
     
     setPast(prevPast => {
       if (prevPast.length === 0) {
-        console.log('⚠️ Undo/Redo: No hay historial para deshacer');
         isUndoRedoInProgress.current = false;
         return prevPast;
       }
 
       const previous = prevPast[prevPast.length - 1];
       const newPast = prevPast.slice(0, prevPast.length - 1);
-
-      console.log('⬅️ Undo/Redo: Deshaciendo', {
-        pastSize: prevPast.length,
-        newPastSize: newPast.length,
-        restoringStateCount: Array.isArray(previous.state) ? previous.state.length : 'N/A',
-        currentStateCount: Array.isArray(presentRef.current) ? presentRef.current.length : 'N/A'
-      });
 
       // CRÍTICO: Guardar el estado ACTUAL en el futuro antes de restaurar
       const currentState = presentRef.current;
@@ -167,20 +144,12 @@ export function useUndoRedo<T>(initialState: T) {
     
     setFuture(prevFuture => {
       if (prevFuture.length === 0) {
-        console.log('⚠️ Undo/Redo: No hay historial para rehacer');
         isUndoRedoInProgress.current = false;
         return prevFuture;
       }
 
       const next = prevFuture[prevFuture.length - 1];
       const newFuture = prevFuture.slice(0, prevFuture.length - 1);
-
-      console.log('➡️ Undo/Redo: Rehaciendo', {
-        futureSize: prevFuture.length,
-        newFutureSize: newFuture.length,
-        restoringStateCount: Array.isArray(next.state) ? next.state.length : 'N/A',
-        currentStateCount: Array.isArray(presentRef.current) ? presentRef.current.length : 'N/A'
-      });
 
       // CRÍTICO: Guardar el estado ACTUAL en el pasado antes de restaurar
       const currentState = presentRef.current;

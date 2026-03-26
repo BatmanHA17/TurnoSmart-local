@@ -42,7 +42,6 @@ export function useOfflineQueue(options: UseOfflineQueueOptions = {}) {
           Date.now() - op.timestamp < 24 * 60 * 60 * 1000
         );
         setQueue(validOps);
-        console.log(`📥 Cola offline cargada: ${validOps.length} operaciones pendientes`);
       }
     } catch (error) {
       console.error('Error loading offline queue:', error);
@@ -77,7 +76,6 @@ export function useOfflineQueue(options: UseOfflineQueueOptions = {}) {
     };
 
     setQueue(prev => [...prev, operation]);
-    console.log(`📝 Operación añadida a cola offline: ${type}`);
     
     return operation.id;
   }, [maxRetries]);
@@ -128,7 +126,6 @@ export function useOfflineQueue(options: UseOfflineQueueOptions = {}) {
     processingRef.current = true;
     setIsSyncing(true);
     
-    console.log(`🔄 Sincronizando ${queue.length} operaciones pendientes...`);
     
     let successful = 0;
     let failed = 0;
@@ -147,7 +144,6 @@ export function useOfflineQueue(options: UseOfflineQueueOptions = {}) {
       if (success) {
         operation.status = 'completed';
         successful++;
-        console.log(`✅ Operación ${operation.id} completada`);
       } else {
         operation.retries++;
         
@@ -189,7 +185,6 @@ export function useOfflineQueue(options: UseOfflineQueueOptions = {}) {
       }
     }
 
-    console.log(`🔄 Sincronización completada: ${successful} exitosas, ${failed} fallidas`);
   }, [queue, onSyncComplete, onOperationFailed]);
 
   // Limpiar operaciones completadas

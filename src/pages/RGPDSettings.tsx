@@ -14,7 +14,6 @@ export default function RGPDSettings() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    console.log("🔥 RGPDSettings - PÁGINA RGPD CARGADA!");
     document.title = "RGPD | TurnoSmart";
     loadRGPDSettings();
   }, []);
@@ -47,18 +46,10 @@ export default function RGPDSettings() {
   };
 
   const handleSave = async () => {
-    console.log("💾 Iniciando guardado de RGPD settings...");
-    console.log("📝 Datos a guardar:", { 
-      privacyPolicy: privacyPolicy.substring(0, 100) + "...", 
-      dataRetention, 
-      consentRequired, 
-      cookieConsent 
-    });
     
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      console.log("👤 Usuario autenticado:", user?.id);
       
       if (!user) {
         console.error("❌ No hay usuario autenticado");
@@ -74,14 +65,10 @@ export default function RGPDSettings() {
         cookie_consent: cookieConsent
       };
 
-      console.log("📤 Enviando datos a Supabase:", rgpdData);
-
       const { data, error } = await supabase
         .from('rgpd_settings')
         .upsert(rgpdData, { onConflict: 'user_id' })
         .select();
-
-      console.log("📥 Respuesta de Supabase:", { data, error });
 
       if (error) {
         console.error('❌ Error saving RGPD settings:', error);
@@ -89,7 +76,6 @@ export default function RGPDSettings() {
         return;
       }
 
-      console.log("✅ RGPD settings guardados exitosamente");
       toast.success("Configuración de RGPD guardada correctamente");
     } catch (error) {
       console.error('❌ Error saving RGPD settings:', error);

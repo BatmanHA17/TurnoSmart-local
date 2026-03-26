@@ -17,7 +17,6 @@ export function DebugEmailButton() {
     setResult(null);
     
     try {
-      console.log("Testing simple-signup function...");
       
       const { data, error } = await supabase.functions.invoke('simple-signup', {
         body: {
@@ -26,7 +25,6 @@ export function DebugEmailButton() {
         }
       });
 
-      console.log("Response:", { data, error });
       
       setResult({ 
         type: 'simple-signup',
@@ -62,7 +60,6 @@ export function DebugEmailButton() {
     setResult(null);
     
     try {
-      console.log("Testing basic email function...");
       
       const { data, error } = await supabase.functions.invoke('test-email', {
         body: {
@@ -70,7 +67,6 @@ export function DebugEmailButton() {
         }
       });
 
-      console.log("Response:", { data, error });
       
       setResult({ 
         type: 'test-email',
@@ -106,7 +102,6 @@ export function DebugEmailButton() {
     setResult(null);
     
     try {
-      console.log("Testing send-verification-email function...");
       
       const { data, error } = await supabase.functions.invoke('send-verification-email', {
         body: {
@@ -115,7 +110,6 @@ export function DebugEmailButton() {
         }
       });
 
-      console.log("Response:", { data, error });
       
       setResult({ 
         type: 'verification-email',

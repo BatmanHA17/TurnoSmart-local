@@ -74,7 +74,6 @@ export default function RegisterInvite() {
     setError('');
 
     try {
-      console.log('🔐 Completing registration with password...');
       
       // Procesar invitación con contraseña
       const { data: acceptData, error: acceptError } = await supabase.functions.invoke(
@@ -97,8 +96,6 @@ export default function RegisterInvite() {
       if (!acceptData.success) {
         throw new Error(acceptData.error || 'Error procesando invitación');
       }
-
-      console.log('✅ Registration and invitation completed:', acceptData);
 
       // Limpiar datos almacenados
       sessionStorage.removeItem('invite_data');

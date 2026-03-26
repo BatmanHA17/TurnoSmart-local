@@ -140,14 +140,6 @@ export default function ColaboradorDetail() {
   // Log when colaborador data changes to debug update issues
   useEffect(() => {
     if (colaborador) {
-      console.log('🔄 Colaborador data updated:', {
-        id: colaborador.id,
-        name: `${colaborador.nombre} ${colaborador.apellidos}`,
-        job_title: colaborador.jobs?.title,
-        department: colaborador.jobs?.department,
-        updated_at: colaborador.updated_at,
-        forceRefresh
-      });
     }
   }, [colaborador?.updated_at, colaborador?.jobs?.title, colaborador?.jobs?.department, forceRefresh]);
   
@@ -227,7 +219,6 @@ export default function ColaboradorDetail() {
 
   // Función unificada de sincronización de datos
   const handleDataSync = async () => {
-    console.log('🔄 Sincronizando datos de colaborador y equipos...');
     try {
       // Refrescar en paralelo
       await Promise.all([
@@ -239,7 +230,6 @@ export default function ColaboradorDetail() {
       // Forzar actualización de UI
       setForceRefresh(prev => prev + 1);
       
-      console.log('✅ Sincronización completada');
     } catch (error) {
       console.error('❌ Error en sincronización:', error);
     }
@@ -436,7 +426,6 @@ export default function ColaboradorDetail() {
       
       // Si cambiamos a la tab de rol y permisos, forzar refresh de permisos
       if (tabFromUrl === 'rol-permisos') {
-        console.log('Refrescando permisos para tab rol-permisos');
         // El hook useUserPermissions se actualiza automáticamente cuando cambia colaborador?.id
       }
     }
@@ -564,7 +553,6 @@ export default function ColaboradorDetail() {
       }
       
       setTeamNames(departmentName);
-      console.log('🔄 Team names updated:', departmentName);
     } catch (error) {
       console.error('Error fetching teams:', error);
     }
@@ -1014,7 +1002,6 @@ export default function ColaboradorDetail() {
       </MainLayout>
     );
   }
-
 
   return (
     <MainLayout>
@@ -2104,7 +2091,6 @@ export default function ColaboradorDetail() {
               </NotionCard>
             </div>
 
-
           </TabsContent>
 
           {/* Vacaciones y Ausencias Tab */}
@@ -2575,7 +2561,6 @@ export default function ColaboradorDetail() {
           )}
         </Tabs>
 
-
         {/* Dialog de confirmación para eliminar */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
           <AlertDialogContent>
@@ -2607,7 +2592,6 @@ export default function ColaboradorDetail() {
           colaboradorData={colaborador}
           isEditMode={true}
           onColaboradorUpdated={async () => {
-            console.log('🔄 Callback ejecutado - refrescando datos del colaborador');
             // Force UI update and refresh all data
             setForceRefresh(prev => prev + 1);
             await refetchColaborador();
@@ -2628,7 +2612,6 @@ export default function ColaboradorDetail() {
           onOpenChange={setIsContractDetailsOpen}
           colaborador={colaborador}
         />
-
 
         {/* Edit Contract Sheet */}
         <EditContractSheet

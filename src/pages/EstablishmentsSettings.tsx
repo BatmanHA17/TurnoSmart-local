@@ -97,8 +97,6 @@ export default function EstablishmentsSettings() {
                           <span 
                             className="text-sm font-medium text-blue-600 hover:text-blue-800 cursor-pointer"
                             onClick={() => {
-                              console.log('Clicking on establishment:', establishment.name);
-                              console.log('Navigating to:', `/settings/locations/${establishment.name}`);
                               navigate(`/settings/locations/${establishment.name}`);
                             }}
                           >

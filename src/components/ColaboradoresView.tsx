@@ -37,7 +37,6 @@ import { toast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { InviteColaboradorDialog } from "@/components/InviteColaboradorDialog";
 
-
 interface Colaborador {
   id: string;
   nombre: string;
@@ -202,7 +201,6 @@ export const ColaboradoresView = () => {
     setShowAddColaborador(false);
   };
 
-
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
       case 'propietario': return 'default';
@@ -245,7 +243,6 @@ export const ColaboradoresView = () => {
         return {};
     }
   };
-
 
   const getRoleBadge = (role?: string) => {
     return getRoleDisplayName(role || 'empleado');
@@ -340,13 +337,9 @@ export const ColaboradoresView = () => {
 
   // Funciones para el modo selección
   const handleSelectColaborador = (colaboradorId: string, checked: boolean) => {
-    console.log("=== VALIDACION COLABORADOR ===");
-    console.log("colaboradorId:", colaboradorId);
-    console.log("checked:", checked);
     
     // Verificar si el colaborador está inactivo
     const colaborador = colaboradores.find(c => c.id === colaboradorId);
-    console.log("colaborador encontrado:", colaborador);
     
     if (colaborador?.status === 'inactivo') {
       toast({
@@ -361,10 +354,6 @@ export const ColaboradoresView = () => {
     if (checked) {
       const missingFields = [];
       
-      console.log("Validando campos obligatorios:");
-      console.log("fecha_inicio_contrato:", colaborador.fecha_inicio_contrato);
-      console.log("tiempo_trabajo_semanal:", colaborador.tiempo_trabajo_semanal);
-      console.log("tipo_contrato:", colaborador.tipo_contrato);
       
       if (!colaborador.fecha_inicio_contrato) {
         missingFields.push("fecha de inicio de contrato");
@@ -378,10 +367,7 @@ export const ColaboradoresView = () => {
         missingFields.push("tipo de contrato");
       }
 
-      console.log("missingFields:", missingFields);
-
       if (missingFields.length > 0) {
-        console.log("Mostrando toast de campos faltantes");
         toast({
           title: "Faltan datos obligatorios",
           description: `${colaborador.nombre} ${colaborador.apellidos} necesita: ${missingFields.join(", ")}. Complete estos datos en su perfil antes de añadirlo al calendario.`,
@@ -810,7 +796,6 @@ export const ColaboradoresView = () => {
         </Table>
         )}
       </div>
-
 
       {/* Add Colaborador Sheet */}
       <AddColaboradorSheet

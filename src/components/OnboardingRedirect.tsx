@@ -19,11 +19,9 @@ export function OnboardingRedirect() {
 
     // FASE 3: If user has organizations, redirect to dashboard canónico
     if (organizations && organizations.length > 0) {
-      console.log('Usuario ya tiene organizaciones, redirigiendo a dashboard');
       navigate('/dashboard', { replace: true });
     } else {
       // User has no organizations, redirect to create one
-      console.log('Usuario sin organizaciones, redirigiendo a crear organización');
       navigate('/onboarding/wizard', { replace: true });
     }
   }, [user, organizations, authLoading, orgLoading, navigate]);

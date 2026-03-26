@@ -55,14 +55,11 @@ export const LeaveRequestFormContent = ({ onClose, colaboradorName }: LeaveReque
           return;
         }
 
-        console.log('Raw employee data from DB:', data);
-
         const formattedEmployees = data?.map(emp => ({
           id: emp.id,
           name: `${emp.nombre} ${emp.apellidos}`
         })) || [];
 
-        console.log('Formatted employees for dropdown:', formattedEmployees);
         setEmployees(formattedEmployees);
       } catch (error) {
         console.error('Error loading employees:', error);

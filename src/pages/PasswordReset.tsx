@@ -41,7 +41,6 @@ export default function PasswordReset() {
   useEffect(() => {
     const establishSession = async () => {
       if (accessToken && refreshToken && type === 'recovery') {
-        console.log('🔐 Estableciendo sesión desde tokens de recuperación...');
         
         try {
           const { data, error } = await supabase.auth.setSession({
@@ -59,7 +58,6 @@ export default function PasswordReset() {
               setError('Enlace de restablecimiento inválido. Por favor solicita uno nuevo.');
             }
           } else if (data?.session) {
-            console.log('✅ Sesión establecida correctamente:', data.session.user.email);
             setSessionEstablished(true);
             
             // Pre-cargar el email del usuario

@@ -27,7 +27,6 @@ export default function HRClockInTracking() {
 
   const handleEmpleadoClick = (fichaje: SeguimientoFichaje) => {
     // TODO: Navegación a página de datos personales del empleado
-    console.log("Navegando a empleado:", fichaje.empleado);
     // Simular navegación como en el tutorial
     alert(`Navegando a datos personales de ${fichaje.empleado}`);
   };

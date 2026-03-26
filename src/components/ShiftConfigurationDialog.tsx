@@ -45,7 +45,6 @@ export function ShiftConfigurationDialog({ isOpen, onClose }: ShiftConfiguration
             }
           });
           
-          console.log('Shifts combinados en ShiftConfigurationDialog (desde matriz):', combined);
           setSavedShifts(combined);
         } catch (error) {
           console.error('Error cargando favoritos en ShiftConfigurationDialog:', error);
@@ -66,7 +65,6 @@ export function ShiftConfigurationDialog({ isOpen, onClose }: ShiftConfiguration
         const favoriteShifts = stored ? JSON.parse(stored) : [];
         const updated = favoriteShifts.filter((fav: any) => fav.id !== shiftId);
         localStorage.setItem('turnosmart-favorite-shifts', JSON.stringify(updated));
-        console.log('Favorito eliminado de localStorage:', shiftId);
       } catch (error) {
         console.error('Error removing favorite from localStorage:', error);
       }
@@ -290,7 +288,6 @@ export function ShiftConfigurationDialog({ isOpen, onClose }: ShiftConfiguration
         date={new Date()} // Fecha actual por defecto
         editingShift={editingShift} // Pass the shift being edited
         onShiftAssigned={(shiftData) => {
-          console.log("Horario guardado:", shiftData);
           setRefreshKey(prev => prev + 1); // Refresh the list after saving
         }}
       />

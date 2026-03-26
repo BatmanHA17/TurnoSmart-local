@@ -178,7 +178,6 @@ export const AddColaboradorSheet = ({
         const { data, error } = await query.order('title');
         
         if (!error && data) {
-          console.log('🔍 Loaded jobs for departments:', selectedDepartments, data);
           setJobs(data);
         }
       } catch (error) {
@@ -267,11 +266,9 @@ export const AddColaboradorSheet = ({
   // Populate form data when in edit mode
   useEffect(() => {
     if (isEditMode && colaboradorData) {
-      console.log('🔍 Setting form data in edit mode:', colaboradorData);
       
       // Get the job_id from colaboradorData (which should include jobs data)
       const jobId = colaboradorData.job_id || colaboradorData.jobs?.id || "";
-      console.log('🔍 Job ID from colaboradorData:', jobId);
       
       setFormData({
         nombre: colaboradorData.nombre || "",
@@ -329,25 +326,15 @@ export const AddColaboradorSheet = ({
       });
       
       // Set selected departments if colaborador has team assignments
-      console.log('🔍 Colaborador job data:', {
-        jobs: colaboradorData.jobs,
-        job_id: colaboradorData.job_id,
-        department: colaboradorData.jobs?.department
-      });
       
       if (colaboradorData.jobs?.department) {
         // Find the department ID that matches the job's department
         const department = departments.find(dept => dept.value === colaboradorData.jobs?.department);
         if (department) {
-          console.log('🔍 Setting selected department from job department:', {
-            departmentName: colaboradorData.jobs.department,
-            departmentId: department.id
-          });
           setSelectedDepartments([{ id: department.id, name: department.value }]);
         }
       } else if (colaboradorData.job_id) {
         // If no department in jobs but there's a job_id, try to find the department via job_departments
-        console.log('🔍 Looking for department via job_id:', colaboradorData.job_id);
         // This will be handled by useEffect when jobs are loaded
       }
     }
@@ -356,7 +343,6 @@ export const AddColaboradorSheet = ({
   // Sincronizar selectedDepartments con los assignments del hook
   useEffect(() => {
     if (isEditMode && assignments && assignments.length > 0 && open) {
-      console.log('🔄 Sincronizando equipos desde useTeamAssignments:', assignments);
       const deptList = assignments.map(a => ({
         id: a.department_id,
         name: a.department_name
@@ -371,7 +357,6 @@ export const AddColaboradorSheet = ({
   useEffect(() => {
     const loadExistingDepartments = async () => {
       if (isEditMode && colaboradorData?.id && open) {
-        console.log('🔍 Cargando departamentos asignados para:', colaboradorData.id);
         
         try {
           const { data: assignedDepts, error } = await supabase
@@ -397,7 +382,6 @@ export const AddColaboradorSheet = ({
               name: (assigned.job_departments as any).value
             }));
             
-            console.log('✅ Departamentos cargados:', deptList);
             setSelectedDepartments(deptList);
           } else {
             // Solo limpiar si no hay departamentos asignados
@@ -416,17 +400,11 @@ export const AddColaboradorSheet = ({
   // useEffect adicional para manejar la inicialización del departamento cuando se cargan los trabajos
   useEffect(() => {
     if (isEditMode && colaboradorData?.job_id && jobs.length > 0 && selectedDepartments.length === 0 && open) {
-      console.log('🔍 Buscando departamento por job_id:', colaboradorData.job_id);
       
       // Buscar el trabajo específico y obtener su department_id
       const currentJob = jobs.find(job => job.id === colaboradorData.job_id);
       if (currentJob?.department_id) {
         const department = departments.find(dept => dept.id === currentJob.department_id);
-        console.log('🔍 Encontrado job con department_id:', {
-          jobTitle: currentJob.title,
-          departmentId: currentJob.department_id,
-          departmentName: department?.value
-        });
         if (department) {
           setSelectedDepartments([{ id: department.id, name: department.value }]);
         }
@@ -507,36 +485,13 @@ export const AddColaboradorSheet = ({
         empleadoId: finalEmpleadoId
       });
 
-      console.log('🔍 DEBUGGING - Datos del formulario:', {
-        info_bancaria: {
-          nombreTitularCuenta: formData.nombreTitularCuenta,
-          iban: formData.iban,
-          bic: formData.bic,
-          numeroIdentificacionInterna: formData.numeroIdentificacionInterna
-        },
-        contacto_emergencia: {
-          nombreContactoEmergencia: formData.nombreContactoEmergencia,
-          apellidoContactoEmergencia: formData.apellidoContactoEmergencia,
-          relacionContactoEmergencia: formData.relacionContactoEmergencia,
-          telefonoMovilEmergencia: formData.telefonoMovilEmergencia,
-          telefonoFijoEmergencia: formData.telefonoFijoEmergencia
-        }
-      });
-
-      console.log('🔍 DEBUGGING - Datos mapeados:', {
-        bankingData,
-        emergencyContactData
-      });
-
       // Set the org_id - preservar el original en modo edición
       if (isEditMode && colaboradorData?.org_id) {
         // En modo edición, SIEMPRE preservar el org_id original del colaborador
         baseData.org_id = colaboradorData.org_id;
-        console.log('✅ Preservando org_id original en edición:', colaboradorData.org_id);
       } else if (organizations && organizations.length > 0) {
         // Solo para nuevos colaboradores, usar la primera organización disponible
         baseData.org_id = organizations[0].id;
-        console.log('🆕 Asignando org_id a nuevo colaborador:', baseData.org_id);
       } else {
         toast({
           title: "Error",
@@ -556,7 +511,6 @@ export const AddColaboradorSheet = ({
                                colaboradorData.email.toLowerCase() !== formData.email.toLowerCase();
         
         if (emailHasChanged) {
-          console.log('📧 Email cambió de:', colaboradorData.email, 'a:', formData.email);
         }
         
         // Si se está usando selección por departamento, limpiar job_id del baseData para evitar conflictos
@@ -574,7 +528,6 @@ export const AddColaboradorSheet = ({
         );
 
         // Department assignments are now handled in the service
-        console.log('✅ Colaborador actualizado con departamentos asignados');
 
         toast({
           title: "Colaborador actualizado",
@@ -592,7 +545,6 @@ export const AddColaboradorSheet = ({
 
         // Si el email cambió, registrar un log específico para reactivar el botón Invitar
         if (emailHasChanged) {
-          console.log('📧 Registrando cambio de email en activity_log');
           await logActivity({
             action: 'email_changed',
             entityType: 'colaborador',
@@ -637,7 +589,6 @@ export const AddColaboradorSheet = ({
         });
 
         // Department assignments are handled in the service now
-        console.log('✅ Colaborador creado con departamentos asignados');
 
         // Assign specific job if selected
         if (formData.jobId) {
@@ -693,11 +644,9 @@ export const AddColaboradorSheet = ({
 
       // Llamar callback para refrescar los datos ANTES de cerrar el diálogo
       if (isEditMode && onColaboradorUpdated) {
-        console.log('🔄 Calling onColaboradorUpdated callback');
             // El componente padre (ColaboradorDetail) se encarga de refrescar todas las asignaciones
             await onColaboradorUpdated();
       } else if (!isEditMode && onColaboradorAdded) {
-        console.log('🔄 Calling onColaboradorAdded callback');
         await onColaboradorAdded();
       }
 
@@ -1113,8 +1062,6 @@ export const AddColaboradorSheet = ({
                      )}
                    </FormField>
 
-
-
                  {/* ASIGNACIÓN DE EQUIPOS */}
                  <div className="space-y-4">
                    <h3 className="text-lg font-medium text-foreground border-b border-border/40 pb-2">
@@ -1159,11 +1106,8 @@ export const AddColaboradorSheet = ({
                                   className="h-3 w-3 cursor-pointer hover:text-destructive" 
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    console.log('🗑️ [MAIN] Attempting to remove department:', dept);
-                                    console.log('🗑️ [MAIN] Current selectedDepartments before removal:', selectedDepartments);
                                     setSelectedDepartments(prev => {
                                       const newDepts = prev.filter(d => d.id !== dept.id);
-                                      console.log('🗑️ [MAIN] New selectedDepartments after removal:', newDepts);
                                       return newDepts;
                                     });
                                     // Also clear the job when removing department
@@ -1174,7 +1118,6 @@ export const AddColaboradorSheet = ({
                            ))}
                          </div>
                        )}
-
 
                        {departments.length === 0 && (
                          <p className="text-sm text-muted-foreground">
@@ -1828,8 +1771,6 @@ export const AddColaboradorSheet = ({
                 )}
               </FormField>
 
-
-
                {/* ASIGNACIÓN DE EQUIPOS */}
                <div className="space-y-4">
                  <h3 className="text-lg font-medium text-foreground border-b border-border/40 pb-2">
@@ -1839,7 +1780,6 @@ export const AddColaboradorSheet = ({
                  <FormField label="Equipo" required={true}>
                     <div className="space-y-3">
                        <Select value={selectedDepartment} data-department-select onValueChange={async (value) => {
-                        console.log('🔄 Equipo seleccionado (lineal):', value);
                         
                         // Verificar si el equipo ya está seleccionado
                         const isAlreadySelected = selectedDepartments.some(dept => dept.id === value);
@@ -1904,11 +1844,8 @@ export const AddColaboradorSheet = ({
                                 className="h-3 w-3 cursor-pointer hover:text-destructive" 
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  console.log('🗑️ Attempting to remove department:', dept);
-                                  console.log('🗑️ Current selectedDepartments before removal:', selectedDepartments);
                                   setSelectedDepartments(prev => {
                                     const newDepts = prev.filter(d => d.id !== dept.id);
-                                    console.log('🗑️ New selectedDepartments after removal:', newDepts);
                                     return newDepts;
                                   });
                                   // Also clear the job when removing department
@@ -1919,7 +1856,6 @@ export const AddColaboradorSheet = ({
                          ))}
                        </div>
                      )}
-
 
                      {departments.length === 0 && (
                        <p className="text-sm text-muted-foreground">

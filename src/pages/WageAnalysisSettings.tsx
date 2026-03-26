@@ -14,11 +14,8 @@ export default function WageAnalysisSettings() {
   }, []);
 
   const handleSave = () => {
-    console.log("WageAnalysisSettings: NUEVO CONTENIDO CARGADO - botón guardar presionado");
     toast.success("Configuración guardada correctamente");
   };
-
-  console.log("WageAnalysisSettings: Componente renderizado con NUEVO DISEÑO");
 
   return (
     <div className="p-6 bg-white min-h-screen">
