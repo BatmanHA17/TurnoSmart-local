@@ -65,6 +65,7 @@ import { ShiftForAudit } from "@/utils/shiftAudit";
 import { AuditCellHighlight, EmployeeViolationBadge } from "@/components/audit";
 import { AuditViolationTooltip } from "@/components/audit/AuditViolationTooltip";
 import { useSmartGenerate } from "@/hooks/useSmartGenerate";
+import { GenerateScheduleSheet, GenerateConfig } from "@/components/calendar/GenerateScheduleSheet";
 import {
   ShiftBlock,
   absenceTypes,
@@ -2622,7 +2623,8 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   const sortedEmployees = sortBy ? sortEmployees(activeEmployees, sortBy) : activeEmployees;
 
   // SMART Schedule Generator
-  const { generate: handleGenerateSchedule, isGenerating } = useSmartGenerate({
+  const [showGenerateSheet, setShowGenerateSheet] = useState(false);
+  const { generate: runSmartGenerate, isGenerating } = useSmartGenerate({
     employees,
     currentWeek,
     orgId: currentOrg?.org_id,
@@ -2639,8 +2641,11 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         });
         return [...otherMonths, ...newBlocks];
       });
+      setShowGenerateSheet(false); // Cerrar panel tras generar
     },
   });
+  const handleOpenGenerateSheet = () => setShowGenerateSheet(true);
+  const handleGenerate = (config: GenerateConfig) => runSmartGenerate(config);
 
   // Transformar shiftBlocks a formato de auditoría
   const shiftsForAudit: ShiftForAudit[] = useMemo(() => {
@@ -2703,7 +2708,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           version={publishState.version}
           onPublish={handlePublishCalendar}
           onUnpublish={handleUnpublishCalendar}
-          onGenerate={canEdit && !isPublished ? handleGenerateSchedule : undefined}
+          onGenerate={canEdit && !isPublished ? handleOpenGenerateSheet : undefined}
           isGenerating={isGenerating}
           auditResult={auditResult}
           isAuditing={isAuditing}
@@ -3539,6 +3544,16 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
             }
           }
         }}
+      />
+
+      {/* SMART Generate Sheet */}
+      <GenerateScheduleSheet
+        open={showGenerateSheet}
+        onOpenChange={setShowGenerateSheet}
+        employees={employees}
+        currentWeek={currentWeek}
+        isGenerating={isGenerating}
+        onGenerate={handleGenerate}
       />
 
       {/* Shift Configuration Dialog */}

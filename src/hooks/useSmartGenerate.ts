@@ -1,11 +1,11 @@
 /**
  * useSmartGenerate — integra el SMART Schedule Engine con el calendario.
  *
- * Lee employees y shiftBlocks del componente, llama a generateSchedule(),
- * y devuelve los nuevos ShiftBlock[] listos para setShiftBlocksWithHistory.
+ * Recibe la configuración del GenerateScheduleSheet (criterios del jefe),
+ * llama a generateSchedule(), y devuelve ShiftBlock[] para el calendario.
  */
 import { useState, useCallback } from "react";
-import { startOfMonth, getDaysInMonth, setDate } from "date-fns";
+import { startOfMonth, setDate } from "date-fns";
 import {
   generateSchedule,
   ScheduleEmployee,
@@ -14,8 +14,12 @@ import {
 } from "@/utils/smartScheduleEngine";
 import { ShiftBlock } from "@/utils/calendarShiftUtils";
 import { useToast } from "@/hooks/use-toast";
+import type { GenerateConfig, EmployeeConfig } from "@/components/calendar/GenerateScheduleSheet";
 
+// ---------------------------------------------------------------------------
 // Tipos internos del calendario
+// ---------------------------------------------------------------------------
+
 interface CalendarEmployee {
   id: string;
   name: string;
@@ -64,44 +68,44 @@ const SHIFT_NAMES: Partial<Record<ShiftCode, string>> = {
 
 const WORK_SHIFTS = new Set<ShiftCode>(["M", "T", "N", "G", "GT"]);
 
-function parseWeeklyHours(workingHours: string): number {
-  // Formato: "0h/40h" → 40
-  const parts = workingHours.split("/");
-  if (parts.length >= 2) {
-    const raw = parts[1].replace("h", "");
-    const parsed = parseInt(raw, 10);
-    if (!isNaN(parsed)) return parsed;
-  }
-  return 40;
-}
-
-function mapCalendarEmployeesToSchedule(
-  employees: CalendarEmployee[]
+/**
+ * Mapea la config del dialog → ScheduleEmployee[] para el motor.
+ * Usa las preferencias y horas que el jefe configuró en el panel.
+ */
+function mapConfigToScheduleEmployees(
+  configs: EmployeeConfig[],
+  calendarEmployees: CalendarEmployee[]
 ): ScheduleEmployee[] {
-  return employees.map((emp) => ({
-    id: emp.id,
-    name: emp.name,
-    weeklyHours: parseWeeklyHours(emp.workingHours),
-    role: emp.role?.toLowerCase().includes("manager") ||
-          emp.role?.toLowerCase().includes("jefe") ||
-          emp.role?.toLowerCase().includes("director") ||
-          emp.role?.toLowerCase().includes("gerente")
-      ? "manager"
-      : "employee",
-    preference: "rotating",
-  }));
+  return configs
+    .filter((c) => c.included)
+    .map((c) => {
+      const calEmp = calendarEmployees.find((e) => e.id === c.id);
+      return {
+        id: c.id,
+        name: c.name,
+        weeklyHours: c.weeklyHours,
+        role: calEmp?.role?.toLowerCase().includes("jefe") ||
+              calEmp?.role?.toLowerCase().includes("manager") ||
+              calEmp?.role?.toLowerCase().includes("director") ||
+              calEmp?.role?.toLowerCase().includes("gerente")
+          ? ("manager" as const)
+          : ("employee" as const),
+        preference: c.preference,
+      };
+    });
 }
 
 function mapOutputToShiftBlocks(
   output: ScheduleOutput,
-  employees: CalendarEmployee[],
+  includedEmployees: EmployeeConfig[],
   year: number,
   month: number,
   orgId: string | undefined
 ): ShiftBlock[] {
   const blocks: ShiftBlock[] = [];
 
-  for (const emp of employees) {
+  for (const emp of includedEmployees) {
+    if (!emp.included) continue;
     const empSchedule = output.schedules[emp.id];
     if (!empSchedule) continue;
 
@@ -151,74 +155,96 @@ export function useSmartGenerate({
   const [isGenerating, setIsGenerating] = useState(false);
   const [lastOutput, setLastOutput] = useState<ScheduleOutput | null>(null);
 
-  const generate = useCallback(async () => {
-    if (employees.length === 0) {
-      toast({
-        title: "Sin empleados",
-        description: "Añade colaboradores antes de generar el cuadrante.",
-        variant: "destructive",
-      });
-      return;
-    }
+  /**
+   * generate() ahora recibe la config del GenerateScheduleSheet.
+   * El jefe ya configuró empleados, preferencias, cobertura y criterios.
+   */
+  const generate = useCallback(
+    async (config: GenerateConfig) => {
+      const includedEmployees = config.employees.filter((e) => e.included);
 
-    setIsGenerating(true);
-
-    try {
-      // Determinar mes a generar (mes de la semana actual en pantalla)
-      const monthStart = startOfMonth(currentWeek);
-      const year = monthStart.getFullYear();
-      const month = monthStart.getMonth() + 1;
-
-      const scheduleEmployees = mapCalendarEmployeesToSchedule(employees);
-
-      const output = generateSchedule({
-        employees: scheduleEmployees,
-        year,
-        month,
-        constraints: {
-          ergonomicRotation: true,
-          fairWeekendDistribution: true,
-          minCoveragePerShift: 1,
-        },
-      });
-
-      setLastOutput(output);
-
-      const newBlocks = mapOutputToShiftBlocks(output, employees, year, month, orgId);
-
-      onResult(newBlocks);
-
-      // Toast con resultado
-      const hasViolations = output.violations.length > 0;
-      const hasWarnings = output.warnings.length > 0;
-
-      if (hasViolations) {
+      if (includedEmployees.length === 0) {
         toast({
-          title: `Cuadrante generado — Score ${output.score}/100`,
-          description: `⚠️ ${output.violations.length} problema(s) legal(es) detectado(s). Revisa el panel de auditoría.`,
+          title: "Sin empleados",
+          description: "Selecciona al menos un empleado en el panel.",
           variant: "destructive",
         });
-      } else if (hasWarnings) {
-        toast({
-          title: `Cuadrante generado — Score ${output.score}/100 ✓`,
-          description: `${newBlocks.length} turnos asignados. ${output.warnings.length} aviso(s) de revisión.`,
-        });
-      } else {
-        toast({
-          title: `Cuadrante generado — Score ${output.score}/100 ✓`,
-          description: `${newBlocks.length} turnos asignados para ${employees.length} empleados. Sin problemas legales.`,
-        });
+        return;
       }
-    } catch (err) {
-      toast({
-        title: "Error al generar",
-        description: String(err),
-        variant: "destructive",
-      });
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [employees, currentWeek, orgId, onResult, toast]);
+
+      setIsGenerating(true);
+
+      try {
+        const monthStart = startOfMonth(currentWeek);
+        const year = monthStart.getFullYear();
+        const month = monthStart.getMonth() + 1;
+
+        const scheduleEmployees = mapConfigToScheduleEmployees(config.employees, employees);
+
+        // Calcular cobertura mínima como el máximo de los 3 turnos
+        const minCoverage = Math.max(
+          config.coveragePerShift.morning,
+          config.coveragePerShift.afternoon,
+          config.coveragePerShift.night
+        );
+
+        const output = generateSchedule({
+          employees: scheduleEmployees,
+          year,
+          month,
+          constraints: {
+            ergonomicRotation: config.optionalCriteria.ergonomicRotation,
+            fairWeekendDistribution: config.optionalCriteria.fairWeekendDistribution,
+            minCoveragePerShift: minCoverage,
+          },
+          occupancyForecast: config.weeklyOccupancy,
+        });
+
+        setLastOutput(output);
+
+        const newBlocks = mapOutputToShiftBlocks(
+          output,
+          config.employees,
+          year,
+          month,
+          orgId
+        );
+
+        onResult(newBlocks);
+
+        // Toast con resultado
+        const hasViolations = output.violations.length > 0;
+        const hasWarnings = output.warnings.length > 0;
+
+        if (hasViolations) {
+          toast({
+            title: `Cuadrante generado — Score ${output.score}/100`,
+            description: `⚠️ ${output.violations.length} problema(s) legal(es). Revisa el panel de auditoría.`,
+            variant: "destructive",
+          });
+        } else if (hasWarnings) {
+          toast({
+            title: `Cuadrante generado — Score ${output.score}/100 ✓`,
+            description: `${newBlocks.length} turnos para ${includedEmployees.length} empleados. ${output.warnings.length} aviso(s).`,
+          });
+        } else {
+          toast({
+            title: `Cuadrante generado — Score ${output.score}/100 ✓`,
+            description: `${newBlocks.length} turnos para ${includedEmployees.length} empleados. Sin problemas legales.`,
+          });
+        }
+      } catch (err) {
+        toast({
+          title: "Error al generar",
+          description: String(err),
+          variant: "destructive",
+        });
+      } finally {
+        setIsGenerating(false);
+      }
+    },
+    [employees, currentWeek, orgId, onResult, toast]
+  );
 
   return { generate, isGenerating, lastOutput };
 }
