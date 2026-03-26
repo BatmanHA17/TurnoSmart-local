@@ -1,0 +1,4311 @@
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
+import { useNavigate } from "react-router-dom";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ChevronLeft, ChevronRight, Plus, MoreVertical, UserPlus, X, Check, ArrowUpDown, Clock, Info, PiggyBank, Coffee, Settings, Trash2, Grid3X3, Star, Save, History, Shield } from "lucide-react";
+import type { ApprovedRequest } from "./TeamCalendar";
+import { AddEmployeesToCalendarDialog } from "./AddEmployeesToCalendarDialog";
+import { DragDropZones, DeleteZone } from "./DragDropZones";
+import { useSelectedEmployees } from "@/hooks/useSelectedEmployees";
+import { format, startOfWeek, addDays, isSameDay, addWeeks, subWeeks, getWeek } from "date-fns";
+import { es } from "date-fns/locale";
+import { UnifiedCalendarHeader } from "./calendar/UnifiedCalendarHeader";
+import { WeekEmptyState } from "./calendar/WeekEmptyState";
+
+import { ViewToggleButtons } from "./ViewToggleButtons";
+import { AdvancedShiftDialog } from "./AdvancedShiftDialog";
+import { ShiftConfigurationDialog } from "./ShiftConfigurationDialog";
+import { ShiftBulkActions } from "./ShiftBulkActions";
+import { ShiftDetailsPanel } from "./ShiftDetailsPanel";
+import { TurnoSmartShiftDetailsPanel } from "./TurnoSmartShiftDetailsPanel";
+import { DeleteShiftConfirmation } from "./DeleteShiftConfirmation";
+import { ShiftSelectorPopup } from "./ShiftSelectorPopup";
+import { ShiftCard } from "./ShiftCard";
+import { TimeSlotRectangles } from "./TimeSlotRectangles";
+import { getSavedShifts, getSavedShiftsSync, SavedShift } from "@/store/savedShiftsStore";
+import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { useUserRoleCanonical } from "@/hooks/useUserRoleCanonical";
+import { useAuth } from "@/hooks/useAuth";
+import { useActivityLog } from "@/hooks/useActivityLog";
+import { EmployeeCompensatoryBalance } from "./EmployeeCompensatoryBalance";
+import { FavoritesArea, defaultAbsenceShifts, getCustomAbsences } from "./FavoritesArea";
+import { useFavoriteShifts } from "@/hooks/useFavoriteShifts";
+import { useAutoSave } from "@/hooks/useAutoSave";
+import { useCalendarVersions } from "@/hooks/useCalendarVersions";
+import { useCalendarPublishState } from "@/hooks/useCalendarPublishState";
+import { AutoSaveIndicator } from "./AutoSaveIndicator";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useBeforeUnload } from "@/hooks/useBeforeUnload";
+
+import { VersionHistoryDialog } from "./calendar/VersionHistoryDialog";
+import { OperationBackupsDialog } from "./calendar/OperationBackupsDialog";
+import { ConfirmationDialog } from "./calendar/ConfirmationDialog";
+import { useDataProtection } from "@/hooks/useDataProtection";
+import { useDataPersistence } from "@/hooks/useDataPersistence";
+import { ConnectionStatusBanner } from "./ConnectionStatusBanner";
+import { EmployeeSortingSheet } from "./EmployeeSortingSheet";
+import { CalendarActionButtons } from "./CalendarActionButtons";
+import { CalendarFullScreenView } from "./CalendarFullScreenView";
+import { CalendarStatusBadge } from "./CalendarStatusBadge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { CleanShiftsDialog } from "./CleanShiftsDialog";
+import { useWeekAudit } from "@/hooks/useShiftAudit";
+import { ShiftForAudit } from "@/utils/shiftAudit";
+import { AuditCellHighlight, EmployeeViolationBadge } from "@/components/audit";
+import { AuditViolationTooltip } from "@/components/audit/AuditViolationTooltip";
+
+interface Employee {
+  id: string;
+  name: string;
+  role: string;
+  department: string;
+  workingHours: string;
+  startDate?: string;
+}
+
+interface ShiftBlock {
+  id: string;
+  employeeId: string;
+  date: Date;
+  startTime?: string;
+  endTime?: string;
+  type: "morning" | "afternoon" | "night" | "absence";
+  color: string;
+  name?: string;
+  organization_id?: string;
+  absenceCode?: string;
+  hasBreak?: boolean;
+  breaks?: any[];
+  totalBreakTime?: number;
+  breakType?: string;
+  breakDuration?: string;
+  notes?: string;
+}
+
+interface GoogleCalendarStyleProps {
+  approvedRequests?: ApprovedRequest[];
+}
+
+export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarStyleProps = {}) {
+  const navigate = useNavigate();
+  const { role, loading: roleLoading, isAdmin, isManager, isOwner } = useUserRoleCanonical();
+  const { user } = useAuth();
+  const isEmployee = role === 'EMPLOYEE';
+  const canEdit = !isEmployee; // Los empleados no pueden editar
+  const { currentOrg } = useCurrentOrganization();
+  const { logActivity } = useActivityLog();
+  const { favoriteShifts, addToFavorites, removeFromFavorites, isFavorite} = useFavoriteShifts();
+  const { createVersion } = useCalendarVersions();
+  const { createBackupBeforeOperation } = useDataProtection();
+  
+  // Sistema de persistencia de datos con soporte offline
+  const {
+    connectionStatus,
+    isOnline,
+    isOffline,
+    saveStatus,
+    lastSavedAt: persistenceLastSaved,
+    isSaving: isPersistenceSaving,
+    pendingCount,
+    hasPending,
+    isSyncing,
+    persistShift,
+    removeShift,
+    persistShiftsBatch,
+    forceSync,
+  } = useDataPersistence({
+    orgId: currentOrg?.org_id,
+    onSyncComplete: () => {
+      // Recargar turnos después de sincronización
+      if (employees.length > 0) {
+        loadShiftsFromSupabase(employees.map(e => e.id));
+      }
+    },
+  });
+
+  // Current time state removed - not needed for week view
+
+  // Estado para manejar los turnos asignados - declarar temprano
+  const [shiftBlocks, setShiftBlocks] = useState<ShiftBlock[]>([]);
+  
+  // Flag para controlar cuando el undo/redo debe sincronizarse
+  const isUndoRedoOperation = useRef(false);
+  
+  // Sistema Undo/Redo
+  const {
+    state: undoRedoState,
+    saveState: saveUndoState,
+    undo: undoBase,
+    redo: redoBase,
+    canUndo,
+    canRedo,
+    historySize,
+    futureSize,
+  } = useUndoRedo<ShiftBlock[]>(shiftBlocks);
+  
+  // Wrapper para undo que marca que es una operación de undo/redo
+  const undo = useCallback(() => {
+    console.log('🔙 UNDO operation triggered');
+    isUndoRedoOperation.current = true;
+    undoBase();
+  }, [undoBase]);
+  
+  const redo = useCallback(() => {
+    console.log('🔜 REDO operation triggered');
+    isUndoRedoOperation.current = true;
+    redoBase();
+  }, [redoBase]);
+  
+  // Sincronizar shiftBlocks con undo/redo state SOLO en operaciones de undo/redo
+  useEffect(() => {
+    if (isUndoRedoOperation.current && undoRedoState !== shiftBlocks) {
+      console.log('🔄 Syncing undo/redo state to shiftBlocks', { 
+        undoRedoCount: undoRedoState.length,
+        currentCount: shiftBlocks.length 
+      });
+      
+      // CRÍTICO: Actualizar directamente sin pasar por setShiftBlocksWithHistory
+      // para evitar guardar este cambio en el historial
+      setShiftBlocks(undoRedoState);
+      
+      // Actualizar localStorage también
+      try {
+        localStorage.setItem('calendar-shift-blocks', JSON.stringify(undoRedoState.map(shift => ({
+          ...shift,
+          date: shift.date.toISOString ? shift.date.toISOString() : shift.date,
+          startTime: shift.startTime,
+          endTime: shift.endTime,
+        }))));
+      } catch (error) {
+        console.error('Error saving to localStorage:', error);
+      }
+      
+      isUndoRedoOperation.current = false;
+    }
+  }, [undoRedoState, shiftBlocks]);
+
+  // Auto-save state
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [changeCount, setChangeCount] = useState(0);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  
+  // Full screen view state
+  const [isFullScreenOpen, setIsFullScreenOpen] = useState(false);
+  
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onUndo: undo,
+    onRedo: redo,
+    onSave: () => {
+      if (hasUnsavedChanges) {
+        saveShiftsToSupabase(shiftBlocks);
+      }
+    },
+    enabled: canEdit,
+  });
+  
+  // Warn before leaving with unsaved changes OR pending offline operations
+  useBeforeUnload({
+    when: (hasUnsavedChanges && changeCount > 0) || hasPending,
+    message: hasPending 
+      ? `Tienes ${pendingCount} cambios pendientes de sincronizar. ¿Seguro que quieres salir?`
+      : 'Tienes cambios sin guardar. ¿Seguro que quieres salir?',
+  });
+  
+  // Wrapper para setShiftBlocks que guarda automáticamente en historial Undo/Redo Y persiste inmediatamente
+  const setShiftBlocksWithHistory = useCallback((updater: ShiftBlock[] | ((prev: ShiftBlock[]) => ShiftBlock[])) => {
+    setShiftBlocks(prevBlocks => {
+      console.log('🔄 setShiftBlocksWithHistory START - prevBlocks count:', prevBlocks.length);
+
+      // CRÍTICO: Guardar el estado ACTUAL (prevBlocks) ANTES de aplicar cualquier cambio
+      saveUndoState(prevBlocks);
+
+      // Aplicar el cambio
+      const computedBlocks = typeof updater === 'function' ? updater(prevBlocks) : updater;
+
+      // Asegurar IDs persistibles (UUID) para evitar errores "invalid input syntax for type uuid"
+      const newBlocks = computedBlocks.map((b) => {
+        if (typeof b.id === 'string' && (b.id.startsWith('shift-') || b.id.startsWith('first-day-'))) {
+          return { ...b, id: crypto.randomUUID() };
+        }
+        return b;
+      });
+
+      console.log('🔄 setShiftBlocksWithHistory END - newBlocks count:', newBlocks.length);
+
+      // Marcar como cambio no guardado
+      setHasUnsavedChanges(true);
+      setChangeCount(prev => prev + 1);
+
+      // 🚀 PERSISTENCIA INSTANTÁNEA: Guardar en localStorage y Supabase inmediatamente
+      // Guardar en localStorage como backup inmediato
+      try {
+        const serialized = newBlocks.map(shift => ({
+          ...shift,
+          date: shift.date instanceof Date ? shift.date.toISOString() : shift.date,
+        }));
+        localStorage.setItem('calendar-shift-blocks', JSON.stringify(serialized));
+        localStorage.setItem('calendar-shifts-backup-timestamp', Date.now().toString());
+      } catch (error) {
+        console.error('Error en backup local:', error);
+      }
+
+      // Persistir en Supabase de forma asíncrona
+      if (currentOrg?.org_id) {
+        persistShiftsBatch(newBlocks).then(success => {
+          if (success) {
+            setHasUnsavedChanges(false);
+            setLastSaved(new Date());
+            setSaveError(null);
+          }
+        }).catch(err => {
+          console.error('Error en persistencia:', err);
+          setSaveError(err.message);
+        });
+      }
+
+      return newBlocks;
+    });
+  }, [saveUndoState, currentOrg?.org_id, persistShiftsBatch]);
+  
+  // Handler functions for action buttons
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleExportPDF = () => {
+    toast({ title: "Exportando PDF", description: "Preparando documento para descarga..." });
+    // Integrar con ScheduleExportConfig existente
+  };
+
+  const handleExportExcel = () => {
+    toast({ title: "Exportando Excel", description: "Preparando archivo para descarga..." });
+    // Integrar con funcionalidad de Excel existente
+  };
+
+  const handleExportImage = () => {
+    toast({ title: "Descargando imagen", description: "Capturando calendario como imagen..." });
+    // Implementar captura de pantalla
+  };
+
+  // Publish handlers
+  const handlePublishCalendar = async (): Promise<boolean> => {
+    if (!shiftBlocks || shiftBlocks.length === 0) {
+      toast({
+        title: "No hay turnos",
+        description: "Debe haber al menos un turno para publicar el calendario",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    const success = await publishCalendar(shiftBlocks, employees);
+    return success;
+  };
+
+  const handleUnpublishCalendar = async (): Promise<boolean> => {
+    const success = await unpublishCalendar();
+    return success;
+  };
+
+  const handleDeleteCalendar = () => {
+    // Show confirmation dialog for calendar deletion
+    toast({
+      title: "Función en desarrollo",
+      description: "La eliminación de calendarios estará disponible próximamente",
+    });
+  };
+  
+  const handleRestoreVersion = async (version: any) => {
+    // Mostrar confirmación antes de restaurar
+    setConfirmRestoreVersion(version.id);
+  };
+
+  const handleConfirmRestoreVersion = async () => {
+    if (!confirmRestoreVersion) return;
+    
+    try {
+      // Buscar la versión por ID
+      const { data: versions } = await supabase
+        .from('calendar_versions')
+        .select('*')
+        .eq('id', confirmRestoreVersion)
+        .single();
+      
+      if (!versions) {
+        throw new Error('Versión no encontrada');
+      }
+      
+      const version = versions;
+      
+      // Crear backup de la versión actual antes de restaurar
+      const backupShifts = shiftBlocks.map(shift => ({
+        ...shift,
+        date: format(shift.date, "yyyy-MM-dd"),
+      }));
+      
+      // Mapear employees al formato esperado por createVersion
+      const backupEmployees = employees.map(emp => ({
+        id: emp.id,
+        nombre: emp.name.split(' ')[0] || emp.name,
+        apellidos: emp.name.split(' ').slice(1).join(' ') || '',
+        email: emp.id + '@temp.com', // Temporal, no tenemos email en este contexto
+        ...emp
+      }));
+      
+      await createVersion(
+        backupShifts as any,
+        backupEmployees as any,
+        { start: currentWeek, end: addDays(currentWeek, 6) },
+        true,
+        `Backup antes de restaurar: ${format(new Date(), "dd/MM/yyyy HH:mm")}`
+      );
+      
+      // Restaurar la versión seleccionada - convertir dates de string a Date
+      const restoredData = version.snapshot_data as any;
+      const restoredShifts = restoredData.shiftBlocks.map((shift: any) => ({
+        ...shift,
+        date: typeof shift.date === 'string' ? new Date(shift.date) : shift.date,
+      }));
+      
+      // Convertir employees restaurados al formato de GoogleCalendarStyle
+      const restoredEmployees = restoredData.employees.map((emp: any) => ({
+        id: emp.id,
+        name: `${emp.nombre || ''} ${emp.apellidos || ''}`.trim(),
+        role: emp.role || '',
+        department: emp.department || '',
+        workingHours: emp.workingHours || '',
+        ...emp
+      }));
+      
+      setShiftBlocksWithHistory(restoredShifts);
+      updateEmployees(restoredEmployees);
+      
+      // Guardar en localStorage y Supabase
+      localStorage.setItem('calendar-shift-blocks', JSON.stringify(restoredShifts));
+      await saveShiftsToSupabase(restoredShifts);
+      
+      // Log activity
+      await logActivity({
+        action: "VERSION_RESTAURADA",
+        entityType: "calendar_version",
+        entityName: version.version_name,
+        details: {
+          versionId: version.id,
+          versionNumber: version.version_number,
+          totalShifts: (restoredData.metadata as any)?.totalShifts,
+          employeeCount: (restoredData.metadata as any)?.employeeCount,
+        }
+      });
+      
+      setConfirmRestoreVersion(null);
+      
+      toast({
+        title: "✅ Versión restaurada",
+        description: `Se ha restaurado "${version.version_name}". Se creó un backup automático de tu versión anterior.`,
+      });
+    } catch (error) {
+      console.error("Error restaurando versión:", error);
+      toast({
+        title: "❌ Error al restaurar",
+        description: "No se pudo restaurar la versión",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Current time update removed - not needed for week view
+  
+  // Debug de permisos
+  useEffect(() => {
+    console.log("🔍 Debug de permisos del usuario:");
+    console.log("- isAdmin:", isAdmin);
+    console.log("- role:", role);
+    console.log("- roleLoading:", roleLoading);
+  }, [isAdmin, role, roleLoading]);
+  
+  // Punto 8: Por defecto siempre aparece en current week (lunes actual)
+  const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [selectedCell, setSelectedCell] = useState<{employee: string, date: Date} | null>(null);
+  const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
+  const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<string>(() => {
+    return localStorage.getItem('calendar-sort-criteria') || "";
+  });
+  const [showEmployeeSortingSheet, setShowEmployeeSortingSheet] = useState(false);
+  const [showEmployeeTooltips, setShowEmployeeTooltips] = useState<{[key: string]: boolean}>({});
+  const [showAddShiftPopup, setShowAddShiftPopup] = useState<{employeeId: string, date: Date} | null>(null);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState<{employeeId: string, date: Date} | null>(null);
+  const [editingShift, setEditingShift] = useState<ShiftBlock | null>(null);
+  const [showShiftConfiguration, setShowShiftConfiguration] = useState(false);
+  const [showAddEmployeesDialog, setShowAddEmployeesDialog] = useState(false);
+  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [showShiftDetails, setShowShiftDetails] = useState<{shift: any, employee: any} | null>(null);
+  const [showTurnoSmartDetails, setShowTurnoSmartDetails] = useState<{shift: any, employee: any} | null>(null);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState<any>(null);
+  const [showShiftSelector, setShowShiftSelector] = useState<{position: {x: number, y: number}, employeeId: string, date: Date} | null>(null);
+  const [selectedShifts, setSelectedShifts] = useState<Set<string>>(new Set());
+  const [selectedColumns, setSelectedColumns] = useState<Set<string>>(new Set());
+  const [dayCounters, setDayCounters] = useState<{[key: string]: number}>({});
+  const [dragOverCell, setDragOverCell] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [deleteZoneDragOver, setDeleteZoneDragOver] = useState(false);
+  const [currentDropAction, setCurrentDropAction] = useState<'move' | 'duplicate' | null>(null);
+  const [showTimeSlots, setShowTimeSlots] = useState<boolean>(false);
+  const [hoveredZone, setHoveredZone] = useState<'move' | 'duplicate' | null>(null);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [showOperationBackups, setShowOperationBackups] = useState(false);
+  const [showCleanDialog, setShowCleanDialog] = useState(false);
+  
+  // Confirmation dialogs state  
+  const [confirmClearCalendar, setConfirmClearCalendar] = useState(false);
+  const [confirmRestoreVersion, setConfirmRestoreVersion] = useState<string | null>(null);
+  const [showFavorites, setShowFavorites] = useState(false);
+  const [draggedFavorite, setDraggedFavorite] = useState<any>(null);
+
+  const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  // Publishing state - after currentWeek is declared
+  const { 
+    publishState, 
+    isLoading: publishLoading, 
+    error: publishError, 
+    publishCalendar, 
+    unpublishCalendar, 
+    canPublish, 
+    isPublished, 
+    isDraft,
+    clearError: clearPublishError
+  } = useCalendarPublishState(currentWeek);
+
+  // Auto-save function
+  const saveCalendarState = async (shiftBlocksToSave: ShiftBlock[]) => {
+    try {
+      setSaveError(null);
+      
+      // 1. Persist all shifts to Supabase (existing logic)
+      for (const shift of shiftBlocksToSave) {
+        await persistShiftToSupabase(shift);
+      }
+      
+      // 2. Create version snapshot
+      const weekRange = {
+        start: weekStart,
+        end: addDays(weekStart, 6)
+      };
+      
+      await createVersion(
+        shiftBlocksToSave.map(shift => ({
+          employeeId: shift.employeeId,
+          date: typeof shift.date === 'string' ? shift.date : shift.date.toISOString().split('T')[0],
+          startTime: shift.startTime,
+          endTime: shift.endTime,
+          name: shift.name || 'Turno',
+          color: shift.color,
+          notes: shift.notes,
+          breakDuration: shift.breakDuration
+        })),
+        employees as any[], // Cast to bypass type checking
+        weekRange,
+        true // isAutoSave
+      );
+      
+      // 3. Update local storage as backup
+      localStorage.setItem('calendar_shifts_backup', JSON.stringify({
+        shifts: shiftBlocksToSave,
+        timestamp: new Date().toISOString(),
+        weekStart: weekStart.toISOString()
+      }));
+      
+      // 4. Log activity
+      await logActivity({
+        action: 'autoguardar_calendario',
+        entityType: 'calendario',
+        entityName: `Semana ${format(weekStart, 'dd/MM/yyyy')}`,
+        details: {
+          totalTurnos: shiftBlocksToSave.length,
+          empleados: employees.length,
+          cambios: changeCount
+        }
+      });
+      
+      setLastSaved(new Date());
+      setHasUnsavedChanges(false);
+      setChangeCount(0);
+      
+    } catch (error) {
+      console.error('Error saving calendar state:', error);
+      setSaveError(error instanceof Error ? error.message : 'Error al guardar');
+    }
+  };
+
+  // Auto-save integration
+  const { forceSave, isAutoSaving } = useAutoSave({
+    data: shiftBlocks || [], // Provide fallback
+    onSave: saveCalendarState,
+    delay: 3000, // 3 seconds
+    enabled: !!shiftBlocks // Only enable when shiftBlocks exists
+  });
+
+  // Track changes - REMOVED: This was causing infinite loop
+  // Changes are now tracked only when setShiftBlocksWithHistory is called
+
+  // Handle publish errors
+  useEffect(() => {
+    if (publishError) {
+      toast({
+        title: "Error de publicación",
+        description: publishError,
+        variant: "destructive"
+      });
+      clearPublishError();
+    }
+  }, [publishError, clearPublishError]);
+
+  // Hook para manejar empleados seleccionados desde colaboradores
+  const { selectedEmployees: selectedFromColaboradores, clearSelectedEmployees } = useSelectedEmployees();
+
+  // Estado para colaboradores de Supabase
+  const [colaboradores, setColaboradores] = useState<any[]>([]);
+
+  // Sample employees data - now loads from Supabase colaboradores
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  
+  // Estado de carga inicial de datos
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
+  // DISABLED: Auto-generation of "Primer día" shifts removed to prevent unwanted recreation
+  // Users can manually create these shifts if needed
+  // 
+  // Previous behavior: automatically created "Primer día" shifts for contract start dates
+  // Problem: Would recreate shifts that users had intentionally deleted
+  // Solution: Remove automatic generation - let users create shifts manually when needed
+
+  // Función para cargar colaboradores desde Supabase y sincronizar con employees
+  const loadColaboradores = async () => {
+    try {
+      // 🔄 SINCRONIZADO CON /turnosmart/day - MISMA CONSULTA EXACTA
+      if (!currentOrg?.org_id) {
+        console.warn('No hay org_id disponible para cargar colaboradores');
+        setIsLoadingData(false);
+        return;
+      }
+
+      const today = new Date().toISOString().split('T')[0];
+      
+      const { data, error } = await supabase
+        .from('colaboradores')
+        .select('id, nombre, apellidos, avatar_url, email, tiempo_trabajo_semanal, tipo_contrato, fecha_inicio_contrato, fecha_fin_contrato')
+        .eq('org_id', currentOrg.org_id)
+        .or(`status.eq.activo,and(status.eq.inactivo,fecha_fin_contrato.gte.${today})`)
+        .order('nombre', { ascending: true }); // Mismo orden que en CalendarDay
+
+      if (error) {
+        console.error('Error cargando colaboradores:', error);
+        setIsLoadingData(false);
+        return;
+      }
+
+      console.log('📊 Colaboradores activos cargados desde Supabase:', data?.length || 0);
+      setColaboradores(data || []);
+      
+      // Convertir colaboradores a formato Employee y actualizar el estado
+      if (data && data.length > 0) {
+        const mappedEmployees: Employee[] = data.map(colaborador => ({
+          id: colaborador.id,
+          name: `${colaborador.nombre} ${colaborador.apellidos}`,
+          role: colaborador.tipo_contrato || 'Empleado',
+          department: 'General',
+          workingHours: colaborador.tiempo_trabajo_semanal ? `0h/${colaborador.tiempo_trabajo_semanal}h` : '0h/40h',
+          startDate: colaborador.fecha_inicio_contrato || undefined
+        }));
+        
+        // Recuperar orden manual si existe
+        const savedManualOrder = localStorage.getItem('manual-employee-order');
+        let finalEmployees = mappedEmployees;
+        
+        if (savedManualOrder) {
+          try {
+            const savedOrder = JSON.parse(savedManualOrder);
+            const orderMap = new Map<string, number>(savedOrder.map((emp: any, index: number) => [emp.id, index]));
+            
+            finalEmployees = [...mappedEmployees].sort((a, b) => {
+              const posA = orderMap.get(a.id) ?? -1;
+              const posB = orderMap.get(b.id) ?? -1;
+              
+              if (posA >= 0 && posB >= 0) {
+                return posA - posB;
+              }
+              if (posA >= 0) return -1;
+              if (posB >= 0) return 1;
+              return a.name.localeCompare(b.name);
+            });
+            
+            console.log('✅ Orden manual restaurado desde localStorage');
+            setSortBy('manual');
+            localStorage.setItem('calendar-sort-criteria', 'manual');
+          } catch (error) {
+            console.error('Error parsing manual order:', error);
+            localStorage.removeItem('manual-employee-order');
+          }
+        }
+        
+        console.log('✅ Empleados mapeados para calendario:', finalEmployees.map(e => e.name));
+        setEmployees(finalEmployees);
+        
+        // Sincronizar con localStorage
+        localStorage.setItem('calendar-employees', JSON.stringify(mappedEmployees));
+        
+        // ✅ ENABLED: Loading shifts from Supabase when employees are loaded
+        // This ensures turnos persist when navigating between pages
+        await loadShiftsFromSupabase(mappedEmployees.map(e => e.id));
+        
+        // Marcar carga inicial como completa
+        setIsLoadingData(false);
+      } else {
+        // Si no hay empleados, marcar carga como completa
+        setIsLoadingData(false);
+      }
+    } catch (error) {
+      console.error('Error en loadColaboradores:', error);
+      setIsLoadingData(false);
+    }
+  };
+
+  // 🔄 CRÍTICO: Recargar turnos cuando cambie la semana visible
+  useEffect(() => {
+    // Recalcular el inicio de la semana basado en currentWeek
+    const calculatedWeekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
+    
+    console.log('📅 Semana cambió, recargando turnos...', {
+      currentWeek: format(currentWeek, 'yyyy-MM-dd'),
+      weekStart: format(calculatedWeekStart, 'yyyy-MM-dd'),
+      weekEnd: format(addDays(calculatedWeekStart, 6), 'yyyy-MM-dd'),
+      orgId: currentOrg?.org_id,
+      employeeCount: employees.length
+    });
+    
+    // Solo cargar si tenemos org Y empleados, para evitar cargas innecesarias
+    if (currentOrg?.org_id && employees.length > 0) {
+      loadShiftsFromSupabase(employees.map(e => e.id));
+    }
+  }, [currentWeek, currentOrg?.org_id]); // Recargar cuando cambie la semana o la organización
+
+  // Función para cargar turnos desde Supabase
+  const loadShiftsFromSupabase = async (employeeIds: string[]) => {
+    try {
+      // 🔄 SINCRONIZADO: Filtrar por org_id para evitar mezclar turnos de diferentes organizaciones
+      if (!currentOrg?.org_id) {
+        console.warn('No hay org_id disponible para cargar turnos');
+        return;
+      }
+
+      // ✅ FIXED: Cargar solo los turnos de la semana visible
+      const weekStartStr = format(weekStart, 'yyyy-MM-dd');
+      const weekEndStr = format(addDays(weekStart, 6), 'yyyy-MM-dd');
+
+      const { data: shifts, error } = await supabase
+        .from('calendar_shifts')
+        .select('*')
+        .eq('org_id', currentOrg.org_id)
+        .gte('date', weekStartStr)
+        .lte('date', weekEndStr);
+
+      if (error) {
+        console.error('Error cargando turnos:', error);
+        return;
+      }
+
+      if (shifts && shifts.length > 0) {
+        // Obtener horarios guardados actualizados para sincronizar nombres
+        const savedShifts = await getSavedShifts();
+        
+        const mappedShifts: ShiftBlock[] = shifts.map(shift => {
+          // Buscar el horario guardado correspondiente por nombre original
+          const savedShift = savedShifts.find(s => s.name === shift.shift_name);
+          
+          // Detectar ausencias por nombre O por horarios nulos
+          const ABSENCE_NAMES = ['Libre', 'Vacaciones', 'Enfermo', 'Falta', 'Permiso', 'Baja', 'Curso', 'Horas Sindicales', 'Sancionado'];
+          const isAbsenceByName = ABSENCE_NAMES.some(name => 
+            shift.shift_name.toLowerCase().includes(name.toLowerCase())
+          );
+          const isAbsenceByTime = !shift.start_time && !shift.end_time;
+          const isAbsenceByTimeRange = shift.start_time === '00:00:00' && shift.end_time === '23:59:00';
+          const isAbsence = savedShift?.accessType === 'absence' || isAbsenceByName || isAbsenceByTime || isAbsenceByTimeRange;
+          
+          return {
+            id: shift.id,
+            employeeId: shift.employee_id,
+            date: new Date(shift.date),
+            // Si es ausencia, forzar undefined para no mostrar horario
+            startTime: isAbsence ? undefined : shift.start_time,
+            endTime: isAbsence ? undefined : shift.end_time,
+            type: isAbsence ? 'absence' : 'morning',
+            color: shift.color || savedShift?.color || '#86efac',
+            name: savedShift?.name || shift.shift_name, // Usar nombre actualizado del horario guardado
+            notes: shift.notes,
+            organization_id: shift.org_id,
+            hasBreak: savedShift?.hasBreak || !!shift.break_duration || false,
+            breakDuration: savedShift?.breakDuration || shift.break_duration || undefined,
+            breaks: savedShift?.breaks || [],
+            totalBreakTime: savedShift?.totalBreakTime || (shift.break_duration ? parseInt(shift.break_duration) : 0)
+          };
+        });
+
+        console.log('📅 Turnos cargados desde Supabase con sincronización:', mappedShifts.length);
+        
+        // SIEMPRE recargar desde Supabase para asegurar sincronización
+        setShiftBlocks(() => {
+          console.log('🔄 Recargando turnos desde Supabase para sincronización completa');
+          localStorage.setItem('calendar-shift-blocks', JSON.stringify(mappedShifts));
+          return mappedShifts;
+        });
+      } else {
+        console.log('📅 No hay turnos en Supabase');
+        // Limpiar estado si no hay turnos
+        setShiftBlocks([]);
+        localStorage.removeItem('calendar-shift-blocks');
+      }
+    } catch (error) {
+      console.error('Error en loadShiftsFromSupabase:', error);
+    }
+  };
+
+  // Función para verificar si un colaborador debe aparecer en el calendario
+  const shouldShowColaborador = (colaborador: any, currentDate: Date = new Date()): boolean => {
+    // Si no existe el colaborador, no mostrarlo
+    if (!colaborador) {
+      return false;
+    }
+    
+    // Si el colaborador está marcado como inactivo, no mostrarlo
+    if (colaborador.status === 'inactivo') {
+      return false;
+    }
+    
+    // Si no tiene fecha de inicio, mostrarlo por defecto
+    if (!colaborador.fecha_inicio_contrato) {
+      return true;
+    }
+    
+    const startDate = new Date(colaborador.fecha_inicio_contrato);
+    const checkDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+    const contractStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    
+    // ✅ Verificar fecha de fin de contrato
+    if (colaborador.fecha_fin_contrato) {
+      const endDate = new Date(colaborador.fecha_fin_contrato);
+      const contractEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+      
+      // El colaborador debe aparecer solo si estamos dentro del rango de su contrato
+      return contractStart <= checkDate && checkDate <= contractEnd;
+    }
+    
+    // Si no tiene fecha de fin, solo verificar que haya empezado
+    return contractStart <= checkDate;
+  };
+
+  // Función para verificar si se puede asignar turno en una fecha específica
+  const canAssignShiftOnDate = (employeeId: string, targetDate: Date, isFirstDayShift: boolean = false): boolean => {
+    const colaborador = colaboradores.find(c => c.id === employeeId);
+    
+    // Si no existe el colaborador, no permitir
+    if (!colaborador) {
+      return false;
+    }
+    
+    // Si está inactivo, no permitir asignación
+    if (colaborador.status === 'inactivo') {
+      return false;
+    }
+    
+    // Si no tiene fecha de inicio, permitir por defecto
+    if (!colaborador.fecha_inicio_contrato) {
+      return true;
+    }
+    
+    const startDate = new Date(colaborador.fecha_inicio_contrato);
+    const target = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+    const contractStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    
+    // ✅ Verificar fecha de fin de contrato
+    if (colaborador.fecha_fin_contrato) {
+      const endDate = new Date(colaborador.fecha_fin_contrato);
+      const contractEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+      
+      // Permitir turnos "Primer día" exactamente en la fecha de inicio
+      if (isFirstDayShift && target.getTime() === contractStart.getTime()) {
+        return true;
+      }
+      
+      // Solo permitir asignación si la fecha está dentro del rango del contrato
+      return contractStart <= target && target <= contractEnd;
+    }
+    
+    // Si no tiene fecha de fin, solo verificar que no sea antes del inicio
+    // Permitir turnos "Primer día" exactamente en la fecha de inicio
+    if (isFirstDayShift && target.getTime() === contractStart.getTime()) {
+      return true;
+    }
+    
+    return contractStart <= target;
+  };
+
+  // Función para obtener horas semanales de un empleado desde colaboradores
+  const getWeeklyHoursFromColaborador = (employeeName: string): number => {
+    const colaborador = colaboradores.find(col => 
+      `${col.nombre} ${col.apellidos}`.toLowerCase().includes(employeeName.toLowerCase()) ||
+      employeeName.toLowerCase().includes(`${col.nombre} ${col.apellidos}`.toLowerCase())
+    );
+    
+    return colaborador?.tiempo_trabajo_semanal || 0;
+  };
+
+  // Función para calcular horas reales de la semana para un empleado
+  const getWeeklyRealHours = (employeeId: string): number => {
+    const currentWeekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Lunes
+    const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
+    
+    let totalHours = 0;
+    
+    // Buscar todos los turnos del empleado en la semana actual (excluyendo ausencias)
+    const employeeShifts = shiftBlocks.filter(shift => 
+      shift.employeeId === employeeId &&
+      weekDays.some(day => isSameDay(shift.date, day)) &&
+      !isAbsenceType(shift)
+    );
+    
+    employeeShifts.forEach(shift => {
+      if (shift.startTime && shift.endTime) {
+        // Calcular horas del turno
+        const [startHour, startMinute] = shift.startTime.split(':').map(Number);
+        const [endHour, endMinute] = shift.endTime.split(':').map(Number);
+        
+        const startTotalMinutes = startHour * 60 + startMinute;
+        let endTotalMinutes = endHour * 60 + endMinute;
+        
+        // Manejar turnos que cruzan medianoche
+        if (endTotalMinutes < startTotalMinutes) {
+          endTotalMinutes += 24 * 60;
+        }
+        
+        const durationMinutes = endTotalMinutes - startTotalMinutes;
+        const hours = durationMinutes / 60;
+        
+        totalHours += hours;
+      }
+    });
+    
+    return Math.round(totalHours * 10) / 10; // Redondear a 1 decimal
+  };
+
+  // Tipos de ausencias disponibles
+  const absenceTypes = [
+    'Baja por enfermedad',
+    'Descanso semanal', 
+    'Vacaciones',
+    'Accidente laboral',
+    'Ausencia injustificada',
+    'Ausencia justificada',
+    'Baja parental',
+    'Baja por maternidad',
+    'Baja por paternidad',
+    'Día festivo',
+    'Enfermedad profesional',
+    'Excedencia sin sueldo',
+    'Formación',
+    'Indisponibilidad temporal',
+    'Paro parcial',
+    'Permiso retribuido',
+    'Reconocimiento médico',
+    'Recuperación día festivo',
+    'Recuperación por horas de ropa',
+    'Recuperación por horas nocturnas',
+    'Suspensión disciplinaria',
+    'Suspensión preventiva'
+  ];
+
+  // Función para verificar si un tipo de turno es una ausencia
+  const isAbsenceType = (shift: ShiftBlock): boolean => {
+    // Verificar por tipo
+    if (shift.type === 'absence') {
+      return true;
+    }
+    
+    // Verificar por nombre si existe
+    if (shift.name) {
+      return absenceTypes.some(absence => 
+        shift.name!.toLowerCase().includes(absence.toLowerCase()) ||
+        absence.toLowerCase().includes(shift.name!.toLowerCase())
+      );
+    }
+    
+    return false;
+  };
+
+  // Función para calcular ausencias realizadas de la semana para un empleado
+  const getWeeklyAbsenceHours = (employeeId: string): number => {
+    const currentWeekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Lunes
+    const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
+    
+    let totalAbsenceHours = 0;
+    
+    // Buscar todos los turnos de ausencia del empleado en la semana actual
+    const employeeAbsences = shiftBlocks.filter(shift => 
+      shift.employeeId === employeeId &&
+      weekDays.some(day => isSameDay(shift.date, day)) &&
+      isAbsenceType(shift)
+    );
+    
+    employeeAbsences.forEach(shift => {
+      if (shift.startTime && shift.endTime) {
+        // Calcular horas de la ausencia
+        const [startHour, startMinute] = shift.startTime.split(':').map(Number);
+        const [endHour, endMinute] = shift.endTime.split(':').map(Number);
+        
+        const startTotalMinutes = startHour * 60 + startMinute;
+        let endTotalMinutes = endHour * 60 + endMinute;
+        
+        // Manejar ausencias que cruzan medianoche
+        if (endTotalMinutes < startTotalMinutes) {
+          endTotalMinutes += 24 * 60;
+        }
+        
+        const durationMinutes = endTotalMinutes - startTotalMinutes;
+        const hours = durationMinutes / 60;
+        
+        totalAbsenceHours += hours;
+      }
+    });
+    
+    return Math.round(totalAbsenceHours * 10) / 10; // Redondear a 1 decimal
+  };
+  
+  // Función para navegar al perfil del colaborador
+  const navigateToColaborador = (employeeName: string) => {
+    const colaborador = colaboradores.find(c => 
+      c.nombre && c.apellidos && 
+      `${c.nombre} ${c.apellidos}` === employeeName
+    );
+    
+    if (!colaborador) return;
+    
+    // Si es employee, solo puede navegar a su propio perfil
+    if (isEmployee) {
+      const currentUserColaborador = colaboradores.find(c => c.email === user?.email);
+      if (!currentUserColaborador || currentUserColaborador.id !== colaborador.id) {
+        toast({
+          title: "Acceso restringido",
+          description: "Solo puedes acceder a tu propio perfil",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+    
+    navigate(`/colaboradores/${colaborador.id}/profile`);
+  };
+
+  // Función para adaptar horarios de turnos favoritos según el contrato del empleado
+  // Función para adaptar horarios de shift blocks según el contrato del empleado
+  const adaptShiftBlockToContract = (shift: ShiftBlock, sourceEmployeeId: string, targetEmployeeId: string) => {
+    // Si no hay horarios definidos, no adaptar
+    if (!shift.startTime || !shift.endTime) {
+      return {
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        adapted: false,
+        originalHours: 0,
+        adaptedHours: 0
+      };
+    }
+
+    // Obtener información de los colaboradores
+    const sourceColaborador = colaboradores.find(c => c.id === sourceEmployeeId);
+    const targetColaborador = colaboradores.find(c => c.id === targetEmployeeId);
+    const sourceEmployee = employees.find(e => e.id === sourceEmployeeId);
+    const targetEmployee = employees.find(e => e.id === targetEmployeeId);
+    
+    // Calcular horas diarias de cada contrato
+    const sourceContractHours = sourceColaborador?.tiempo_trabajo_semanal 
+      ? Math.round(sourceColaborador.tiempo_trabajo_semanal / 5) 
+      : sourceEmployee?.name ? getWeeklyHoursFromColaborador(sourceEmployee.name) / 5 : 8;
+      
+    const targetContractHours = targetColaborador?.tiempo_trabajo_semanal 
+      ? Math.round(targetColaborador.tiempo_trabajo_semanal / 5) 
+      : targetEmployee?.name ? getWeeklyHoursFromColaborador(targetEmployee.name) / 5 : 8;
+
+    console.log('Adaptando shift block:', { 
+      shiftName: shift.name, 
+      originalStart: shift.startTime, 
+      originalEnd: shift.endTime,
+      sourceContractHours,
+      targetContractHours,
+      sourceEmployee: sourceEmployee?.name,
+      targetEmployee: targetEmployee?.name
+    });
+
+    // Si ambos tienen las mismas horas de contrato, no adaptar
+    if (sourceContractHours === targetContractHours) {
+      return {
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        adapted: false,
+        originalHours: sourceContractHours,
+        adaptedHours: targetContractHours
+      };
+    }
+
+    // Si es un turno de ausencia (libre), no adaptarlo
+    if (shift.type === 'absence' || shift.name === 'Descanso Semanal' || shift.name?.includes('Libre')) {
+      return {
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        adapted: false,
+        originalHours: sourceContractHours,
+        adaptedHours: targetContractHours
+      };
+    }
+
+    // Parsear hora de inicio del turno original
+    const [startHour, startMinute] = shift.startTime.split(':').map(Number);
+    const startTime = new Date();
+    startTime.setHours(startHour, startMinute, 0, 0);
+
+    // Calcular nueva hora de fin basada en las horas del contrato objetivo
+    const newEndTime = new Date(startTime.getTime() + (targetContractHours * 60 * 60 * 1000));
+    
+    const adaptedEndTime = `${newEndTime.getHours().toString().padStart(2, '0')}:${newEndTime.getMinutes().toString().padStart(2, '0')}`;
+
+    return {
+      startTime: shift.startTime,
+      endTime: adaptedEndTime,
+      adapted: true,
+      originalHours: sourceContractHours,
+      adaptedHours: targetContractHours
+    };
+  };
+  const adaptShiftToContract = (shift: SavedShift, targetEmployeeId: string) => {
+    // Obtener las horas del contrato del empleado objetivo
+    const targetColaborador = colaboradores.find(c => c.id === targetEmployeeId);
+    const targetEmployee = employees.find(e => e.id === targetEmployeeId);
+    
+    // Si no encontramos información del contrato, usar el turno original
+    const contractHours = targetColaborador?.tiempo_trabajo_semanal 
+      ? Math.round(targetColaborador.tiempo_trabajo_semanal / 5) // horas diarias
+      : targetEmployee?.name ? getWeeklyHoursFromColaborador(targetEmployee.name) / 5 : 8;
+    
+    console.log('Adaptando turno:', { 
+      shiftName: shift.name, 
+      originalStart: shift.startTime, 
+      originalEnd: shift.endTime,
+      contractHours,
+      targetEmployee: targetEmployee?.name
+    });
+
+    // Si es un turno de ausencia (libre), no adaptarlo
+    if (shift.accessType === 'absence' || shift.name === 'Descanso Semanal') {
+      return {
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        adapted: false
+      };
+    }
+
+    // Si no tiene horarios definidos, mantener original
+    if (!shift.startTime || !shift.endTime) {
+      return {
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        adapted: false
+      };
+    }
+
+    // Parsear hora de inicio del turno original
+    const [startHour, startMinute] = shift.startTime.split(':').map(Number);
+    
+    // Calcular nueva hora de fin basada en las horas del contrato
+    const endTotalMinutes = (startHour * 60 + startMinute) + (contractHours * 60);
+    const endHour = Math.floor(endTotalMinutes / 60) % 24;
+    const endMin = endTotalMinutes % 60;
+    
+    const adaptedStartTime = shift.startTime;
+    const adaptedEndTime = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
+
+    return {
+      startTime: adaptedStartTime,
+      endTime: adaptedEndTime,
+      adapted: true,
+      originalHours: shift.startTime && shift.endTime ? 
+        (() => {
+          const [oStartH, oStartM] = shift.startTime.split(':').map(Number);
+          const [oEndH, oEndM] = shift.endTime.split(':').map(Number);
+          return ((oEndH * 60 + oEndM) - (oStartH * 60 + oStartM)) / 60;
+        })() : 0,
+      adaptedHours: contractHours
+    };
+  };
+  // Removed duplicate shiftBlocks declaration - already declared above
+
+  // Función para actualizar empleados con persistencia y sin duplicados
+  const updateEmployees = (newEmployees: Employee[]) => {
+    // Filtrar duplicados antes de establecer el estado
+    const uniqueEmployees = newEmployees.reduce((acc: Employee[], emp) => {
+      if (!acc.find(existing => existing.id === emp.id)) {
+        acc.push(emp);
+      }
+      return acc;
+    }, []);
+    
+    console.log("updateEmployees - antes de duplicados:", newEmployees.map(e => `${e.id}: ${e.name}`));
+    console.log("updateEmployees - después de filtrar duplicados:", uniqueEmployees.map(e => `${e.id}: ${e.name}`));
+    
+    setEmployees(uniqueEmployees);
+    localStorage.setItem('calendar-employees', JSON.stringify(uniqueEmployees));
+    console.log("Empleados guardados en localStorage (sin duplicados):", uniqueEmployees.map(e => `${e.id}: ${e.name}`));
+  };
+
+  // Función para eliminar empleado del calendario con validación
+  const removeEmployeeFromCalendar = (employeeId: string, employeeName: string) => {
+    console.log("🚀 removeEmployeeFromCalendar iniciada:", { employeeId, employeeName });
+    console.log("🚀 isAdmin valor:", isAdmin);
+    
+    // Verificar permisos: solo admin, super_admin y roles superiores pueden eliminar empleados
+    if (!isAdmin) {
+      console.log("❌ Sin permisos - isAdmin es false");
+      // toast({
+      //   title: "Sin permisos",
+      //   description: "No tienes permisos para eliminar empleados del calendario.",
+      //   variant: "destructive",
+      // });
+      return;
+    }
+
+    console.log("✅ Permisos OK - continuando con validación de horarios");
+
+    // Verificar si el empleado tiene horarios asignados (filtrar horarios válidos)
+    const employeeShifts = shiftBlocks.filter(shift => 
+      shift.employeeId === employeeId && 
+      shift.startTime && 
+      shift.endTime &&
+      shift.date
+    );
+    
+    console.log(`Verificando eliminación de ${employeeName}:`, {
+      employeeId,
+      totalShiftBlocks: shiftBlocks.length,
+      employeeShifts: employeeShifts.length,
+      allShifts: shiftBlocks.map(s => ({ 
+        id: s.id, 
+        employeeId: s.employeeId, 
+        name: s.name,
+        startTime: s.startTime,
+        endTime: s.endTime 
+      }))
+    });
+    
+    if (employeeShifts.length > 0) {
+      // Mostrar confirmación para forzar eliminación
+      if (confirm(`${employeeName} tiene ${employeeShifts.length} horario(s) asignado(s). ¿Deseas forzar la eliminación de este empleado y todos sus horarios?`)) {
+        forceDeleteEmployee(employeeId, employeeName);
+        return true;
+      }
+      return false;
+    }
+
+    // Si no tiene shifts, proceder con la eliminación
+    const updatedEmployees = employees.filter(emp => emp.id !== employeeId);
+    updateEmployees(updatedEmployees);
+    
+    // toast({
+    //   title: "Empleado eliminado",
+    //   description: `${employeeName} ha sido eliminado del calendario.`,
+    // });
+    
+    return true;
+  };
+
+  // Función para forzar la eliminación de un empleado y sus horarios
+  const forceDeleteEmployee = (employeeId: string, employeeName: string) => {
+    // Eliminar todos los horarios del empleado con historial
+    setShiftBlocksWithHistory(currentShifts => {
+      const filteredShifts = currentShifts.filter(shift => shift.employeeId !== employeeId);
+      localStorage.setItem('calendar-shift-blocks', JSON.stringify(filteredShifts));
+      return filteredShifts;
+    });
+    
+    // Eliminar el empleado
+    const updatedEmployees = employees.filter(emp => emp.id !== employeeId);
+    updateEmployees(updatedEmployees);
+    
+    // toast({
+    //   title: "Empleado eliminado forzadamente",
+    //   description: `${employeeName} y todos sus horarios han sido eliminados del calendario.`,
+    // });
+    
+    return true;
+  };
+
+  // Cargar colaboradores cuando currentOrg esté disponible
+  useEffect(() => {
+    if (!currentOrg?.org_id) {
+      console.log('⏳ Esperando currentOrg para cargar colaboradores...');
+      return;
+    }
+    
+    console.log('🚀 Inicializando GoogleCalendarStyle con org:', currentOrg.org_id);
+    loadColaboradores();
+  }, [currentOrg?.org_id]); // Ejecutar cuando currentOrg esté disponible
+
+  // REMOVIDO: Limpieza automática de localStorage que estaba causando logout
+  // El problema era que este useEffect se ejecutaba en cada renderizado
+  // y podría estar interfiriendo con las claves de sesión de Supabase
+
+  // Función para limpiar localStorage y Supabase manualmente
+  const clearLocalStorageShifts = async () => {
+    // Mostrar confirmación en lugar de ejecutar directamente
+    setConfirmClearCalendar(true);
+  };
+
+  const handleConfirmClearCalendar = async () => {
+    try {
+      const orgId = typeof currentOrg === 'string' ? currentOrg : currentOrg?.org_id;
+      
+      // 🛡️ PROTECCIÓN: Crear backup antes de eliminar todo
+      if (shiftBlocks.length > 0) {
+        await createBackupBeforeOperation(
+          'clear_calendar',
+          {
+            shiftBlocks: shiftBlocks.map(shift => ({
+              ...shift,
+              date: format(shift.date, "yyyy-MM-dd"),
+            })),
+            employees,
+            timestamp: new Date().toISOString(),
+          },
+          `Limpieza completa del calendario - ${shiftBlocks.length} turnos`,
+          shiftBlocks.length
+        );
+        console.log('🛡️ Backup de seguridad creado antes de limpiar calendario');
+      }
+      
+      // 1. Eliminar todos los turnos de la organización actual desde Supabase
+      if (orgId) {
+        const { error } = await supabase
+          .from('calendar_shifts')
+          .delete()
+          .eq('org_id', orgId);
+        
+        if (error) {
+          console.error('Error eliminando turnos de Supabase:', error);
+        } else {
+          console.log('✅ Todos los turnos eliminados de Supabase');
+        }
+      }
+      
+      // 2. Limpiar localStorage
+      localStorage.removeItem('calendar-shift-blocks');
+      
+      // 3. Limpiar estado local
+      setShiftBlocks([]);
+      
+      console.log("✅ LocalStorage, Supabase y shiftBlocks limpiados completamente");
+      
+      toast({
+        title: "✅ Calendario limpiado",
+        description: "Todos los turnos han sido eliminados. Se creó un backup de seguridad que puedes restaurar desde el botón de Backups.",
+      });
+    } catch (error) {
+      console.error('Error en clearLocalStorageShifts:', error);
+      toast({
+        title: "❌ Error",
+        description: "Hubo un problema al limpiar el calendario.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Función para eliminar un turno específico de Supabase
+  const deleteShiftFromSupabase = async (shiftId: string) => {
+    try {
+      // Get shift details before deletion for logging
+      const { data: shiftData } = await supabase
+        .from('calendar_shifts')
+        .select('*')
+        .eq('id', shiftId)
+        .single();
+      
+      const { error } = await supabase
+        .from('calendar_shifts')
+        .delete()
+        .eq('id', shiftId);
+      
+      if (error) {
+        console.error('Error eliminando turno de Supabase:', error);
+        return false;
+      }
+      
+      console.log('✅ Turno eliminado de Supabase:', shiftId);
+      
+      // Log activity
+      if (shiftData) {
+        const employee = employees.find(e => e.id === shiftData.employee_id);
+        await logActivity({
+          action: "TURNO_ELIMINADO",
+          entityType: "calendar_shift",
+          entityName: `${shiftData.shift_name} - ${employee?.name || 'Colaborador'}`,
+          details: {
+            employeeName: employee?.name,
+            employeeId: shiftData.employee_id,
+            shiftName: shiftData.shift_name,
+            date: shiftData.date,
+            startTime: shiftData.start_time,
+            endTime: shiftData.end_time
+          }
+        });
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error en deleteShiftFromSupabase:', error);
+      return false;
+    }
+  };
+
+  // Función para persistir turno en Supabase
+  const persistShiftToSupabase = async (shift: ShiftBlock) => {
+    try {
+      // Asegurar que tenemos un UUID válido para el ID
+      const shiftId = shift.id.startsWith('first-day-') || shift.id.startsWith('shift-') 
+        ? crypto.randomUUID() 
+        : shift.id;
+      
+      const { data, error } = await supabase
+        .from('calendar_shifts')
+        .upsert({
+          id: shiftId,
+          employee_id: shift.employeeId,
+          date: format(shift.date, 'yyyy-MM-dd'),
+          start_time: shift.startTime && shift.startTime.trim() !== '' ? shift.startTime : null,
+          end_time: shift.endTime && shift.endTime.trim() !== '' ? shift.endTime : null,
+          shift_name: shift.name || '',
+          color: shift.color,
+          notes: shift.notes || null,
+          organization: shift.organization_id || 'default',
+          break_duration: shift.breakDuration || null,
+          org_id: currentOrg?.org_id || null
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error persistiendo turno en Supabase:', error);
+        return false;
+      }
+
+      console.log('✅ Turno persistido en Supabase:', data);
+      
+      // Log activity
+      const employee = employees.find(e => e.id === shift.employeeId);
+      await logActivity({
+        action: "TURNO_CREADO",
+        entityType: "calendar_shift",
+        entityName: `${shift.name} - ${employee?.name || 'Colaborador'}`,
+        details: {
+          employeeName: employee?.name,
+          employeeId: shift.employeeId,
+          shiftName: shift.name,
+          date: format(shift.date, 'yyyy-MM-dd'),
+          startTime: shift.startTime,
+          endTime: shift.endTime,
+          source: "calendar"
+        }
+      });
+      
+      // Actualizar el ID en el estado local si se generó uno nuevo
+      if (shiftId !== shift.id) {
+        setShiftBlocks(currentShifts => {
+          const updatedShifts = currentShifts.map(s => 
+            s.id === shift.id ? { ...s, id: shiftId } : s
+          );
+          localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
+          return updatedShifts;
+        });
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error en persistShiftToSupabase:', error);
+      return false;
+    }
+  };
+
+  // Función para actualizar todos los turnos con el mismo nombre
+  const updateAllShiftsWithSameName = async (oldShiftName: string, updatedShiftData: Partial<ShiftBlock>) => {
+    try {
+      // Normalizar el nombre para evitar problemas de espacios
+      const normalizedOldName = oldShiftName.trim();
+      
+      console.log(`🔄 INICIANDO actualización EN LOTE de todos los turnos "${normalizedOldName}"`);
+      console.log('📝 Datos nuevos:', updatedShiftData);
+      
+      // Primero, verificar cuántos turnos hay con este nombre ANTES de actualizar
+      const { data: existingShifts, error: countError } = await supabase
+        .from('calendar_shifts')
+        .select('id, shift_name, employee_id, date, color, start_time, end_time')
+        .eq('shift_name', normalizedOldName)
+        .eq('org_id', currentOrg?.org_id || null);
+      
+      if (countError) {
+        console.error('❌ Error verificando turnos:', countError);
+      } else {
+        console.log(`📊 ANTES DE ACTUALIZAR: Encontrados ${existingShifts?.length || 0} turnos con nombre "${normalizedOldName}":`, 
+          existingShifts?.map(s => ({ id: s.id, employee: s.employee_id, date: s.date, color: s.color }))
+        );
+      }
+      
+      // 1. Actualizar en Supabase usando match EXACTO del nombre - TODOS A LA VEZ
+      const { data: updatedRecords, error: updateError } = await supabase
+        .from('calendar_shifts')
+        .update({
+          shift_name: updatedShiftData.name || normalizedOldName,
+          start_time: updatedShiftData.startTime || null,
+          end_time: updatedShiftData.endTime || null,
+          color: updatedShiftData.color,
+          break_duration: updatedShiftData.breakDuration || null,
+          notes: updatedShiftData.notes || null,
+        })
+        .eq('shift_name', normalizedOldName)
+        .eq('org_id', currentOrg?.org_id || null)
+        .select();
+
+      if (updateError) {
+        console.error('❌ Error actualizando en Supabase:', updateError);
+        toast({
+          title: "Error de sincronización",
+          description: "No se pudieron actualizar todos los turnos en el servidor",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      console.log(`✅ ACTUALIZACIÓN EN LOTE COMPLETADA: ${updatedRecords?.length || 0} registros actualizados`);
+      console.log('📦 Registros DESPUÉS de actualizar:', updatedRecords?.map(r => ({
+        id: r.id,
+        name: r.shift_name,
+        employee: r.employee_id,
+        date: r.date,
+        color: r.color,
+        start_time: r.start_time,
+        end_time: r.end_time
+      })));
+      
+      // Verificar que la actualización fue exitosa
+      if (updatedRecords && updatedRecords.length !== existingShifts?.length) {
+        console.warn(`⚠️ ADVERTENCIA: Se esperaban ${existingShifts?.length} actualizaciones pero se realizaron ${updatedRecords.length}`);
+      }
+
+      // 2. RECARGAR TODOS los turnos desde Supabase para tener el estado 100% sincronizado
+      // Esperar un momento para asegurar que la actualización se haya completado en la BD
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      console.log('🔄 Recargando TODOS los turnos desde Supabase DESPUÉS de actualización en lote...');
+      const { data: allShifts, error: fetchError } = await supabase
+        .from('calendar_shifts')
+        .select('*')
+        .eq('org_id', currentOrg?.org_id || null)
+        .order('date', { ascending: true });
+
+      if (fetchError) {
+        console.error('❌ Error recargando turnos:', fetchError);
+        toast({
+          title: "Error de sincronización",
+          description: "Los cambios se guardaron pero hubo un problema al recargar",
+          variant: "destructive",
+        });
+      } else if (allShifts) {
+        console.log(`📊 Recargados ${allShifts.length} turnos desde Supabase DESPUÉS de actualización`);
+        
+        // Verificar que los turnos actualizados están presentes
+        const verifyUpdated = allShifts.filter(s => 
+          s.shift_name === (updatedShiftData.name || normalizedOldName)
+        );
+        console.log(`✅ Verificación: ${verifyUpdated.length} turnos con nombre actualizado "${updatedShiftData.name || normalizedOldName}"`);
+        console.log('📋 Turnos verificados:', verifyUpdated.map(s => ({
+          id: s.id,
+          name: s.shift_name,
+          employee: s.employee_id,
+          date: s.date,
+          color: s.color
+        })));
+        
+        // Convertir TODOS los datos de Supabase al formato ShiftBlock
+        const convertedShifts: ShiftBlock[] = allShifts.map((shift: any) => ({
+          id: shift.id || crypto.randomUUID(),
+          employeeId: shift.employee_id,
+          date: new Date(shift.date),
+          startTime: shift.start_time,
+          endTime: shift.end_time,
+          type: shift.shift_type || 'morning',
+          color: shift.color || '#86efac',
+          name: shift.shift_name,
+          organization_id: shift.org_id || 'default',
+          hasBreak: !!shift.break_duration,
+          breaks: [],
+          totalBreakTime: shift.break_duration || 0,
+          breakType: undefined,
+          breakDuration: shift.break_duration,
+          notes: shift.notes,
+          absenceCode: shift.absence_code
+        }));
+
+        // 3. Actualizar el estado local COMPLETAMENTE con los datos de Supabase
+        setShiftBlocks(() => {
+          localStorage.setItem('calendar-shift-blocks', JSON.stringify(convertedShifts));
+          console.log(`💾 Estado LOCAL actualizado COMPLETAMENTE con ${convertedShifts.length} turnos`);
+          
+          // Contar cuántos tienen el nombre actualizado
+          const updatedNameCount = convertedShifts.filter(s => 
+            s.name === (updatedShiftData.name || normalizedOldName)
+          ).length;
+          console.log(`✅ Turnos con nombre "${updatedShiftData.name || normalizedOldName}": ${updatedNameCount}`);
+          
+          // Verificar que NO hay turnos con nombres incorrectos actualizados
+          const allShiftNames = new Set(convertedShifts.map(s => s.name));
+          console.log('📋 Nombres de turnos en el estado:', Array.from(allShiftNames));
+          
+          return convertedShifts;
+        });
+      }
+
+      // 4. Log activity
+      await logActivity({
+        action: "TURNOS_ACTUALIZADOS_EN_LOTE",
+        entityType: "calendar_shift",
+        entityName: `${oldShiftName} → ${updatedShiftData.name || oldShiftName}`,
+        details: {
+          oldName: oldShiftName,
+          newName: updatedShiftData.name,
+          changes: updatedShiftData,
+          shiftsAffected: updatedRecords?.length || 0,
+          source: "calendar"
+        }
+      });
+
+      console.log(`✅✅✅ COMPLETADO: Todos los turnos "${oldShiftName}" actualizados y sincronizados`);
+      
+      // 5. Esperar un momento adicional para asegurar que no hay operaciones en curso que sobrescriban
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // 6. Verificación final - recargar una vez más para confirmar
+      const { data: finalCheck } = await supabase
+        .from('calendar_shifts')
+        .select('id, shift_name, color, start_time, end_time')
+        .eq('shift_name', updatedShiftData.name || normalizedOldName)
+        .eq('org_id', currentOrg?.org_id || null);
+      
+      console.log(`🔍 Verificación FINAL: ${finalCheck?.length || 0} turnos con nombre "${updatedShiftData.name || normalizedOldName}"`);
+      if (finalCheck && finalCheck.length > 0) {
+        console.log('✅ Muestra de turnos verificados:', finalCheck.slice(0, 3).map(s => ({
+          id: s.id,
+          name: s.shift_name,
+          color: s.color,
+          start: s.start_time,
+          end: s.end_time
+        })));
+      }
+      
+      toast({
+        title: "Turnos sincronizados",
+        description: `${updatedRecords?.length || 0} turno(s) actualizado(s) exitosamente`,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('❌ Error crítico en updateAllShiftsWithSameName:', error);
+      toast({
+        title: "Error crítico",
+        description: "Ocurrió un error al actualizar los turnos",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  // SOLO guardar en localStorage cuando se modifica explícitamente
+  const updateShiftBlocks = async (newShiftBlocks: ShiftBlock[]) => {
+    console.log('🔄 Actualizando shiftBlocks:', newShiftBlocks.length, 'turnos');
+    setShiftBlocks(newShiftBlocks);
+    try {
+      localStorage.setItem('calendar-shift-blocks', JSON.stringify(newShiftBlocks));
+      console.log("=== GUARDANDO EN LOCALSTORAGE ===");
+      console.log("Shifts being saved:", newShiftBlocks.length);
+      
+      // Guardar en Supabase - PREVENIENDO DUPLICADOS
+      if (currentOrg?.org_id) {
+        await saveShiftsToSupabase(newShiftBlocks);
+      }
+    } catch (error) {
+      console.error("Error guardando horarios en localStorage:", error);
+    }
+  };
+
+  // Función para guardar turnos en Supabase evitando duplicados - MEJORADA
+  const saveShiftsToSupabase = async (shifts: ShiftBlock[]) => {
+    try {
+      // Primero eliminar turnos existentes para los mismos empleados y fechas
+      const uniqueShifts = shifts.filter(shift => shift.startTime && shift.endTime);
+      
+      for (const shift of uniqueShifts) {
+        // Eliminar turnos duplicados existentes (por empleado, fecha y nombre de turno)
+        await supabase
+          .from('calendar_shifts')
+          .delete()
+          .match({
+            employee_id: shift.employeeId,
+            date: format(shift.date, 'yyyy-MM-dd'),
+            shift_name: shift.name
+          });
+
+        // Insertar el turno actualizado con toda la información sincronizada
+        const { error } = await supabase
+          .from('calendar_shifts')
+          .insert({
+            employee_id: shift.employeeId,
+            date: format(shift.date, 'yyyy-MM-dd'),
+            start_time: shift.startTime,
+            end_time: shift.endTime,
+            shift_name: shift.name, // Nombre actualizado del horario
+            color: shift.color,
+            notes: shift.notes,
+            break_duration: shift.breakDuration,
+            org_id: currentOrg?.org_id,
+            organization: currentOrg?.org_id
+          });
+
+        if (error) {
+          console.error('Error guardando turno en Supabase:', error);
+        } else {
+          console.log(`✅ Turno "${shift.name}" guardado para ${shift.employeeId} en ${format(shift.date, 'yyyy-MM-dd')}`);
+        }
+      }
+      
+      console.log('✅ Todos los turnos guardados en Supabase sin duplicados');
+    } catch (error) {
+      console.error('Error en saveShiftsToSupabase:', error);
+    }
+  };
+
+  // Función para recargar turnos y sincronizar cambios de horarios guardados
+  const reloadAndSyncShifts = async () => {
+    if (employees.length > 0) {
+      console.log('🔄 Recargando turnos para sincronizar cambios...');
+      await loadShiftsFromSupabase(employees.map(e => e.id));
+    }
+  };
+
+  // Escuchar cambios en horarios guardados para sincronizar
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'saved-shifts-updated') {
+        console.log('🔄 Detectado cambio en horarios guardados, sincronizando...');
+        reloadAndSyncShifts();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [employees]);
+
+  // ❌ REMOVED: Debug functionality no longer needed
+
+
+  // Inicializar horarios guardados desde la base de datos
+  useEffect(() => {
+    getSavedShifts().then(() => {
+      console.log('Shifts loaded from database');
+    });
+  }, []);
+
+  // ❌ REMOVED: Auto-generation functionality causing infinite loop
+
+  // Función para formatear tiempo desde base de datos (remover segundos si existen)
+  const formatTimeFromDatabase = (timeString: string): string => {
+    // Si viene en formato HH:MM:SS, convertir a HH:MM
+    if (timeString.includes(':') && timeString.split(':').length === 3) {
+      const [hours, minutes] = timeString.split(':');
+      return `${hours}:${minutes}`;
+    }
+    return timeString;
+  };
+
+  // Función para calcular la hora de fin basada en hora de inicio y duración
+  const calculateEndTime = (startTime: string, hours: number): string => {
+    const [startHour, startMinute] = startTime.split(':').map(Number);
+    const startTotalMinutes = startHour * 60 + startMinute;
+    const endTotalMinutes = startTotalMinutes + (hours * 60);
+    
+    const endHour = Math.floor(endTotalMinutes / 60) % 24;
+    const endMinute = endTotalMinutes % 60;
+    
+    return `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
+  };
+
+  // Efecto para procesar empleados seleccionados desde colaboradores
+  useEffect(() => {
+    if (selectedFromColaboradores.length > 0) {
+      // Convertir empleados de colaboradores al formato del calendario
+      const newEmployees = selectedFromColaboradores.map(colaborador => ({
+        id: colaborador.id,
+        name: `${colaborador.nombre} ${colaborador.apellidos}`,
+        role: colaborador.tipo_contrato || "Sin definir",
+        department: "Bares", // Por defecto
+        workingHours: `0h/${colaborador.tiempo_trabajo_semanal || 40}h`
+      }));
+      
+      // Actualizar empleados existentes y añadir nuevos - CON PREVENCIÓN DE DUPLICADOS
+      let updatedEmployees = [...employees];
+      const newEmployeesAdded: { employee: Employee; colaborador: any }[] = [];
+      
+      newEmployees.forEach(newEmployee => {
+        const existingIndex = updatedEmployees.findIndex(emp => emp.id === newEmployee.id);
+        const originalColaborador = selectedFromColaboradores.find(col => col.id === newEmployee.id);
+        
+        if (existingIndex >= 0) {
+          // Actualizar empleado existente con nueva información
+          updatedEmployees[existingIndex] = newEmployee;
+        } else {
+          // Añadir nuevo empleado solo si no existe
+          updatedEmployees.push(newEmployee);
+          newEmployeesAdded.push({ employee: newEmployee, colaborador: originalColaborador });
+        }
+      });
+      
+      // Filtrar duplicados una vez más por seguridad
+      updatedEmployees = updatedEmployees.reduce((acc: Employee[], emp) => {
+        if (!acc.find(existing => existing.id === emp.id)) {
+          acc.push(emp);
+        }
+        return acc;
+      }, []);
+      
+      updateEmployees(updatedEmployees);
+      
+      // ❌ DISABLED: Auto-generation of "Primer día" for new employees removed
+      console.log(`ℹ️ Auto-generation disabled. Found ${newEmployeesAdded.length} new employees but will not create automatic shifts.`);
+      
+      // Limpiar empleados seleccionados después de procesarlos
+      clearSelectedEmployees();
+    }
+  }, [selectedFromColaboradores]);
+
+  // DISABLED: Sincronización automática en tiempo real eliminada para evitar modificaciones automáticas
+  // Esta función estaba causando cambios automáticos cuando había modificaciones en la tabla colaboradores
+
+  // Calculate hours between start and end time - MOVED UP to avoid hoisting issue
+  const calculateShiftHours = (startTime?: string | null, endTime?: string | null): number => {
+    // Si alguno de los valores es null/undefined, retornar 8 horas para ausencias de día completo
+    if (!startTime || !endTime) {
+      return 8; // Asumimos 8 horas para ausencias de día completo
+    }
+    
+    const [startHour, startMin] = startTime.split(':').map(Number);
+    const [endHour, endMin] = endTime.split(':').map(Number);
+    
+    const startTotalMin = startHour * 60 + startMin;
+    let endTotalMin = endHour * 60 + endMin;
+    
+    // Handle overnight shifts
+    if (endTotalMin < startTotalMin) {
+      endTotalMin += 24 * 60;
+    }
+    
+    return (endTotalMin - startTotalMin) / 60;
+  };
+
+  // Determinar si un turno debe contar horas trabajadas 
+  const shouldCountHours = (shiftData: ShiftBlock): boolean => {
+    // Si es un turno de ausencia, verificar si es "Curso" que SÍ cuenta horas
+    if (shiftData.type === "absence") {
+      const shiftName = shiftData.name?.trim() || '';
+      // Solo "Curso" cuenta como horas trabajadas entre las ausencias
+      if (shiftName === 'Curso' || shiftName === 'C') {
+        return true;
+      }
+      return false;
+    }
+    
+    // Verificar por el nombre del horario si contiene códigos de ausencia (excepto Curso)
+    const absenceCodes = ['V', 'L', 'E', 'F', 'P', 'H', 'S', 'Vacaciones', 'Libre', 'Día Libre', 'Descanso Semanal', 'Descanso', 'Enfermo', 'Falta', 'Permiso', 'Horas Sindicales', 'Sancionado', 'Baja IT'];
+    const shiftName = shiftData.name?.trim() || '';
+    
+    // "Curso" y "C" SÍ cuentan horas, el resto de ausencias NO
+    if (shiftName === 'Curso' || shiftName === 'C') {
+      return true;
+    }
+    
+    // Si el nombre del horario es otro código de ausencia, NO cuenta horas
+    if (absenceCodes.includes(shiftName)) {
+      return false;
+    }
+    
+    // Si tiene absenceCode que no sea Curso, es una ausencia, NO cuenta horas
+    if (shiftData.absenceCode && shiftData.absenceCode !== 'C' && shiftData.absenceCode !== 'Curso') {
+      return false;
+    }
+    
+    // Solo los turnos de trabajo reales y Curso cuentan horas
+    return true;
+  };
+
+  // Calcular horas reales del turno considerando si debe contar o no
+  const getShiftHours = (shift: ShiftBlock): number => {
+    return shouldCountHours(shift) ? calculateShiftHours(shift.startTime, shift.endTime) : 0;
+  };
+
+  // Calculate hours for each employee across the week
+  const calculateEmployeeHours = (employeeId: string) => {
+    // Convertir ambos IDs a string para comparación consistente
+    const shifts = shiftBlocks.filter(shift => String(shift.employeeId) === String(employeeId));
+    
+    // DEBUG para varios empleados (removed hardcoded IDs)
+    const isDebugEmployee = false; // Disabled debug mode
+    
+    if (isDebugEmployee) {
+      console.log("=== calculateEmployeeHours DEBUG DETALLADO ===");
+      console.log("EmployeeId:", employeeId);
+      console.log("Total shiftBlocks:", shiftBlocks.length);
+      console.log("All employeeIds in shifts:", shiftBlocks.map(s => s.employeeId));
+      console.log("Filtered shifts for employee:", shifts);
+      
+      shifts.forEach((shift, index) => {
+        console.log(`--- Shift ${index + 1} ---`);
+        console.log("Shift data:", shift);
+        console.log("Shift name:", shift.name);
+        console.log("Shift type:", shift.type);
+        console.log("Start time:", shift.startTime);
+        console.log("End time:", shift.endTime);
+        console.log("shouldCountHours:", shouldCountHours(shift));
+        console.log("getShiftHours:", getShiftHours(shift));
+        console.log("calculateShiftHours raw:", calculateShiftHours(shift.startTime, shift.endTime));
+      });
+    }
+    
+    const totalHours = shifts.reduce((total, shift) => {
+      const shiftHours = getShiftHours(shift);
+      if (employeeId === "2") {
+        console.log(`Adding ${shiftHours} hours from shift: ${shift.name}`);
+      }
+      return total + shiftHours;
+    }, 0);
+    
+    if (employeeId === "2") {
+      console.log("TOTAL HOURS CALCULATED:", totalHours);
+      console.log("==================================");
+    }
+    
+    return totalHours;
+  };
+
+  // Mock employees with contract hours for calculations
+  const mockEmployees = [
+    { id: "1", name: "Bruce Wayne", role: "Manager", department: "Bares", contractHours: 40 },
+    { id: "2", name: "Daniela Banda", role: "Camarera", department: "Bares", contractHours: 40 },
+    { id: "3", name: "Joker As", role: "Recepcionista", department: "Recepción", contractHours: 30 },
+    { id: "4", name: "Sergio Mateo", role: "Ayudante", department: "Cocina", contractHours: 40 },
+    { id: "5", name: "María García", role: "Jefe de Sector", department: "Bares", contractHours: 40 },
+    { id: "6", name: "Carlos López", role: "Camarero", department: "Restaurante", contractHours: 40 },
+    { id: "7", name: "Ana Ruiz", role: "Recepcionista", department: "Recepción", contractHours: 30 },
+    { id: "8", name: "Pedro Sánchez", role: "Ayudante", department: "Bares", contractHours: 20 },
+  ];
+
+  // Mock shifts data with hours information - SIMPLIFICADO
+  const mockShifts = shiftBlocks.map(shift => ({
+    ...shift,
+    hours: getShiftHours(shift)
+  }));
+
+  // Function to check if employee exceeds weekly hours
+  const checkEmployeeHoursCompliance = (employeeId: string): { isExceeded: boolean, plannedHours: number, contractHours: number } => {
+    const plannedHours = calculateEmployeeHours(employeeId);
+    const employee = mockEmployees.find(emp => emp.id === employeeId);
+    if (!employee) return { isExceeded: false, plannedHours: 0, contractHours: 0 };
+    
+    const contractHours = employee.contractHours;
+    const isExceeded = plannedHours > contractHours;
+    
+    return { isExceeded, plannedHours, contractHours };
+  };
+
+  // Calculate planned hours, hours to plan, and hour bank for each employee
+  const getEmployeeStats = (employeeId: string) => {
+    const employee = mockEmployees.find(emp => emp.id === employeeId);
+    if (!employee) return { plannedHours: 0, hoursToPlanned: 0, hourBank: 0, contractMonths: 0 };
+    
+    
+    const plannedHours = calculateEmployeeHours(employeeId);
+    const contractHours = employee.contractHours;
+    
+    // Si no tiene horarios asignados, devolver 0h
+    const shiftsForEmployee = shiftBlocks.filter(shift => shift.employeeId === employeeId);
+    if (shiftsForEmployee.length === 0) {
+      console.log(`=== ${employee.name} SIN HORARIOS ===`);
+      return { 
+        plannedHours: 0, 
+        hoursToPlanned: contractHours, 
+        hourBank: 0, 
+        contractMonths: 9 
+      };
+    }
+    
+    const hoursToPlanned = Math.max(0, contractHours - plannedHours);
+    
+    // DEBUG GENERALIZADO para empleados con turnos
+    console.log(`=== CALCULANDO ${employee.name} ===`);
+    console.log("Employee ID:", employeeId);
+    console.log("Shifts encontrados:", shiftsForEmployee.length);
+    console.log("Horas planificadas calculadas:", plannedHours);
+    console.log("Horas de contrato:", contractHours);
+    console.log("Horas restantes por planificar:", hoursToPlanned);
+    console.log("========================================");
+    
+    // Simulate contract months remaining (in a real app this would come from contract data)
+    const contractMonths = 9; // "9m" as shown in TurnoSmart example
+    
+    // Hour bank will be implemented later as mentioned in the Scribehow
+    const hourBank = 0;
+    
+    return { plannedHours, hoursToPlanned, hourBank, contractMonths };
+  };
+
+  // Función para mostrar las horas contractuales base
+  const getContractHours = (employeeId: string) => {
+    const employee = employees.find(emp => emp.id === employeeId);
+    
+    console.log(`=== getContractHours DEBUG para employeeId: ${employeeId} ===`);
+    console.log("Employee encontrado:", employee);
+    console.log("workingHours del employee:", employee?.workingHours);
+    
+    // Extraer las horas semanales del workingHours (formato: "0h/40h")
+    const workingHours = employee?.workingHours || "0h/40h";
+    const weeklyHours = workingHours.split('/')[1] || "40h";
+    const weeklyHoursNumber = parseInt(weeklyHours.replace('h', ''));
+    
+    console.log("workingHours parseadas:", workingHours);
+    console.log("weeklyHours extraídas:", weeklyHours);
+    console.log("weeklyHoursNumber final:", weeklyHoursNumber);
+    console.log("Resultado final:", `${weeklyHoursNumber}h semanales`);
+    
+    return `${weeklyHoursNumber}h semanales`;
+  };
+
+  // Helper function to get shifts for employee and date (support multiple shifts)
+  const getShiftsForEmployeeAndDate = (employeeId: string, date: Date): ShiftBlock[] => {
+    return shiftBlocks.filter(shift => 
+      shift.employeeId === employeeId && isSameDay(shift.date, date)
+    );
+  };
+
+  const getShiftForEmployeeAndDate = (employeeId: string, date: Date) => {
+    const shifts = getShiftsForEmployeeAndDate(employeeId, date);
+    return shifts.length > 0 ? shifts[0] : undefined;
+  };
+
+  const handleCellClick = (employee: Employee, date: Date, event?: React.MouseEvent) => {
+    // 🔒 BLOQUEO: Si es EMPLOYEE, no permitir crear turnos
+    if (isEmployee) {
+      return;
+    }
+    
+    // 🔒 BLOQUEO: Si calendario está publicado, no permitir edición
+    if (isPublished) {
+      toast({
+        title: "Calendario publicado",
+        description: "No se pueden realizar cambios en un calendario publicado",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const existingShift = getShiftForEmployeeAndDate(employee.id, date);
+    
+    // Don't show popup if clicking on a shift card area - let the ShiftCard handle its own clicks
+    if (existingShift && event?.target) {
+      const target = event.target as HTMLElement;
+      // Check if the click is on a shift card or its children
+      if (target.closest('[data-shift-card]')) {
+        return;
+      }
+    }
+    
+    if (existingShift && event?.detail === 2) {
+      // Double click - show shift details
+      setShowShiftDetails({ shift: existingShift, employee });
+      return;
+    }
+    
+    // Single click on empty cell - show shift selector popup
+    if (event && !existingShift) {
+      const rect = (event.target as HTMLElement).getBoundingClientRect();
+      setShowShiftSelector({
+        position: { x: rect.left, y: rect.bottom + 5 },
+        employeeId: employee.id,
+        date: date
+      });
+    }
+  };
+
+  // Actualizar contadores de día cuando cambian los turnos
+  const updateDayCounters = () => {
+    const counters: {[key: string]: number} = {};
+    weekDays.forEach(day => {
+      const dayKey = format(day, "yyyy-MM-dd");
+      const shiftsForDay = shiftBlocks.filter(shift => 
+        format(shift.date, "yyyy-MM-dd") === dayKey
+      );
+      
+      // Contar EMPLEADOS ÚNICOS trabajando por día (máximo 1 por empleado/día), excluyendo ausencias
+      const workingShifts = shiftsForDay.filter(shift => {
+        // Solo contar turnos de empleados que deberían estar activos en esta fecha
+        const colaborador = colaboradores.find(c => c.id === shift.employeeId);
+        if (!shouldShowColaborador(colaborador, day)) {
+          return false;
+        }
+        return shouldCountHours(shift);
+      });
+      const uniqueEmployees = new Set(workingShifts.map(shift => shift.employeeId));
+      counters[dayKey] = uniqueEmployees.size;
+    });
+    setDayCounters(counters);
+  };
+
+  // Actualizar contadores cuando cambien los turnos
+  useEffect(() => {
+    updateDayCounters();
+  }, [shiftBlocks, weekDays]);
+
+  // Función para seleccionar/deseleccionar turnos individuales
+  const handleShiftSelect = (shift: any) => {
+    setSelectedShifts(prev => {
+      const newSet = new Set(prev);
+      const shiftId = shift.id;
+      
+      if (newSet.has(shiftId)) {
+        newSet.delete(shiftId);
+      } else {
+        newSet.add(shiftId);
+      }
+      
+      return newSet;
+    });
+  };
+
+  // Función para seleccionar/deseleccionar columna completa
+  const handleColumnSelect = (date: Date) => {
+    const dateString = format(date, 'yyyy-MM-dd');
+    const isColumnSelected = selectedColumns.has(dateString);
+    
+    setSelectedColumns(prev => {
+      const newSet = new Set(prev);
+      if (isColumnSelected) {
+        newSet.delete(dateString);
+      } else {
+        newSet.add(dateString);
+      }
+      return newSet;
+    });
+
+    setSelectedShifts(prev => {
+      const newSet = new Set(prev);
+      
+      // Obtener todos los turnos de esta fecha
+      employees.forEach(employee => {
+        const shifts = getShiftsForEmployeeAndDate(employee.id, date);
+        shifts.forEach(shift => {
+          if (isColumnSelected) {
+            newSet.delete(shift.id);
+          } else {
+            newSet.add(shift.id);
+          }
+        });
+      });
+      
+      return newSet;
+    });
+  };
+
+  const handleShiftSelected = (selectedShift: any, employeeId: string, date: Date) => {
+    // Validar si se puede asignar turno en esta fecha (no es primer día)
+    if (!canAssignShiftOnDate(employeeId, date, false)) {
+      const colaborador = colaboradores.find(c => c.id === employeeId);
+      const employee = employees.find(e => e.id === employeeId);
+      if (colaborador?.fecha_inicio_contrato) {
+        const startDate = new Date(colaborador.fecha_inicio_contrato);
+        // toast({
+        //   title: "No se puede asignar turno",
+        //   description: `${employee?.name || 'El colaborador'} no puede tener turnos antes de su fecha de inicio: ${format(startDate, 'dd/MM/yyyy', { locale: es })}`,
+        //   variant: "destructive",
+        // });
+      }
+      return;
+    }
+
+    // Crear un nuevo horario basado en el seleccionado
+    const isAbsence = selectedShift.isAbsence || selectedShift.accessType === 'absence';
+    
+    const newShift: ShiftBlock = {
+      id: crypto.randomUUID(),
+      employeeId,
+      date,
+      startTime: isAbsence ? undefined : (selectedShift.startTime || undefined),
+      endTime: isAbsence ? undefined : (selectedShift.endTime || undefined),
+      type: isAbsence ? 'absence' : 'morning',
+      color: selectedShift.color || "#86efac",
+      name: selectedShift.name,
+      organization_id: currentOrg?.org_id || 'default',
+      hasBreak: !!(selectedShift.breakType && selectedShift.breakDuration),
+      absenceCode: isAbsence ? (selectedShift.absenceCode || selectedShift.name) : undefined
+    };
+    
+    // CRITICAL FIX: Usar callback para mantener estado consistente + Undo/Redo
+    setShiftBlocksWithHistory(currentShifts => {
+      const updatedShifts = [...currentShifts, newShift];
+      console.log(`🔄 Turno añadido: ${currentShifts.length} -> ${updatedShifts.length} turnos`);
+      // Persistir inmediatamente en localStorage
+      localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
+      return updatedShifts;
+    });
+    
+    // CRÍTICO: Persistir inmediatamente en Supabase
+    persistShiftToSupabase(newShift).catch(error => {
+      console.error('Error crítico guardando turno en Supabase:', error);
+    });
+  };
+
+  const handleTimeSlotClick = (employee: Employee, date: Date, shiftIndex: number, e: React.MouseEvent, absenceCode?: string) => {
+    e.stopPropagation();
+    
+    // Validar si se puede asignar turno en esta fecha (no es primer día)
+    if (!canAssignShiftOnDate(employee.id, date, false)) {
+      const colaborador = colaboradores.find(c => c.id === employee.id);
+      if (colaborador?.fecha_inicio_contrato) {
+        const startDate = new Date(colaborador.fecha_inicio_contrato);
+      }
+      return;
+    }
+
+    // Manejar slots de ausencia (dinámico: sistema + personalizadas)
+    if (absenceCode) {
+      // Construir mapeo dinámico de colores desde defaultAbsenceShifts y customAbsences
+      const absenceColors: Record<string, { color: string; name: string }> = {};
+      
+      // Ausencias del sistema
+      defaultAbsenceShifts.forEach(shift => {
+        const code = shift.id.split('-')[0];
+        absenceColors[code] = { color: shift.color, name: shift.name };
+      });
+      
+      // Ausencias personalizadas
+      const customAbsences = getCustomAbsences();
+      customAbsences.forEach(ca => {
+        absenceColors[ca.code] = { color: ca.color, name: ca.name };
+      });
+      
+      const absenceInfo = absenceColors[absenceCode] || { color: '#6b7280', name: absenceCode };
+      
+      const newShift: ShiftBlock = {
+        id: crypto.randomUUID(),
+        employeeId: employee.id,
+        date: date,
+        startTime: undefined,
+        endTime: undefined,
+        type: 'absence',
+        color: absenceInfo.color,
+        name: absenceInfo.name,
+        organization_id: currentOrg?.org_id || 'default',
+        hasBreak: false,
+        absenceCode: absenceCode
+      };
+      
+      setShiftBlocksWithHistory(currentShifts => {
+        const updatedShifts = [...currentShifts, newShift];
+        console.log(`🔄 Turno ${absenceInfo.name} añadido: ${currentShifts.length} -> ${updatedShifts.length} turnos`);
+        localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
+        return updatedShifts;
+      });
+      
+      persistShiftToSupabase(newShift).catch(error => {
+        console.error(`Error crítico guardando turno ${absenceInfo.name} en Supabase:`, error);
+      });
+      return;
+    }
+
+    const savedShifts = getSavedShiftsSync()
+      .filter(s => s.accessType !== 'absence')
+      .sort((a, b) => {
+        const timeA = a.startTime || '99:99';
+        const timeB = b.startTime || '99:99';
+        return timeA.localeCompare(timeB);
+      });
+    const selectedShift = savedShifts[shiftIndex];
+    
+    if (selectedShift) {
+      // Manejar ausencias como turnos de día completo
+      const isAbsence = selectedShift.accessType === 'absence';
+      const absenceCode = isAbsence ? selectedShift.name : null;
+      
+      // Crear turno directamente con los datos del slot seleccionado
+      const newShift: ShiftBlock = {
+        id: crypto.randomUUID(),
+        employeeId: employee.id,
+        date: date,
+        startTime: isAbsence ? undefined : (selectedShift.startTime || '08:00'),
+        endTime: isAbsence ? undefined : (selectedShift.endTime || '16:00'),
+        type: isAbsence ? 'absence' : (selectedShift.name.includes('Mañana') ? 'morning' : selectedShift.name.includes('Tarde') ? 'afternoon' : 'night') as 'morning' | 'afternoon' | 'night' | 'absence',
+        color: selectedShift.color,
+        name: selectedShift.name,
+        organization_id: currentOrg?.org_id || 'default',
+        hasBreak: !!(selectedShift.breakType && selectedShift.breakDuration),
+        absenceCode: absenceCode
+      };
+      
+      // CRITICAL FIX: Usar callback para mantener estado consistente + Undo/Redo
+      setShiftBlocksWithHistory(currentShifts => {
+        const updatedShifts = [...currentShifts, newShift];
+        console.log(`🔄 Turno slot añadido: ${currentShifts.length} -> ${updatedShifts.length} turnos`);
+        // Persistir inmediatamente en localStorage
+        localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
+        return updatedShifts;
+      });
+      
+      // CRÍTICO: Persistir inmediatamente en Supabase
+      persistShiftToSupabase(newShift).catch(error => {
+        console.error('Error crítico guardando turno en Supabase:', error);
+      });
+    }
+  };
+
+  // Function to handle adding additional shifts
+  const handleAddShift = (employee: Employee, date: Date, event?: React.MouseEvent) => {
+    // Check if calendar is published
+    if (isPublished) {
+      toast({
+        title: "Calendario publicado",
+        description: "No se pueden realizar cambios en un calendario publicado. Use el megáfono para modificar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validar si se puede asignar turno en esta fecha (no es primer día)
+    if (!canAssignShiftOnDate(employee.id, date, false)) {
+      const colaborador = colaboradores.find(c => c.id === employee.id);
+      if (colaborador?.fecha_inicio_contrato) {
+        const startDate = new Date(colaborador.fecha_inicio_contrato);
+        // toast({
+        //   title: "No se puede asignar turno",
+        //   description: `${employee.name} no puede tener turnos antes de su fecha de inicio: ${format(startDate, 'dd/MM/yyyy', { locale: es })}`,
+        //   variant: "destructive",
+        // });
+      }
+      return;
+    }
+
+    let position = { x: 0, y: 0 };
+    
+    if (event) {
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      // Posicionar a la derecha del elemento trigger
+      position = { 
+        x: rect.right + 5,
+        y: rect.top
+      };
+    }
+    
+    setShowShiftSelector({
+      employeeId: employee.id,
+      date,
+      position
+    });
+  };
+
+  // Función para seleccionar/deseleccionar empleado completo
+  const handleEmployeeSelect = (employeeId: string) => {
+    const isEmployeeSelected = selectedEmployees.has(employeeId);
+    
+    setSelectedEmployees(prev => {
+      const newSet = new Set(prev);
+      if (isEmployeeSelected) {
+        newSet.delete(employeeId);
+      } else {
+        newSet.add(employeeId);
+      }
+      return newSet;
+    });
+
+    setSelectedShifts(prev => {
+      const newSet = new Set(prev);
+      
+      // Obtener todos los turnos de este empleado en la semana actual
+      weekDays.forEach(day => {
+        const shifts = getShiftsForEmployeeAndDate(employeeId, day);
+        shifts.forEach(shift => {
+          if (isEmployeeSelected) {
+            newSet.delete(shift.id);
+          } else {
+            newSet.add(shift.id);
+          }
+        });
+      });
+      
+      return newSet;
+    });
+  };
+
+  const handleEmployeeSelection = (employeeId: string) => {
+    const newSelected = new Set(selectedEmployees);
+    if (newSelected.has(employeeId)) {
+      newSelected.delete(employeeId);
+    } else {
+      newSelected.add(employeeId);
+    }
+    setSelectedEmployees(newSelected);
+  };
+
+  const handleDaySelection = (dayKey: string) => {
+    const newSelected = new Set(selectedDays);
+    if (newSelected.has(dayKey)) {
+      newSelected.delete(dayKey);
+    } else {
+      newSelected.add(dayKey);
+    }
+    setSelectedDays(newSelected);
+  };
+
+  const clearSelection = () => {
+    setSelectedEmployees(new Set());
+    setSelectedDays(new Set());
+    setSelectedShifts(new Set());
+    setSelectedColumns(new Set());
+  };
+
+  // Drag and Drop Handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    const target = e.target as HTMLElement;
+    const dropAction = target.closest('[data-drop-action]')?.getAttribute('data-drop-action');
+    
+    // console.log('handleDragOver', { dropAction, target: target.className });
+    
+    if (dropAction === 'move' || dropAction === 'duplicate') {
+      e.dataTransfer.dropEffect = dropAction === 'move' ? 'move' : 'copy';
+      setCurrentDropAction(dropAction as 'move' | 'duplicate');
+      // console.log('Setting drop action:', dropAction);
+    } else {
+      e.dataTransfer.dropEffect = 'move';
+      setCurrentDropAction('move');
+      // console.log('Setting default drop action: move');
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetEmployeeId: string, targetDate: Date) => {
+    e.preventDefault();
+    
+    // CRITICAL PROTECTION: Solo procesar si realmente se originó de una interacción de usuario válida
+    if (!e.isTrusted) {
+      console.log('🚫 Drop event rechazado: no es trusted');
+      return;
+    }
+    
+    // PROTECTION: Verificar que existe data válido del drag (text/plain o application/json)
+    const dragDataRaw = e.dataTransfer?.getData('text/plain') || e.dataTransfer?.getData('application/json');
+    if (!dragDataRaw) {
+      console.log('🚫 Drop event rechazado: no hay data de drag');
+      return;
+    }
+    
+    console.log('handleDrop called', { targetEmployeeId, targetDate, currentDropAction });
+    setDragOverCell(null);
+    setIsDragging(false);
+    setHoveredZone(null);
+    
+    // Validar si se puede asignar turno en esta fecha (no es primer día)
+    if (!canAssignShiftOnDate(targetEmployeeId, targetDate, false)) {
+      const colaborador = colaboradores.find(c => c.id === targetEmployeeId);
+      const employee = employees.find(e => e.id === targetEmployeeId);
+      let errorMessage = "No se puede asignar turno en esta fecha.";
+      
+      if (colaborador?.fecha_fin_contrato) {
+        const endDate = new Date(colaborador.fecha_fin_contrato);
+        const targetDateOnly = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+        const contractEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+        
+        if (targetDateOnly > contractEnd) {
+          errorMessage = `El contrato de ${employee?.name || 'este colaborador'} finalizó el ${format(endDate, 'dd/MM/yyyy', { locale: es })}. No se pueden asignar turnos después de esta fecha.`;
+        }
+      }
+      
+      if (colaborador?.fecha_inicio_contrato && !colaborador?.fecha_fin_contrato) {
+        const startDate = new Date(colaborador.fecha_inicio_contrato);
+        const targetDateOnly = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+        const contractStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+        
+        if (targetDateOnly < contractStart) {
+          errorMessage = `El contrato de ${employee?.name || 'este colaborador'} comienza el ${format(startDate, 'dd/MM/yyyy', { locale: es })}. No se pueden asignar turnos antes de esta fecha.`;
+        }
+      }
+      
+      toast({
+        title: "Fecha inválida",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Verificar si viene de favoritos
+    if (draggedFavorite) {
+      // Adaptar el turno al contrato del empleado objetivo
+      const adaptedTimes = adaptShiftToContract(draggedFavorite, targetEmployeeId);
+      
+      // Obtener el absenceCode real del draggedFavorite
+      const isAbsence = draggedFavorite.accessType === 'absence';
+      
+      const newShift: ShiftBlock = {
+        id: `shift-${Date.now()}`,
+        employeeId: targetEmployeeId,
+        date: new Date(targetDate),
+        startTime: isAbsence ? undefined : adaptedTimes.startTime,
+        endTime: isAbsence ? undefined : adaptedTimes.endTime,
+        type: isAbsence ? 'absence' : 'morning',
+        color: draggedFavorite.color,
+        name: draggedFavorite.name,
+        absenceCode: isAbsence ? (draggedFavorite as any).absenceCode || draggedFavorite.name : undefined
+      };
+      
+      console.log('🎯 DROP: Adding favorite shift to calendar', { employeeId: targetEmployeeId, date: targetDate });
+      
+      setShiftBlocksWithHistory(currentShifts => {
+        console.log('🎯 DROP: Before adding favorite - shifts count:', currentShifts.length);
+        const updatedShifts = [...currentShifts, newShift];
+        console.log('🎯 DROP: After adding favorite - shifts count:', updatedShifts.length);
+        localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
+        return updatedShifts;
+      });
+      
+      // CRÍTICO: Persistir inmediatamente en Supabase
+      persistShiftToSupabase(newShift).catch(error => {
+        console.error('Error crítico guardando turno favorito en Supabase:', error);
+      });
+      
+      // Log activity for favorite shift
+      const targetEmployee = employees.find(e => e.id === targetEmployeeId);
+      await logActivity({
+        action: "TURNO_FAVORITO_AÑADIDO",
+        entityType: "calendar_shift",
+        entityName: `${draggedFavorite.name} - ${targetEmployee?.name || 'Colaborador'}`,
+        details: {
+          employeeName: targetEmployee?.name,
+          employeeId: targetEmployeeId,
+          shiftName: draggedFavorite.name,
+          date: targetDate.toISOString().split('T')[0],
+          startTime: adaptedTimes.startTime,
+          endTime: adaptedTimes.endTime,
+          source: "favorites",
+          adapted: adaptedTimes.adapted,
+          originalHours: adaptedTimes.originalHours,
+          adaptedHours: adaptedTimes.adaptedHours
+        }
+      });
+      
+      setDraggedFavorite(null);
+      
+      // Mostrar información de adaptación en el toast
+      const toastMessage = adaptedTimes.adapted 
+        ? `"${draggedFavorite.name}" adaptado de ${adaptedTimes.originalHours}h a ${adaptedTimes.adaptedHours}h (${adaptedTimes.startTime}-${adaptedTimes.endTime})`
+        : `"${draggedFavorite.name}" añadido al calendario`;
+      
+      // toast({
+      //   title: adaptedTimes.adapted ? "Horario adaptado automáticamente" : "Horario agregado desde favoritos",
+      //   description: toastMessage,
+      // });
+      return;
+    }
+    
+    try {
+      const dragData = JSON.parse(e.dataTransfer.getData('application/json'));
+      console.log('Drag data received:', dragData);
+      
+      // Manejar si viene desde favoritos a través de dataTransfer
+      if (dragData.type === 'favorite' && dragData.shift) {
+        const favoriteShift = dragData.shift as SavedShift;
+        const adaptedTimes = adaptShiftToContract(favoriteShift, targetEmployeeId);
+        
+        // Usar el absenceCode del dragData si está disponible
+        const isAbsence = dragData.isAbsence || favoriteShift.accessType === 'absence';
+        const absenceCode = dragData.absenceCode || (favoriteShift as any).absenceCode || favoriteShift.name;
+        
+        const newShift: ShiftBlock = {
+          id: `shift-${Date.now()}`,
+          employeeId: targetEmployeeId,
+          date: new Date(targetDate),
+          startTime: isAbsence ? undefined : adaptedTimes.startTime,
+          endTime: isAbsence ? undefined : adaptedTimes.endTime,
+          type: isAbsence ? 'absence' : 'morning',
+          color: favoriteShift.color,
+          name: favoriteShift.name,
+          absenceCode: isAbsence ? absenceCode : undefined
+        };
+        
+        setShiftBlocksWithHistory(currentShifts => {
+          const updatedShifts = [...currentShifts, newShift];
+          localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
+          return updatedShifts;
+        });
+        
+        // CRÍTICO: Persistir inmediatamente en Supabase
+        persistShiftToSupabase(newShift).catch(error => {
+          console.error('Error crítico guardando turno favorito en Supabase:', error);
+        });
+        
+        const toastMessage = adaptedTimes.adapted 
+          ? `"${favoriteShift.name}" adaptado de ${adaptedTimes.originalHours}h a ${adaptedTimes.adaptedHours}h (${adaptedTimes.startTime}-${adaptedTimes.endTime})`
+          : `"${favoriteShift.name}" añadido al calendario`;
+        
+        // toast({
+        //   title: adaptedTimes.adapted ? "Horario adaptado automáticamente" : "Horario agregado desde favoritos",
+        //   description: toastMessage,
+        // });
+        return;
+      }
+      
+      const { shift, sourceEmployeeId } = dragData;
+      console.log('Regular shift drag data:', { shift, sourceEmployeeId });
+      
+      // Si es el mismo empleado y la misma fecha, no hacer nada
+      if (sourceEmployeeId === targetEmployeeId && 
+          format(new Date(shift.date), 'yyyy-MM-dd') === format(targetDate, 'yyyy-MM-dd')) {
+        console.log('Same position, no action needed');
+        return;
+      }
+      
+      // Determinar la acción basada en dónde se soltó - buscar más profundamente
+      const target = e.target as HTMLElement;
+      let dropAction = target.getAttribute('data-drop-action');
+      
+      // Si no encuentra el atributo directamente, buscar en el padre más cercano
+      if (!dropAction) {
+        dropAction = target.closest('[data-drop-action]')?.getAttribute('data-drop-action');
+      }
+      
+      const action = dropAction || currentDropAction || 'move';
+      
+      console.log('Drop action determined:', { 
+        dropAction, 
+        currentDropAction, 
+        finalAction: action,
+        targetElement: target.className,
+        targetDataAction: target.getAttribute('data-drop-action')
+      });
+      
+      if (action === 'duplicate') {
+        // Duplicar: crear nuevo horario sin eliminar el original
+        // Adaptar el turno al contrato del empleado objetivo
+        const adaptedTimes = adaptShiftBlockToContract(shift, sourceEmployeeId, targetEmployeeId);
+        
+        const newShift: ShiftBlock = {
+          ...shift,
+          id: `shift-${Date.now()}`,
+          employeeId: targetEmployeeId,
+          date: new Date(targetDate),
+          startTime: adaptedTimes.startTime,
+          endTime: adaptedTimes.endTime
+        };
+        
+        console.log('🎯 DROP: Duplicating shift', { from: sourceEmployeeId, to: targetEmployeeId });
+        
+        setShiftBlocksWithHistory(currentShifts => {
+          console.log('🎯 DROP: Before duplicate - shifts count:', currentShifts.length);
+          const updatedShifts = [...currentShifts, newShift];
+          console.log('🎯 DROP: After duplicate - shifts count:', updatedShifts.length);
+          localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
+          return updatedShifts;
+        });
+        
+        // CRÍTICO: Persistir inmediatamente en Supabase
+        persistShiftToSupabase(newShift).catch(error => {
+          console.error('Error crítico guardando turno duplicado en Supabase:', error);
+        });
+        
+        // Mostrar información de adaptación si fue necesaria
+        if (adaptedTimes.adapted) {
+          console.log(`✅ Turno "${shift.name}" duplicado y adaptado de ${adaptedTimes.originalHours}h a ${adaptedTimes.adaptedHours}h para ${employees.find(e => e.id === targetEmployeeId)?.name}`);
+        }
+        
+        // toast({
+        //   title: "Horario duplicado",
+        //   description: `Horario duplicado para ${employees.find(e => e.id === targetEmployeeId)?.name || 'empleado'}`,
+        // });
+      } else {
+        // Mover: eliminar original y crear nuevo
+        // Adaptar el turno al contrato del empleado objetivo
+        const adaptedTimes = adaptShiftBlockToContract(shift, sourceEmployeeId, targetEmployeeId);
+        
+        console.log('🎯 DROP: Moving shift', { from: sourceEmployeeId, to: targetEmployeeId, shiftId: shift.id });
+        
+        setShiftBlocksWithHistory(currentShifts => {
+          console.log('🎯 DROP: Before move - shifts count:', currentShifts.length);
+          const filteredShifts = currentShifts.filter(s => s.id !== shift.id);
+          console.log('🎯 DROP: After removing old - shifts count:', filteredShifts.length);
+          
+          const newShift: ShiftBlock = {
+            ...shift,
+            id: `shift-${Date.now()}`,
+            employeeId: targetEmployeeId,
+            date: new Date(targetDate),
+            startTime: adaptedTimes.startTime,
+            endTime: adaptedTimes.endTime
+          };
+          
+          const updatedShifts = [...filteredShifts, newShift];
+          console.log('🎯 DROP: After adding new - shifts count:', updatedShifts.length);
+          localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
+          
+          // CRÍTICO: Persistir inmediatamente en Supabase y eliminar el original
+          deleteShiftFromSupabase(shift.id);
+          persistShiftToSupabase(newShift).catch(error => {
+            console.error('Error crítico guardando turno movido en Supabase:', error);
+          });
+          
+          return updatedShifts;
+        });
+        
+        // Mostrar información de adaptación si fue necesaria
+        if (adaptedTimes.adapted) {
+          console.log(`✅ Turno "${shift.name}" movido y adaptado de ${adaptedTimes.originalHours}h a ${adaptedTimes.adaptedHours}h para ${employees.find(e => e.id === targetEmployeeId)?.name}`);
+        }
+        
+        // toast({
+        //   title: "Horario movido",
+        //   description: `Horario movido a ${employees.find(e => e.id === targetEmployeeId)?.name || 'empleado'}`,
+        // });
+      }
+      
+      setCurrentDropAction(null);
+    } catch (error) {
+      console.error('Error al procesar drop:', error);
+      // toast({
+      //   title: "Error",
+      //   description: "Error al procesar el turno",
+      //   variant: "destructive",
+      // });
+    }
+  };
+
+  const handleDragEnter = (employeeId: string, date: Date) => {
+    const cellKey = `${employeeId}-${format(date, 'yyyy-MM-dd')}`;
+    setDragOverCell(cellKey);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Solo limpiar dragOverCell si realmente salimos de la celda
+    const relatedTarget = e.relatedTarget as HTMLElement;
+    const currentTarget = e.currentTarget as HTMLElement;
+    
+    if (!currentTarget.contains(relatedTarget)) {
+      setDragOverCell(null);
+    }
+  };
+
+  // Delete Zone Handlers
+  const handleDeleteZoneDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    setDeleteZoneDragOver(true);
+  };
+
+  const handleDeleteZoneDragLeave = () => {
+    setDeleteZoneDragOver(false);
+  };
+
+  const handleDeleteZoneDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDeleteZoneDragOver(false);
+    setIsDragging(false);
+    
+    try {
+      const dragData = JSON.parse(e.dataTransfer.getData('application/json'));
+      
+      // Verificar si es un favorito
+      if (dragData.type === 'favorite' && dragData.isFavorite) {
+        const favoriteShift = dragData.shift;
+        
+        // No permitir eliminar el turno por defecto "Descanso Semanal"
+        if (favoriteShift.isSystemDefault) {
+          // toast({
+          //   title: "No se puede eliminar",
+          //   description: "El turno 'Descanso Semanal' es un turno del sistema y no se puede eliminar",
+          //   variant: "destructive",
+          // });
+          return;
+        }
+        
+        // Eliminar de favoritos
+        removeFromFavorites(favoriteShift.id);
+        
+        // toast({
+        //   title: "Favorito eliminado",
+        //   description: `El turno "${favoriteShift.name}" ha sido eliminado de favoritos`,
+        // });
+        return;
+      }
+      
+      // Si es un turno del calendario
+      if (dragData.shift && dragData.type === 'calendar') {
+        const { shift } = dragData;
+        
+        // Verificar que el turno existe en el array
+        const shiftExists = shiftBlocks.find(s => s.id === shift.id);
+        
+        if (!shiftExists) {
+          // toast({
+          //   title: "Error",
+          //   description: "El turno no existe en el calendario",
+          //   variant: "destructive",
+          // });
+          return;
+        }
+        
+        // Eliminar de Supabase primero
+        deleteShiftFromSupabase(shift.id);
+        
+        // Eliminar el turno del calendario con historial
+        setShiftBlocksWithHistory(currentShifts => {
+          const newShiftBlocks = currentShifts.filter(s => s.id !== shift.id);
+          localStorage.setItem('calendar-shift-blocks', JSON.stringify(newShiftBlocks));
+          return newShiftBlocks;
+        });
+        
+        // Registro de actividad sin toast
+        return;
+      }
+      
+      
+      // Registro de actividad sin toast
+    } catch (error) {
+      console.error('Error al eliminar:', error);
+      // toast({
+      //   title: "Error",
+      //   description: "Error al eliminar",
+      //   variant: "destructive",
+      // });
+    }
+  };
+
+  // Global drag start/end handlers
+  useEffect(() => {
+    const handleGlobalDragStart = (e: DragEvent) => {
+      setIsDragging(true);
+    };
+    
+    const handleGlobalDragEnd = (e: DragEvent) => {
+      setIsDragging(false);
+      setDeleteZoneDragOver(false);
+      setCurrentDropAction(null);
+      setDraggedFavorite(null);
+      setHoveredZone(null);
+    };
+
+    document.addEventListener('dragstart', handleGlobalDragStart);
+    document.addEventListener('dragend', handleGlobalDragEnd);
+
+    return () => {
+      document.removeEventListener('dragstart', handleGlobalDragStart);
+      document.removeEventListener('dragend', handleGlobalDragEnd);
+    };
+  }, []);
+
+  // Auto-scroll cuando se arrastra cerca de los bordes
+  useEffect(() => {
+    if (!isDragging) return;
+    
+    let scrollInterval: NodeJS.Timeout | null = null;
+    
+    const handleDragMove = (e: DragEvent) => {
+      const threshold = 100; // Píxeles desde el borde para activar scroll
+      const scrollSpeed = 10; // Velocidad de scroll
+      
+      const viewportHeight = window.innerHeight;
+      const mouseY = e.clientY;
+      
+      // Scroll hacia abajo cuando está cerca del borde inferior
+      if (mouseY > viewportHeight - threshold) {
+        if (!scrollInterval) {
+          scrollInterval = setInterval(() => {
+            window.scrollBy(0, scrollSpeed);
+          }, 16); // ~60fps
+        }
+      }
+      // Scroll hacia arriba cuando está cerca del borde superior
+      else if (mouseY < threshold) {
+        if (!scrollInterval) {
+          scrollInterval = setInterval(() => {
+            window.scrollBy(0, -scrollSpeed);
+          }, 16);
+        }
+      }
+      // Detener scroll cuando no está cerca de los bordes
+      else {
+        if (scrollInterval) {
+          clearInterval(scrollInterval);
+          scrollInterval = null;
+        }
+      }
+    };
+    
+    document.addEventListener('dragover', handleDragMove);
+    
+    return () => {
+      document.removeEventListener('dragover', handleDragMove);
+      if (scrollInterval) {
+        clearInterval(scrollInterval);
+      }
+    };
+  }, [isDragging]);
+
+  const hasSelections = selectedEmployees.size > 0 || selectedDays.size > 0;
+
+  const sortEmployees = (employees: Employee[], sortType: string) => {
+    return [...employees].sort((a, b) => {
+      switch (sortType) {
+        case "name-asc":
+          return a.name.localeCompare(b.name, 'es', { numeric: true });
+        case "name-desc":
+          return b.name.localeCompare(a.name, 'es', { numeric: true });
+        case "surname-asc":
+          return a.name.split(' ').slice(-1)[0].localeCompare(b.name.split(' ').slice(-1)[0], 'es', { numeric: true });
+        case "surname-desc":
+          return b.name.split(' ').slice(-1)[0].localeCompare(a.name.split(' ').slice(-1)[0], 'es', { numeric: true });
+        case "role-asc":
+          return a.role.localeCompare(b.role);
+        case "role-desc":
+          return b.role.localeCompare(a.role);
+        case "seniority-recent":
+          // Más reciente primero (mayor fecha de inicio)
+          return new Date(b.startDate || '1900-01-01').getTime() - new Date(a.startDate || '1900-01-01').getTime();
+        case "seniority-old":
+          // Más antiguo primero (menor fecha de inicio)
+          return new Date(a.startDate || '1900-01-01').getTime() - new Date(b.startDate || '1900-01-01').getTime();
+        default:
+          return 0;
+      }
+    });
+  };
+
+  // Filtrar empleados que deberían aparecer según su fecha de inicio de contrato
+  const activeEmployees = employees.filter(employee => {
+    const colaborador = colaboradores.find(c => c.id === employee.id);
+    
+    // ✅ FIXED: Siempre mostrar empleados que tengan turnos en la semana visible
+    const hasShiftsThisWeek = shiftBlocks.some(shift => 
+      shift.employeeId === employee.id && 
+      weekDays.some(day => isSameDay(shift.date, day))
+    );
+    
+    // Mostrar si: 1) Tiene shifts esta semana, O 2) Su fecha de contrato permite verlo
+    return hasShiftsThisWeek || shouldShowColaborador(colaborador, currentWeek);
+  });
+  
+  const sortedEmployees = sortBy ? sortEmployees(activeEmployees, sortBy) : activeEmployees;
+
+  // Transformar shiftBlocks a formato de auditoría
+  const shiftsForAudit: ShiftForAudit[] = useMemo(() => {
+    return shiftBlocks.map(shift => {
+      const employee = employees.find(e => e.id === shift.employeeId);
+      return {
+        id: shift.id,
+        employeeId: shift.employeeId,
+        employeeName: employee?.name || 'Desconocido',
+        date: format(shift.date, 'yyyy-MM-dd'),
+        shiftName: shift.name || 'Turno',
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        isAbsence: shift.type === 'absence',
+        absenceCode: shift.absenceCode,
+        contractHours: 40
+      };
+    });
+  }, [shiftBlocks, employees]);
+
+  // Hook de auditoría para semana
+  const {
+    auditResult,
+    isAuditing,
+    runAudit,
+    getViolationsForCell,
+    getViolationsForEmployee,
+    getMaxSeverityForCell
+  } = useWeekAudit(shiftsForAudit, weekStart, currentOrg?.org_id);
+
+  return (
+    <TooltipProvider delayDuration={300}>
+    <div className="space-y-3">
+      {/* Header Unificado - Idéntico en todas las vistas */}
+        <UnifiedCalendarHeader
+          viewMode="week"
+          selectedDate={currentWeek}
+          onDateChange={setCurrentWeek}
+          hasUnsavedChanges={hasUnsavedChanges}
+          changeCount={changeCount}
+          onSave={forceSave}
+          onPrint={handlePrint}
+          onExport={handleExportPDF}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          historySize={historySize}
+          futureSize={futureSize}
+          onUndo={undo}
+          onRedo={redo}
+          onShowHistory={() => setShowVersionHistory(true)}
+          onShowBackups={() => setShowOperationBackups(true)}
+          onOpenSettings={() => setShowShiftConfiguration(true)}
+          onDelete={handleDeleteCalendar}
+          canEdit={canEdit}
+          isPublished={isPublished}
+          isDraft={isDraft}
+          canPublish={canPublish}
+          isPublishing={publishState.isPublishing}
+          publishedAt={publishState.published_at}
+          version={publishState.version}
+          onPublish={handlePublishCalendar}
+          onUnpublish={handleUnpublishCalendar}
+          auditResult={auditResult}
+          isAuditing={isAuditing}
+          onRefreshAudit={runAudit}
+          onClean={() => setShowCleanDialog(true)}
+          employeeCount={sortedEmployees.length}
+          dayCount={7}
+        />
+
+      {/* Área de Favoritos */}
+      <FavoritesArea
+        isVisible={showFavorites}
+        favoriteShifts={favoriteShifts}
+        onDragStart={(e, shift) => {
+          setDraggedFavorite(shift);
+          // El setData ya se maneja en FavoritesArea
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log("DataTransfer:", e.dataTransfer);
+          
+          // Verificar si hay datos en dataTransfer (desde ShiftCard)
+          try {
+            const data = e.dataTransfer.getData('application/json');
+            console.log("Raw data from dataTransfer:", data);
+            
+            if (data) {
+              const dragData = JSON.parse(data);
+              console.log("Parsed drag data:", dragData);
+              
+            if (dragData && dragData.shift) {
+              console.log("Shift encontrado, verificando para añadir a favoritos:", dragData.shift);
+              
+              // Verificar si es "Descanso Semanal" - no permitir duplicados
+              if (dragData.shift.name === "Descanso Semanal" || 
+                  dragData.shift.absenceCode === 'L' ||
+                  dragData.shift.type === 'absence') {
+                // toast({
+                //   title: "Descanso Semanal ya disponible",
+                //   description: "El turno de descanso semanal ya está disponible por defecto en favoritos",
+                //   variant: "default"
+                // });
+                return;
+              }
+              
+              // Convertir el shift del calendario a formato SavedShift
+              const savedShiftFormat: SavedShift = {
+                id: `favorite-${Date.now()}`, // Nuevo ID para favorito
+                name: dragData.shift.name || 'Turno sin nombre',
+                startTime: dragData.shift.startTime,
+                endTime: dragData.shift.endTime,
+                color: dragData.shift.color || '#86efac',
+                accessType: dragData.shift.type === 'absence' ? 'absence' : 'company',
+                
+                createdAt: new Date(),
+                updatedAt: new Date()
+              };
+              
+              console.log("Formato convertido:", savedShiftFormat);
+              addToFavorites(savedShiftFormat);
+              return;
+            }
+            }
+          } catch (error) {
+            console.error("Error procesando dataTransfer:", error);
+          }
+          
+          console.log("No hay datos válidos en dataTransfer");
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          e.dataTransfer.dropEffect = 'copy';
+          console.log("Drag over área de favoritos");
+        }}
+        onRemoveFavorite={removeFromFavorites}
+      />
+
+      {/* Main Calendar Table */}
+      {(() => {
+        // Calcular si hay turnos en la semana actual
+        const hasShiftsThisWeek = shiftBlocks.some(shift => 
+          weekDays.some(day => isSameDay(shift.date, day))
+        );
+        const hasEmployees = employees.length > 0;
+        // CRÍTICO: Solo mostrar WeekEmptyState para EMPLOYEE, nunca para OWNER/ADMIN/MANAGER
+        const showEmptyState = !isLoadingData && !hasShiftsThisWeek && hasEmployees && role === 'EMPLOYEE' && !isAdmin;
+
+        return showEmptyState ? (
+          <WeekEmptyState
+            currentWeek={currentWeek}
+            onPreviousWeek={() => setCurrentWeek(subWeeks(currentWeek, 1))}
+            onNextWeek={() => setCurrentWeek(addWeeks(currentWeek, 1))}
+            onWeekChange={setCurrentWeek}
+            weekDays={weekDays}
+          />
+        ) : (
+          <Card className="overflow-hidden relative">
+            {/* Calendar Status Badge - Positioned in top right */}
+            {isPublished && (
+              <div className="absolute top-2 right-2 z-10">
+                <CalendarStatusBadge 
+                  status={publishState.status}
+                  version={publishState.version}
+                  publishedAt={publishState.published_at}
+                />
+              </div>
+            )}
+            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              <table className="w-full min-w-[580px] md:min-w-[700px] lg:min-w-full">
+            {/* Header Row - Sticky */}
+            <thead className="sticky top-0 z-10 bg-background">
+              <tr className="border-b bg-muted/30">
+                <th className="text-left p-1 sm:p-2 w-24 sm:w-32 md:w-48 min-w-[90px] sm:min-w-[120px] md:min-w-[200px] relative">
+                    <div className="flex flex-col items-start gap-1">
+                      {/* Número de semana sutil */}
+                      <div className="text-[7px] sm:text-[8px] text-muted-foreground/60 font-medium mb-1">
+                        S.{getWeek(weekStart, { weekStartsOn: 1 })}
+                      </div>
+                       <div className="flex items-center justify-between w-full">
+                          <div className="text-[8px] sm:text-[9px] font-medium text-muted-foreground">
+                            Personas / Día
+                          </div>
+                          <div className="flex items-center gap-1">
+                              {/* Botón ordenar - OCULTO para empleados */}
+                              {canEdit && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 hover:bg-muted/50 rounded-md"
+                                      onClick={() => setShowEmployeeSortingSheet(true)}
+                                    >
+                                      <ArrowUpDown className="h-3 w-3" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Ordenar empleados</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                             )}
+
+                           {/* Add employee icon */}
+                            {/* Botón añadir empleados - OCULTO para empleados */}
+                            {canEdit && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md"
+                                    onClick={() => {
+                                      navigate('/colaboradores?mode=selection&return=turnos-crear');
+                                    }}
+                                  >
+                                    <UserPlus className="h-3 w-3" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Añadir empleados al calendario</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+
+                           {/* Toggle Time Slots Button - OCULTO para empleados */}
+                           {canEdit && (
+                             <Tooltip>
+                               <TooltipTrigger asChild>
+                                 <Button
+                                   variant={showTimeSlots ? "default" : "outline"}
+                                   size="sm"
+                                   className="h-6 w-6 p-0"
+                                   onClick={() => setShowTimeSlots(!showTimeSlots)}
+                                 >
+                                   <Grid3X3 className="h-3 w-3" />
+                                 </Button>
+                               </TooltipTrigger>
+                               <TooltipContent>
+                                 <p className="text-[9px]">{showTimeSlots ? 'Ocultar' : 'Mostrar'} slots</p>
+                               </TooltipContent>
+                             </Tooltip>
+                           )}
+
+                           {/* Favorites Button - OCULTO para empleados */}
+                           {canEdit && (
+                             <Tooltip>
+                               <TooltipTrigger asChild>
+                                 <Button
+                                   variant={showFavorites ? "default" : "outline"}
+                                   size="sm"
+                                   className={`h-6 w-6 p-0 transition-all duration-200 ${
+                                     showFavorites 
+                                       ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100' 
+                                       : 'hover:bg-muted'
+                                   }`}
+                                   onClick={() => setShowFavorites(!showFavorites)}
+                                 >
+                                   <Star className={`h-3 w-3 ${showFavorites ? 'fill-amber-400 text-amber-400' : ''}`} />
+                                 </Button>
+                               </TooltipTrigger>
+                               <TooltipContent>
+                                 <p className="text-[9px]">Favoritos</p>
+                               </TooltipContent>
+                             </Tooltip>
+                           )}
+                         </div>
+                       </div>
+                    </div>
+                </th>
+                {weekDays.map((day, index) => {
+                  const dayKey = format(day, "yyyy-MM-dd");
+                  return (
+                   <th key={dayKey} className="text-center p-1 sm:p-2 min-w-[65px] sm:min-w-[75px] md:min-w-[100px] w-[65px] sm:w-[75px] md:w-[100px] relative group">
+                     <div className="flex items-center justify-center gap-1">
+                        <div className="flex flex-col items-center justify-center gap-1">
+                           {/* Día y número con estilo pill verde para día actual */}
+                           <div className={`flex items-center justify-center gap-1 ${isSameDay(day, new Date()) ? "bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full text-[9px] sm:text-[10px] font-semibold" : ""}`}>
+                             <div className={`text-[8px] sm:text-[9px] font-medium ${isSameDay(day, new Date()) ? "text-emerald-800" : "text-muted-foreground"}`}>
+                               {format(day, "EEE", { locale: es }).toUpperCase()}
+                             </div>
+                             <div className={`text-[8px] sm:text-[9px] md:text-[11px] font-medium ${isSameDay(day, new Date()) ? "text-emerald-800" : ""}`}>
+                               {format(day, "d")}
+                             </div>
+                           </div>
+                          {/* Contador de personas/día minimalista */}
+                          <div className="text-[7px] sm:text-[8px] md:text-[10px] text-gray-500 font-medium">
+                            {dayCounters[format(day, "yyyy-MM-dd")] || 0}
+                          </div>
+                       </div>
+                       
+                        {/* Checkbox para seleccionar columna completa - estilo TurnoSmart */}
+                        <div className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <input
+                            type="checkbox"
+                            className="w-2.5 h-2.5 sm:w-3 sm:h-3 cursor-pointer accent-black"
+                           checked={selectedColumns.has(format(day, 'yyyy-MM-dd'))}
+                           onChange={() => handleColumnSelect(day)}
+                           onClick={(e) => e.stopPropagation()}
+                         />
+                       </div>
+                     </div>
+                   </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            
+            {/* Employee Rows */}
+            <tbody>
+                 {sortedEmployees.map((employee, employeeIndex) => {
+                  const compliance = checkEmployeeHoursCompliance(employee.id);
+                  
+                  // Check if employee has approved absences this week
+                  const hasAbsenceThisWeek = approvedRequests.some(request => {
+                    const employeeNameLower = request.employee.toLowerCase();
+                    const colaboradorNameLower = employee.name.toLowerCase();
+                    
+                    // Flexible name matching
+                    const matchesEmployee = colaboradorNameLower.includes(employeeNameLower.split(' ')[0]) || 
+                                           employeeNameLower.includes(colaboradorNameLower.split(' ')[0]) ||
+                                           colaboradorNameLower.includes('spider') && employeeNameLower.includes('spider') ||
+                                           colaboradorNameLower.includes('batman') && employeeNameLower.includes('batman') ||
+                                           colaboradorNameLower.includes('super') && employeeNameLower.includes('super');
+                    
+                    if (!matchesEmployee) return false;
+                    
+                    // Check if absence overlaps with current week
+                    const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
+                    const weekEnd = addDays(weekStart, 6);
+                    
+                    return (request.startDate <= weekEnd && request.endDate >= weekStart);
+                  });
+                  
+                  // Get absence details for this employee if any
+                  const employeeAbsence = approvedRequests.find(request => {
+                    const employeeNameLower = request.employee.toLowerCase();
+                    const colaboradorNameLower = employee.name.toLowerCase();
+                    
+                    const matchesEmployee = colaboradorNameLower.includes(employeeNameLower.split(' ')[0]) || 
+                                           employeeNameLower.includes(colaboradorNameLower.split(' ')[0]) ||
+                                           colaboradorNameLower.includes('spider') && employeeNameLower.includes('spider') ||
+                                           colaboradorNameLower.includes('batman') && employeeNameLower.includes('batman') ||
+                                           colaboradorNameLower.includes('super') && employeeNameLower.includes('super');
+                    
+                    if (!matchesEmployee) return false;
+                    
+                    const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
+                    const weekEnd = addDays(weekStart, 6);
+                    
+                    return (request.startDate <= weekEnd && request.endDate >= weekStart);
+                  });
+                  
+                  // Calculate absence duration in days
+                  const absenceDays = employeeAbsence ? 
+                    Math.floor((employeeAbsence.endDate.getTime() - employeeAbsence.startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0;
+                  
+                  return (
+                  <tr key={employee.id} className={`border-b hover:bg-muted/20 ${selectedEmployees.has(employee.id) ? "bg-muted/30" : ""} ${compliance.isExceeded ? "bg-red-50" : ""} ${hasAbsenceThisWeek ? "bg-green-50" : ""}`}>
+                  {/* Employee Info Column */}
+                  <td className="py-0.5 px-1 border-r relative group">
+                    <div className="flex items-center justify-between">
+                       <div className="space-y-0 flex-1">
+                            {/* Nickname como en la imagen de referencia */}
+                             <div className="flex items-center gap-1">
+                               <div 
+                                 className={`text-[9px] sm:text-[10px] md:text-[11px] font-medium text-gray-900 truncate transition-colors ${
+                                   canEdit || colaboradores.find(c => c.id === employee.id)?.user_id === user?.id ? 'cursor-pointer hover:text-blue-600' : ''
+                                 }`}
+                                 onClick={() => {
+                                   // Solo permitir navegación si puede editar O si es su propio perfil
+                                   const colaborador = colaboradores.find(c => c.id === employee.id);
+                                   if (canEdit || (colaborador && colaborador.user_id === user?.id)) {
+                                     navigateToColaborador(employee.name);
+                                   }
+                                 }}
+                                 title={canEdit || colaboradores.find(c => c.id === employee.id)?.user_id === user?.id ? "Ver perfil del colaborador" : ""}
+                               >
+                              {employee.name}
+                                </div>
+                                {/* Badge de violaciones de auditoría del empleado */}
+                                {(() => {
+                                  const employeeViolations = getViolationsForEmployee(employee.id);
+                                  const maxSeverity = employeeViolations.length > 0 
+                                    ? employeeViolations.reduce((max, v) => {
+                                        const order = { error: 3, warning: 2, info: 1 };
+                                        return order[v.severity] > order[max] ? v.severity : max;
+                                      }, 'info' as 'error' | 'warning' | 'info')
+                                    : null;
+                                  return maxSeverity ? (
+                                    <EmployeeViolationBadge 
+                                      count={employeeViolations.length} 
+                                      maxSeverity={maxSeverity} 
+                                    />
+                                  ) : null;
+                                })()}
+                               {/* Show absence badge if employee has approved absence */}
+                              {hasAbsenceThisWeek && employeeAbsence && (
+                                <div className="bg-green-100 text-green-700 text-[8px] px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                  Vacaciones ({absenceDays} días)
+                                </div>
+                              )}
+                            {compliance.isExceeded && (
+                              <div 
+                                className="h-3 w-3 text-red-500 cursor-help flex-shrink-0 relative group"
+                                title={`Se han detectado posibles irregularidades en el cumplimiento de la normativa laboral. Revisa las horas planificadas de este colaborador (${compliance.plannedHours}h/${compliance.contractHours}h)`}
+                              >
+                                <Info className="h-3 w-3" />
+                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-red-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                                  ⚠️ Exceso de horas: {compliance.plannedHours}h/{compliance.contractHours}h
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          
+                           {/* Línea de horas exactamente como en la imagen: planificadas | reales | ausencias | diferencia */}
+                           <div className="text-[8px] sm:text-[9px] text-gray-600 whitespace-nowrap flex gap-1">
+                             <span 
+                               className="cursor-help"
+                               title="Horas contratos"
+                             >
+                               {getWeeklyHoursFromColaborador(employee.name) || compliance.plannedHours}h
+                             </span>
+                             <span>|</span>
+                             <span 
+                               className="cursor-help"
+                               title="Horas reales esta semana"
+                             >
+                               {getWeeklyRealHours(employee.id)}h 0'
+                             </span>
+                             <span>|</span>
+                             <span 
+                               className="cursor-help"
+                               title="Ausencias realizadas"
+                             >
+                               {getWeeklyAbsenceHours(employee.id)}h
+                             </span>
+                             <span>|</span>
+                             <span 
+                               className="cursor-help"
+                               title="Diferencia"
+                             >
+                               {(() => {
+                                 const contractHours = getWeeklyHoursFromColaborador(employee.name) || compliance.plannedHours;
+                                 const realHours = getWeeklyRealHours(employee.id);
+                                 const difference = realHours - contractHours;
+                                 const isPositive = difference > 0;
+                                 return (
+                                   <span className={isPositive ? "text-red-500" : ""}>
+                                     {difference >= 0 ? '+' : ''}{difference}h
+                                   </span>
+                                 );
+                               })()}
+                             </span>
+                            </div>
+                             
+                              {/* Quinta información: Compensar Xh - debajo de las horas con tamaño 8px */}
+                              <div 
+                                className={`text-[8px] text-blue-600 transition-colors ${
+                                  canEdit || colaboradores.find(c => c.id === employee.id)?.email === user?.email
+                                   ? 'cursor-pointer hover:text-blue-800'
+                                   : 'cursor-not-allowed opacity-50'
+                               }`}
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 
+                                 // Si es employee, solo puede ver su propia compensación
+                                 if (isEmployee) {
+                                   const currentUserColaborador = colaboradores.find(c => c.email === user?.email);
+                                   if (!currentUserColaborador || currentUserColaborador.id !== employee.id) {
+                                     toast({
+                                       title: "Acceso restringido",
+                                       description: "Solo puedes acceder a tu propia información",
+                                       variant: "destructive"
+                                     });
+                                     return;
+                                   }
+                                 }
+                                 
+                                 // Navegar directamente a la página del colaborador, tab de vacaciones-ausencias usando navigate
+                                 navigate(`/colaboradores/${employee.id}/absences`);
+                               }}
+                               title={canEdit || colaboradores.find(c => c.id === employee.id)?.email === user?.email 
+                                 ? "Ver compensación de horas extras" 
+                                 : "Solo puedes ver tu propia información"}
+                             >
+                               <EmployeeCompensatoryBalance 
+                                 colaboradorId={employee.id}
+                                 className="cursor-pointer text-[8px]"
+                               />
+                             </div>
+                        </div>
+                        {/* Controles del empleado - checkbox y botón eliminar */}
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                          <input
+                            type="checkbox"
+                            className="w-2.5 h-2.5 sm:w-3 sm:h-3 cursor-pointer accent-black"
+                           checked={selectedEmployees.has(employee.id)}
+                           onChange={() => handleEmployeeSelect(employee.id)}
+                           onClick={(e) => e.stopPropagation()}
+                         />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log("🔥 Intentando eliminar empleado:", employee.name, "ID:", employee.id);
+                              console.log("🔥 isAdmin:", isAdmin);
+                              console.log("🔥 Horarios totales:", shiftBlocks.length);
+                              console.log("🔥 Horarios del empleado:", shiftBlocks.filter(s => s.employeeId === employee.id));
+                              removeEmployeeFromCalendar(employee.id, employee.name);
+                            }}
+                            className="w-3 h-3 sm:w-4 sm:h-4 text-red-500 hover:text-red-700 transition-colors"
+                            title={`Eliminar ${employee.name} del calendario`}
+                          >
+                            <X className="w-full h-full" />
+                          </button>
+                       </div>
+                     </div>
+                     
+                   </td>
+                  
+                   {/* Day Columns */}
+                    {weekDays.map((day, dayIndex) => {
+                      const shifts = getShiftsForEmployeeAndDate(employee.id, day);
+                      const dayKey = format(day, "yyyy-MM-dd");
+                      const isSelected = selectedDays.has(dayKey) || selectedEmployees.has(employee.id);
+                      
+                      // Check if this specific day has an approved absence
+                      const hasAbsenceToday = employeeAbsence && 
+                        day >= employeeAbsence.startDate && 
+                        day <= employeeAbsence.endDate;
+                      
+                      // Obtener violaciones de auditoría para esta celda
+                      const cellViolations = getViolationsForCell(employee.id, dayKey);
+                      const cellSeverity = getMaxSeverityForCell(employee.id, dayKey);
+                      
+                      return (
+                           <td 
+                            key={dayIndex} 
+                            className={`p-0.5 sm:p-1 text-center cursor-pointer hover:bg-muted/30 relative h-14 sm:h-16 md:h-20 ${isSelected ? "bg-muted/40" : ""} ${hasAbsenceToday ? "bg-green-100" : ""} ${
+                              dragOverCell === `${employee.id}-${format(day, 'yyyy-MM-dd')}` ? 'bg-blue-100' : ''
+                            }`}
+                           onClick={(e) => {
+                             // No interferir con drag de ShiftCards
+                             const target = e.target as HTMLElement;
+                             if (target.closest('[data-shift-card]')) {
+                               return;
+                             }
+                             handleCellClick(employee, day, e);
+                           }}
+                           onMouseDown={(e) => {
+                             // Prevenir interferencia con drag de ShiftCards
+                             const target = e.target as HTMLElement;
+                             if (target.closest('[data-shift-card]')) {
+                               e.stopPropagation();
+                             }
+                           }}
+                           onDragOver={handleDragOver}
+                           onDrop={(e) => handleDrop(e, employee.id, day)}
+                            onDragEnter={() => handleDragEnter(employee.id, day)}
+                            onDragLeave={handleDragLeave}
+                        >
+                          <AuditCellHighlight severity={cellSeverity} className="h-full w-full">
+                             {/* Current time line removed from week view */}
+                            {/* Zonas de drag and drop que aparecen cuando hay dragging activo */}
+                            {(canEdit || isManager) && isDragging && dragOverCell === `${employee.id}-${format(day, "yyyy-MM-dd")}` && (
+                              <DragDropZones
+                                isActive={true}
+                                hoveredZone={hoveredZone}
+                                onMoveHover={(isHovering) => {
+                                  setHoveredZone(isHovering ? 'move' : null);
+                                }}
+                                onDuplicateHover={(isHovering) => {
+                                  setHoveredZone(isHovering ? 'duplicate' : null);
+                                }}
+                                onDragOver={(e) => {
+                                  e.preventDefault();
+                                  const target = e.target as HTMLElement;
+                                  const dropAction = target.closest('[data-drop-action]')?.getAttribute('data-drop-action');
+                                  
+                                  if (dropAction === 'move') {
+                                    setHoveredZone('move');
+                                  } else if (dropAction === 'duplicate') {
+                                    setHoveredZone('duplicate');
+                                  }
+                                  
+                                  setCurrentDropAction(dropAction as 'move' | 'duplicate' || 'move');
+                                }}
+                                onDrop={(e) => {
+                                  handleDrop(e, employee.id, day);
+                                }}
+                              />
+                            )}
+                          {shifts.length > 0 ? (
+                            <AuditViolationTooltip violations={cellViolations}>
+                            <div className="h-full w-full space-y-0.5 relative">
+                              {/* Indicador visual de violación */}
+                              {cellViolations.length > 0 && (
+                                <div className={`absolute top-0 right-0 w-2 h-2 rounded-full z-10 ${
+                                  cellSeverity === 'error' ? 'bg-destructive' :
+                                  cellSeverity === 'warning' ? 'bg-amber-500' : 'bg-primary'
+                                }`} />
+                              )}
+                              {shifts.map((shift, shiftIndex) => (
+                                <div key={shift.id} className={`${shifts.length > 1 ? 'h-8' : 'h-full'} w-full`}>
+                                   <ShiftCard
+                                      shift={shift}
+                                      employee={employee}
+                                      shiftsCount={shifts.length}
+                                      isSelected={selectedShifts.has(shift.id)}
+                                       onSelect={handleShiftSelect}
+                                      onShowDetails={(shift) => {
+                                        // 🔒 Si está publicado y no es EMPLOYEE, bloquear edición
+                                        if (isPublished && !isEmployee) {
+                                          toast({
+                                            title: "Turno publicado. No es posible editar",
+                                            description: "Debes despublicar el calendario primero para editar turnos",
+                                            variant: "destructive",
+                                          });
+                                          return;
+                                        }
+                                        setShowTurnoSmartDetails({ shift, employee });
+                                      }}
+                                       onEdit={(shift) => {
+                                         if (isPublished) {
+                                           toast({
+                                             title: "Calendario publicado",
+                                             description: "No se pueden realizar cambios en un calendario publicado. Use el megáfono para modificar.",
+                                             variant: "destructive",
+                                           });
+                                           return;
+                                         }
+                                         setEditingShift(shift);
+                                         setShowAdvancedOptions({
+                                           employeeId: shift.employeeId,
+                                           date: new Date(shift.date)
+                                         });
+                                      }}
+                                       onDelete={(shift) => {
+                                         if (isPublished) {
+                                           toast({
+                                             title: "Calendario publicado",
+                                             description: "No se pueden realizar cambios en un calendario publicado. Use el megáfono para modificar.",
+                                             variant: "destructive",
+                                           });
+                                           return;
+                                         }
+                                         setShowDeleteConfirmation(shift);
+                                       }}
+                                       onAddShift={(canEdit || isManager) ? handleAddShift : undefined}
+                                       readOnly={(isEmployee && !isManager && !isAdmin && !isOwner) || isPublished}
+                                    />
+                                </div>
+                              ))}
+                            </div>
+                            </AuditViolationTooltip>
+            ) : (
+              <div className="h-full relative group">
+                {/* Time slot rectangles - aparecen cuando showTimeSlots está activo */}
+                {showTimeSlots && (
+                  <TimeSlotRectangles 
+                    onSlotClick={(shiftIndex, e, absenceCode) => handleTimeSlotClick(employee, day, shiftIndex, e, absenceCode)}
+                  />
+                )}
+                
+                {/* Mensaje "Primer día" separado - solo para el primer día de contrato */}
+                {(() => {
+                  const empleadoColaborador = colaboradores.find(c => c.id === employee.id);
+                  const fechaInicioContrato = empleadoColaborador?.fecha_inicio_contrato;
+                  
+                  if (fechaInicioContrato) {
+                    const fechaInicio = new Date(fechaInicioContrato);
+                    const esPrimerDia = isSameDay(day, fechaInicio);
+                    
+                    // Solo mostrar si es primer día Y no hay turnos asignados
+                    if (esPrimerDia && shifts.length === 0) {
+                      return (
+                        <div key={`primer-dia-${employee.id}-${format(day, 'yyyy-MM-dd')}`} className="absolute top-1 left-1 right-1 z-10 pointer-events-none">
+                          <div className="flex items-center gap-1.5 bg-white/90 backdrop-blur-sm rounded px-1.5 py-0.5 shadow-sm border border-gray-200">
+                            <span className="text-xs">👋</span>
+                            <span className="text-[10px] font-medium text-gray-600">Primer día</span>
+                          </div>
+                        </div>
+                      );
+                    }
+                  }
+                  return null;
+                })()}
+
+                {/* Zona hover invisible - activa al hacer hover */}
+                <div 
+                  className="absolute inset-0 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddShift(employee, day, e);
+                  }}
+                />
+                 {/* Símbolo + que aparece solo en hover */}
+                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                   <div className="bg-white/95 rounded-full w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center shadow-md border border-gray-200 hover:border-gray-300">
+                     <Plus className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-gray-600" />
+                   </div>
+                </div>
+              </div>
+            )}
+                          </AuditCellHighlight>
+                       </td>
+                     );
+                   })}
+                 </tr>
+                 );
+               })}
+               
+             </tbody>
+           </table>
+         </div>
+       </Card>
+        );
+      })()}
+      
+      {/* Add Employee Button positioned under "Personas/Día" column */}
+      <div className="flex">
+        <div className="w-24 sm:w-32 md:w-48 pr-2 sm:pr-4">
+        </div>
+      </div>
+
+      {/* Add Shift Popup */}
+      {showAddShiftPopup && (
+        <div 
+          className="fixed inset-0 bg-black/20 flex items-center justify-center z-50"
+          onClick={() => setShowAddShiftPopup(null)}
+        >
+          <Card 
+            className="w-64 p-4 bg-background border border-border shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="space-y-3">
+              <div className="text-[10px] font-semibold">Horario</div>
+              <div className="text-[8px] text-muted-foreground">
+                Empleado/a: {employees.find(e => e.id === showAddShiftPopup?.employeeId)?.name}
+              </div>
+              <div className="text-[8px] text-muted-foreground">
+                {format(showAddShiftPopup?.date || new Date(), "EEEE, d MMMM yyyy", { locale: es })}
+              </div>
+              
+              {/* Mostrar horarios guardados disponibles */}
+              <div className="space-y-2">
+                {getSavedShiftsSync().length > 0 ? (
+                  getSavedShiftsSync().map((shift) => (
+                    <div 
+                      key={shift.id} 
+                      className="flex items-center justify-between p-2 border rounded hover:bg-accent cursor-pointer"
+                      onClick={() => {
+                        // Asignar el horario guardado al empleado
+                        const newShift: ShiftBlock = {
+                          id: `shift-${Date.now()}`,
+                          employeeId: showAddShiftPopup?.employeeId || '',
+                          date: showAddShiftPopup?.date || new Date(),
+          startTime: shift.startTime || undefined,
+          endTime: shift.endTime || undefined,
+                          type: "morning",
+                          color: shift.color,
+                          name: shift.name,
+                          organization_id: currentOrg?.org_id || 'default',
+                          hasBreak: !!(shift.breakType && shift.breakDuration)
+                        };
+                        setShiftBlocksWithHistory(currentShifts => {
+                          const updatedShifts = [...currentShifts, newShift];
+                          localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
+                          return updatedShifts;
+                        });
+                        setShowAddShiftPopup(null);
+                      }}
+                    >
+                      <div>
+                        <div className="text-[9px] font-medium">{shift.name}</div>
+                        <div className="text-[8px] text-muted-foreground">
+                          {shift.startTime && shift.endTime ? `${shift.startTime} - ${shift.endTime}` : 'Día completo'}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4 text-[8px] text-muted-foreground">
+                    No hay horarios guardados disponibles
+                  </div>
+                )}
+              </div>
+              
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="w-full h-6 text-[8px]"
+                onClick={() => {
+                  setShowAdvancedOptions(showAddShiftPopup);
+                  setShowAddShiftPopup(null);
+                }}
+              >
+                Opciones avanzadas
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Advanced Shift Dialog */}
+      <AdvancedShiftDialog
+        isOpen={!!showAdvancedOptions}
+        onClose={() => {
+          console.log('Cerrando AdvancedShiftDialog');
+          setShowAdvancedOptions(null);
+          setEditingShift(null);
+        }}
+        employee={employees.find(e => e.id === showAdvancedOptions?.employeeId)}
+        date={showAdvancedOptions?.date || new Date()}
+        editingShift={editingShift || (showAdvancedOptions ? shiftBlocks.find(s => 
+          s.employeeId === showAdvancedOptions.employeeId && 
+          format(s.date, "yyyy-MM-dd") === format(showAdvancedOptions.date, "yyyy-MM-dd")
+        ) : undefined)}
+        onShiftAssigned={async (shiftData) => {
+          if (showAdvancedOptions && shiftData.employeeId) {
+            // Si estamos editando, actualizar el turno existente
+            const existingShiftIndex = shiftBlocks.findIndex(s => 
+              s.employeeId === showAdvancedOptions.employeeId && 
+              format(s.date, "yyyy-MM-dd") === format(showAdvancedOptions.date, "yyyy-MM-dd")
+            );
+            
+            if (existingShiftIndex !== -1 && editingShift) {
+              console.log('Actualizando turno con datos de descanso:', { hasBreak: shiftData.hasBreak, breaks: shiftData.breaks, totalBreakTime: shiftData.totalBreakTime, color: shiftData.color });
+              
+              // IMPORTANTE: Normalizar los nombres para evitar problemas de espacios
+              const oldShiftName = editingShift.name?.trim() || '';
+              const newShiftName = shiftData.name?.trim() || '';
+              
+              console.log(`📝 Comparando nombres: "${oldShiftName}" vs "${newShiftName}"`);
+              console.log(`🎨 Comparando colores: "${editingShift.color}" vs "${shiftData.color}"`);
+              
+              // Verificar si se van a actualizar todos los turnos con el mismo nombre
+              const willUpdateAllShifts = oldShiftName && (oldShiftName !== newShiftName || 
+                  editingShift.startTime !== shiftData.startTime ||
+                  editingShift.endTime !== shiftData.endTime ||
+                  editingShift.color !== shiftData.color ||
+                  JSON.stringify(editingShift.breaks) !== JSON.stringify(shiftData.breaks));
+              
+              if (willUpdateAllShifts) {
+                // Si vamos a actualizar todos los turnos, NO actualizar localmente primero
+                // porque updateAllShiftsWithSameName ya hace el trabajo completo
+                console.log(`🔄 Detectado cambio en turno "${oldShiftName}" → "${newShiftName}"`);
+                console.log(`📊 Cambios detectados:`, {
+                  nombreCambio: oldShiftName !== newShiftName,
+                  horaInicioCambio: editingShift.startTime !== shiftData.startTime,
+                  horaFinCambio: editingShift.endTime !== shiftData.endTime,
+                  colorCambio: editingShift.color !== shiftData.color,
+                  descansosCambio: JSON.stringify(editingShift.breaks) !== JSON.stringify(shiftData.breaks)
+                });
+                
+                // CRÍTICO: Pasar el nombre EXACTO que está en la base de datos
+                await updateAllShiftsWithSameName(oldShiftName, {
+                  name: newShiftName,
+                  startTime: shiftData.startTime,
+                  endTime: shiftData.endTime,
+                  color: shiftData.color,
+                  breaks: shiftData.breaks,
+                  hasBreak: shiftData.hasBreak,
+                  totalBreakTime: shiftData.totalBreakTime,
+                  breakType: shiftData.breakType,
+                  breakDuration: shiftData.breakDuration,
+                  notes: shiftData.notes,
+                });
+              } else {
+                // Solo actualizar este turno específico si NO se van a actualizar todos
+                const newBlocks = [...shiftBlocks];
+                newBlocks[existingShiftIndex] = {
+                  ...newBlocks[existingShiftIndex],
+                  startTime: shiftData.startTime || undefined,
+                  endTime: shiftData.endTime || undefined,
+                  name: newShiftName,
+                  organization_id: currentOrg?.org_id || 'default',
+                  hasBreak: shiftData.hasBreak || false,
+                  breaks: shiftData.breaks || [],
+                  totalBreakTime: shiftData.totalBreakTime || 0,
+                  breakType: shiftData.breakType,
+                  breakDuration: shiftData.breakDuration,
+                  notes: shiftData.notes,
+                  color: shiftData.color || newBlocks[existingShiftIndex].color
+                };
+                updateShiftBlocks(newBlocks);
+                console.log("Horario actualizado en el calendario (solo este turno)");
+              }
+              
+              // Limpiar el estado de edición
+              setEditingShift(null);
+            } else {
+              console.log('Creando nuevo turno con datos de descanso:', { hasBreak: shiftData.hasBreak, breaks: shiftData.breaks, totalBreakTime: shiftData.totalBreakTime, color: shiftData.color });
+              // Crear nuevo horario si no existe
+              const newShift: ShiftBlock = {
+                id: `shift-${Date.now()}`,
+                employeeId: shiftData.employeeId,
+                date: new Date(shiftData.date),
+                startTime: shiftData.startTime || undefined,
+                endTime: shiftData.endTime || undefined,
+                type: "morning",
+                color: shiftData.color || "#86efac",
+                name: shiftData.name,
+                organization_id: currentOrg?.org_id || 'default',
+                hasBreak: shiftData.hasBreak || false,
+                breaks: shiftData.breaks || [],
+                totalBreakTime: shiftData.totalBreakTime || 0,
+                breakType: shiftData.breakType,
+                breakDuration: shiftData.breakDuration,
+                notes: shiftData.notes
+              };
+              setShiftBlocksWithHistory(currentShifts => {
+                const updatedShifts = [...currentShifts, newShift];
+                localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
+                return updatedShifts;
+              });
+              console.log("Nuevo horario añadido al calendario:", newShift);
+            }
+          }
+        }}
+      />
+
+      {/* Shift Configuration Dialog */}
+      <ShiftConfigurationDialog
+        isOpen={showShiftConfiguration}
+        onClose={() => setShowShiftConfiguration(false)}
+      />
+      
+      {/* Version History Dialog */}
+      <VersionHistoryDialog
+        open={showVersionHistory}
+        onOpenChange={setShowVersionHistory}
+        onRestore={handleRestoreVersion}
+      />
+      
+      {/* Operation Backups Dialog */}
+      <OperationBackupsDialog
+        open={showOperationBackups}
+        onOpenChange={setShowOperationBackups}
+        onRestore={async (backupData, backupId) => {
+          try {
+            // Restaurar desde backup
+            if (backupData.shiftBlocks) {
+              const restoredShifts = backupData.shiftBlocks.map((shift: any) => ({
+                ...shift,
+                date: typeof shift.date === 'string' ? new Date(shift.date) : shift.date,
+              }));
+              
+              setShiftBlocksWithHistory(restoredShifts);
+              localStorage.setItem('calendar-shift-blocks', JSON.stringify(restoredShifts));
+              await saveShiftsToSupabase(restoredShifts);
+              
+              toast({
+                title: "Backup restaurado",
+                description: `Se han restaurado ${restoredShifts.length} turnos desde el backup`,
+              });
+            }
+          } catch (error) {
+            console.error("Error restaurando backup:", error);
+            toast({
+              title: "Error al restaurar",
+              description: "No se pudo restaurar el backup",
+              variant: "destructive",
+            });
+          }
+        }}
+      />
+
+      {/* Bulk Actions Dialog */}
+      <ShiftBulkActions
+        isOpen={showBulkActions}
+        onClose={() => setShowBulkActions(false)}
+        selectedEmployees={selectedEmployees}
+        selectedDays={selectedDays}
+        employees={employees}
+        weekDays={weekDays}
+        onBulkAssign={(bulkData) => {
+          console.log("Bulk action performed:", bulkData);
+          
+          if (bulkData.type === "assign") {
+            // Create shifts for all selected combinations
+            const newShifts: ShiftBlock[] = [];
+            
+            bulkData.employees.forEach((empId: string) => {
+              bulkData.days.forEach((dayKey: string) => {
+                const dayDate = new Date(dayKey);
+                const newShift: ShiftBlock = {
+                  id: `shift-${Date.now()}-${empId}-${dayKey}`,
+                  employeeId: empId,
+                  date: dayDate,
+          startTime: bulkData.shiftData.startTime || undefined,
+          endTime: bulkData.shiftData.endTime || undefined,
+                  type: "morning",
+                  color: "#86efac",
+                  name: `Turno ${bulkData.shiftData.template}`,
+                  organization_id: currentOrg?.org_id || 'default',
+                  hasBreak: bulkData.shiftData.addBreaks
+                };
+                newShifts.push(newShift);
+              });
+            });
+            
+            setShiftBlocksWithHistory(currentShifts => {
+              const updatedShifts = [...currentShifts, ...newShifts];
+              localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
+              return updatedShifts;
+            });
+          } else if (bulkData.type === "rest") {
+            // Add rest days logic here
+            console.log("Adding rest days for bulk selection");
+          }
+          
+          // Clear selections after bulk action
+          clearSelection();
+        }}
+      />
+
+      {/* Shift Details Panel */}
+      <ShiftDetailsPanel
+        isOpen={!!showShiftDetails}
+        onClose={() => setShowShiftDetails(null)}
+        shift={showShiftDetails?.shift}
+        employee={showShiftDetails?.employee}
+        onEdit={(shift) => {
+          if (isPublished) {
+            toast({
+              title: "Calendario publicado",
+              description: "No se pueden realizar cambios en un calendario publicado. Use el megáfono para modificar.",
+              variant: "destructive",
+            });
+            return;
+          }
+          setEditingShift(shift);
+          setShowAdvancedOptions({
+            employeeId: shift.employeeId,
+            date: new Date(shift.date)
+          });
+          setShowShiftDetails(null);
+        }}
+        onDelete={async (shiftId) => {
+          if (isPublished) {
+            toast({
+              title: "Calendario publicado",
+              description: "No se pueden realizar cambios en un calendario publicado. Use el megáfono para modificar.",
+              variant: "destructive",
+            });
+            return;
+          }
+          // Eliminar de Supabase primero
+          await deleteShiftFromSupabase(shiftId);
+          
+          // Luego eliminar del estado local con historial
+          setShiftBlocksWithHistory(currentShifts => {
+            const filteredShifts = currentShifts.filter(s => s.id !== shiftId);
+            localStorage.setItem('calendar-shift-blocks', JSON.stringify(filteredShifts));
+            return filteredShifts;
+          });
+          setShowShiftDetails(null);
+        }}
+        onDuplicate={(shift) => {
+          const duplicatedShift: ShiftBlock = {
+            ...shift,
+            id: `shift-${Date.now()}-duplicate`,
+            date: new Date(shift.date)
+          };
+          setShiftBlocksWithHistory(currentShifts => {
+            const updatedShifts = [...currentShifts, duplicatedShift];
+            localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
+            return updatedShifts;
+          });
+          setShowShiftDetails(null);
+        }}
+      />
+
+      {/* Add Employees Dialog */}
+      <AddEmployeesToCalendarDialog
+        open={showAddEmployeesDialog}
+        onOpenChange={setShowAddEmployeesDialog}
+        onEmployeesAdded={async (newEmployees, effectiveDate, applyRestDays) => {
+          console.log("Empleados añadidos:", newEmployees, effectiveDate, applyRestDays);
+          
+          // Convert database employees to calendar employee format
+          const calendarEmployees = newEmployees.map(emp => ({
+            id: emp.id,
+            name: emp.name,
+            role: emp.category,
+            department: emp.department,
+            workingHours: `${emp.contract_hours}h/${emp.contract_hours * 5}h`
+          }));
+          
+          // Add new employees to existing ones, avoiding duplicates
+          const existingIds = new Set(employees.map(emp => emp.id));
+          const uniqueNewEmployees = calendarEmployees.filter(emp => !existingIds.has(emp.id));
+          
+          if (uniqueNewEmployees.length > 0) {
+            // Actualizar lista de empleados
+            setEmployees(prev => [...prev, ...uniqueNewEmployees]);
+            
+            // Log activity for added employees
+            for (const employee of uniqueNewEmployees) {
+              await logActivity({
+                action: "COLABORADOR_AÑADIDO",
+                entityType: "employee_management",
+                entityName: employee.name,
+                details: {
+                  employeeId: employee.id,
+                  employeeName: employee.name,
+                  department: employee.department,
+                  role: employee.role,
+                  workingHours: employee.workingHours,
+                  source: "calendar_dialog"
+                }
+              });
+            }
+            
+            // DISABLED: Auto-generation of "Primer día" for new employees removed
+            console.log(`ℹ️ Auto-generation disabled. Found ${uniqueNewEmployees.length} new employees but will not create automatic shifts.`);
+          }
+        }}
+        existingEmployeeIds={employees.map(emp => emp.id)}
+      />
+
+      {/* TurnoSmart Style Shift Details Panel */}
+      <TurnoSmartShiftDetailsPanel
+        isOpen={!!showTurnoSmartDetails}
+        onClose={() => setShowTurnoSmartDetails(null)}
+        shift={showTurnoSmartDetails?.shift}
+        employee={showTurnoSmartDetails?.employee}
+        onEdit={(shift) => {
+          setEditingShift(shift);
+          setShowAdvancedOptions({
+            employeeId: shift.employeeId,
+            date: new Date(shift.date)
+          });
+          setShowTurnoSmartDetails(null);
+        }}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteShiftConfirmation
+        isOpen={!!showDeleteConfirmation}
+        onClose={() => setShowDeleteConfirmation(null)}
+        deleteData={showDeleteConfirmation?.type === 'bulk' ? showDeleteConfirmation : undefined}
+        onConfirm={async () => {
+          if (showDeleteConfirmation) {
+             if (showDeleteConfirmation.type === 'bulk') {
+               // Bulk delete con backup
+                const shiftsToDelete = showDeleteConfirmation.shifts;
+                
+                // 🛡️ PROTECCIÓN: Crear backup antes de bulk delete
+                if (shiftsToDelete.length >= 5) { // Solo para 5+ turnos
+                  await createBackupBeforeOperation(
+                    'bulk_delete',
+                    {
+                      deletedShifts: shiftsToDelete.map(shift => ({
+                        ...shift,
+                        date: format(shift.date, "yyyy-MM-dd"),
+                      })),
+                      remainingShifts: shiftBlocks.filter(shift => 
+                        !shiftsToDelete.some(s => s.id === shift.id)
+                      ).map(shift => ({
+                        ...shift,
+                        date: format(shift.date, "yyyy-MM-dd"),
+                      })),
+                      timestamp: new Date().toISOString(),
+                    },
+                    `Eliminación masiva de ${shiftsToDelete.length} turnos`,
+                    shiftsToDelete.length
+                  );
+                  console.log('🛡️ Backup de seguridad creado antes de bulk delete');
+                }
+                
+                setShiftBlocksWithHistory(currentShifts => {
+                  const filteredShifts = currentShifts.filter(shift => !shiftsToDelete.some(s => s.id === shift.id));
+                  localStorage.setItem('calendar-shift-blocks', JSON.stringify(filteredShifts));
+                  return filteredShifts;
+                });
+                setSelectedShifts(new Set()); // Clear shift selection
+               setSelectedColumns(new Set()); // Clear column selection
+               setSelectedEmployees(new Set()); // Clear employee selection
+                 // Registro de actividad sin toast
+            } else {
+              // Single delete
+              const shiftToDelete = showDeleteConfirmation;
+              
+              // Eliminar de Supabase primero
+              await deleteShiftFromSupabase(shiftToDelete.id);
+              
+              setShiftBlocksWithHistory(currentShifts => {
+                const filteredShifts = currentShifts.filter(s => s.id !== shiftToDelete.id);
+                localStorage.setItem('calendar-shift-blocks', JSON.stringify(filteredShifts));
+                return filteredShifts;
+              });
+              // Clear employee selection if they have no more shifts
+              setSelectedEmployees(prev => {
+                const newSet = new Set(prev);
+                const remainingShifts = shiftBlocks.filter(s => 
+                  s.employeeId === shiftToDelete.employeeId && s.id !== shiftToDelete.id
+                );
+                if (remainingShifts.length === 0) {
+                  newSet.delete(shiftToDelete.employeeId);
+                }
+                return newSet;
+              });
+              // Registro de actividad sin toast
+            }
+            setShowDeleteConfirmation(null);
+          }
+        }}
+        shiftName={showDeleteConfirmation?.name}
+      />
+
+      {/* Shift Selector Popup */}
+      <ShiftSelectorPopup
+        isOpen={!!showShiftSelector}
+        onClose={() => setShowShiftSelector(null)}
+        position={showShiftSelector?.position || { x: 0, y: 0 }}
+        onShiftSelected={(shift) => {
+          if (showShiftSelector) {
+            handleShiftSelected(shift, showShiftSelector.employeeId, showShiftSelector.date);
+            setShowShiftSelector(null);
+          }
+        }}
+        onAdvancedOptions={() => {
+          if (showShiftSelector) {
+            console.log('Botón Opciones avanzadas clickeado:', showShiftSelector);
+            const employee = employees.find(emp => emp.id === showShiftSelector.employeeId);
+            console.log('Empleado encontrado:', employee);
+            if (employee) {
+              console.log('Estableciendo showAdvancedOptions:', {
+                employeeId: showShiftSelector.employeeId,
+                date: showShiftSelector.date
+              });
+              setShowAdvancedOptions({
+                employeeId: showShiftSelector.employeeId,
+                date: showShiftSelector.date
+              });
+              console.log('showAdvancedOptions actualizado');
+            } else {
+              console.log('Empleado no encontrado en la lista de employees');
+            }
+            setShowShiftSelector(null);
+          } else {
+            console.log('showShiftSelector es null');
+          }
+        }}
+      />
+    </div>
+        
+        {/* Zona de eliminación que aparece durante el drag */}
+        <DeleteZone
+          isVisible={isDragging}
+          isDragOver={deleteZoneDragOver}
+          onDragOver={handleDeleteZoneDragOver}
+          onDragLeave={handleDeleteZoneDragLeave}
+          onDrop={handleDeleteZoneDrop}
+        />
+
+        {/* Employee Sorting Sheet */}
+        <EmployeeSortingSheet 
+          isOpen={showEmployeeSortingSheet}
+          onClose={() => {
+            // Limpiar estados de drag and drop al cerrar
+            setIsDragging(false);
+            setDeleteZoneDragOver(false);
+            setDragOverCell(null);
+            setCurrentDropAction(null);
+            setHoveredZone(null);
+            setDraggedFavorite(null);
+            setShowEmployeeSortingSheet(false);
+          }}
+          employees={sortedEmployees.map(emp => {
+            // Buscar datos completos del colaborador basado en el orden actual del calendario
+            const fullColaborador = colaboradores.find(col => col.id === emp.id);
+            return {
+              id: emp.id,
+              nombre: fullColaborador?.nombre || emp.name.split(' ')[0] || '',
+              apellidos: fullColaborador?.apellidos || emp.name.split(' ').slice(1).join(' ') || '',
+              email: fullColaborador?.email || '',
+              tipo_contrato: fullColaborador?.tipo_contrato || emp.role,
+              tiempo_trabajo_semanal: fullColaborador?.tiempo_trabajo_semanal || 40,
+              fecha_inicio_contrato: fullColaborador?.fecha_inicio_contrato || emp.startDate,
+              fecha_nacimiento: fullColaborador?.fecha_nacimiento,
+              genero: fullColaborador?.genero,
+              categoria: fullColaborador?.categoria,
+              departamento: fullColaborador?.departamento || emp.department,
+              // establecimiento_por_defecto: ELIMINADO - usar org_id en su lugar
+              telefono_movil: fullColaborador?.telefono_movil,
+              status: fullColaborador?.status
+            };
+          })}
+          onApplySort={(sortedEmployees) => {
+            console.log('Applying sort to calendar:', sortedEmployees.map(emp => ({
+              name: `${emp.nombre} ${emp.apellidos}`,
+              tiempo_trabajo_semanal: emp.tiempo_trabajo_semanal
+            })));
+            
+            // Convert back to Employee format and update the calendar
+            const sortedCalendarEmployees = sortedEmployees.map(emp => ({
+              id: emp.id,
+              name: `${emp.nombre} ${emp.apellidos}`,
+              role: emp.tipo_contrato || "Sin definir",
+              department: emp.departamento || "Bares",
+              workingHours: `0h/${emp.tiempo_trabajo_semanal || 40}h`,
+              startDate: emp.fecha_inicio_contrato
+            }));
+            
+            console.log('Converted to calendar format:', sortedCalendarEmployees.map(emp => ({
+              name: emp.name,
+              workingHours: emp.workingHours
+            })));
+            
+            updateEmployees(sortedCalendarEmployees);
+            setSortBy(sortedEmployees.some((_, index, arr) => index > 0 && !arr[index-1].apellidos) ? "manual" : "applied"); // Mark as manual if custom order, otherwise applied
+          }}
+          currentSortCriteria={sortBy}
+        />
+        
+        {/* Calendar Full Screen View */}
+        <CalendarFullScreenView
+          isOpen={isFullScreenOpen}
+          onClose={() => setIsFullScreenOpen(false)}
+          employees={employees}
+          shiftBlocks={shiftBlocks}
+          currentWeek={currentWeek}
+          onPrint={handlePrint}
+          onExport={handleExportPDF}
+        />
+
+        {/* Confirmation Dialogs */}
+        <ConfirmationDialog
+          open={confirmClearCalendar}
+          onOpenChange={setConfirmClearCalendar}
+          onConfirm={handleConfirmClearCalendar}
+          title="¿Limpiar todo el calendario?"
+          description="Esta acción eliminará todos los turnos del calendario. Se creará un backup automático que podrás restaurar más tarde desde el botón de Backups."
+          confirmText="Sí, limpiar"
+          cancelText="Cancelar"
+          variant="destructive"
+          affectedCount={shiftBlocks.length}
+        />
+
+        <ConfirmationDialog
+          open={confirmRestoreVersion !== null}
+          onOpenChange={(open) => !open && setConfirmRestoreVersion(null)}
+          onConfirm={handleConfirmRestoreVersion}
+          title="¿Restaurar esta versión?"
+          description="Se creará un backup automático de la versión actual antes de restaurar. Podrás volver a la versión actual desde el historial si lo necesitas."
+          confirmText="Sí, restaurar"
+          cancelText="Cancelar"
+          variant="info"
+        />
+
+        {/* Connection Status Banner - Sistema de persistencia */}
+        <ConnectionStatusBanner
+          connectionStatus={connectionStatus}
+          saveStatus={saveStatus}
+          pendingCount={pendingCount}
+          isSyncing={isSyncing}
+          onManualSync={forceSync}
+          lastSavedAt={persistenceLastSaved}
+        />
+
+        {/* Clean Dialog */}
+        <CleanShiftsDialog
+          open={showCleanDialog}
+          onOpenChange={setShowCleanDialog}
+          currentDate={currentWeek}
+          employees={employees}
+          onSuccess={() => {
+            loadShiftsFromSupabase(employees.map(e => e.id));
+          }}
+        />
+    </TooltipProvider>
+  );
+}

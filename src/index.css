@@ -1,0 +1,399 @@
+@import './components/calendar/day/day-calendar.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Typography - Notion-inspired with Inter as primary font */
+  --font-family-sans: "Nunito Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-family-serif: "Lyon-Text", "Times New Roman", Georgia, serif;
+  --font-family-mono: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+  
+  /* Spacing System - Notion 8px grid base */
+  --spacing-0: 0px;
+  --spacing-1: 4px;      /* 0.5 * 8px - subtle adjustments */
+  --spacing-2: 8px;      /* 1 * 8px - base unit */
+  --spacing-3: 12px;     /* 1.5 * 8px - sidebar internal padding */
+  --spacing-4: 16px;     /* 2 * 8px - mobile margins, paragraph separation */
+  --spacing-6: 24px;     /* 3 * 8px - icon containers, section separation */
+  --spacing-8: 32px;     /* 4 * 8px - large component spacing */
+  --spacing-12: 96px;    /* 12 * 8px - desktop side margins */
+  --spacing-sidebar: 224px; /* 28 * 8px - sidebar width */
+  --spacing-clickable: 30px; /* Standard clickable area height */
+  
+  /* Layout spacing constants */
+  --layout-sidebar-width: var(--spacing-sidebar);
+  --layout-content-padding-desktop: var(--spacing-12);
+  --layout-content-padding-mobile: var(--spacing-4);
+  --layout-sidebar-internal-padding: var(--spacing-3);
+  --layout-section-gap: 6px; /* Notion sidebar section gap */
+  
+  /* Font sizes - Notion hierarchy */
+  --text-xs: 0.75rem;    /* 12px */
+  --text-sm: 0.875rem;   /* 14px */
+  --text-base: 1rem;     /* 16px - base paragraph */
+  --text-lg: 1.25rem;    /* 20px - H3 */
+  --text-xl: 1.5rem;     /* 24px - H2 */
+  --text-2xl: 1.875rem;  /* 30px - H1 */
+  --text-3xl: 2.25rem;   /* 36px - Large titles */
+  
+  /* Font weights - Notion approach */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;  /* UI text weight */
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  
+  /* Line heights - optimized for readability */
+  --leading-tight: 1.25;     /* Headers */
+  --leading-normal: 1.5;     /* Body text */
+  --leading-relaxed: 1.75;   /* Spacious content */
+  
+  /* Colors - Notion-inspired with exact color palette */
+  --font-size: 16px;
+  
+  /* Base neutral colors */
+  --background: hsl(0, 0%, 100%);           /* #FFFFFF - pure white main background */
+  --foreground: hsl(42, 15%, 20%);         /* #373530 - warm dark gray text (not pure black) */
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(42, 15%, 20%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(42, 15%, 20%);
+  --primary: hsl(42, 15%, 20%);            /* Same as foreground for Notion-like primary */
+  --primary-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(45, 25%, 97%);          /* #F7F6F3 - sidebar background */
+  --secondary-foreground: hsl(42, 15%, 20%);
+  --muted: hsl(60, 14%, 94%);              /* #F1F1EF - muted background */
+  --muted-foreground: hsl(42, 8%, 47%);    /* #787774 - secondary text/placeholder */
+  --accent: hsl(60, 14%, 94%);
+  --accent-foreground: hsl(42, 15%, 20%);
+  --destructive: hsl(4, 43%, 55%);         /* #C4554D - Notion red */
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --border: hsl(60, 14%, 92%);              /* Much lighter border */
+  --input: hsl(45, 25%, 97%);              /* Light background for inputs */
+  --input-background: hsl(45, 25%, 97%);   /* Light background for inputs */
+  --switch-background: hsl(42, 8%, 47%);
+  --ring: hsl(42, 8%, 47%);
+  
+  /* Notion accent colors - text variants */
+  --accent-gray-text: hsl(42, 8%, 47%);        /* #787774 */
+  --accent-brown-text: hsl(20, 26%, 46%);      /* #976D57 */
+  --accent-orange-text: hsl(26, 61%, 49%);     /* #CC782F */
+  --accent-yellow-text: hsl(42, 49%, 51%);     /* #C29343 */
+  --accent-green-text: hsl(142, 21%, 41%);     /* #548164 */
+  --accent-blue-text: hsl(205, 37%, 47%);      /* #487CA5 */
+  --accent-purple-text: hsl(269, 27%, 54%);    /* #8A67AB */
+  --accent-pink-text: hsl(323, 36%, 51%);      /* #B35488 */
+  --accent-red-text: hsl(4, 43%, 55%);         /* #C4554D */
+  
+  /* Notion accent colors - background variants */
+  --accent-gray-bg: hsl(60, 14%, 94%);         /* #F1F1EF */
+  --accent-brown-bg: hsl(20, 14%, 93%);        /* #F3EEEE */
+  --accent-orange-bg: hsl(32, 64%, 93%);       /* #F8ECDF */
+  --accent-yellow-bg: hsl(48, 67%, 92%);       /* #FAF3DD */
+  --accent-green-bg: hsl(104, 22%, 93%);       /* #EEF3ED */
+  --accent-blue-bg: hsl(197, 50%, 94%);        /* #E9F3F7 */
+  --accent-purple-bg: hsl(276, 25%, 96%);      /* #F6F3F8 */
+  --accent-pink-bg: hsl(323, 29%, 96%);        /* #F9F2F5 */
+  --accent-red-bg: hsl(4, 50%, 94%);           /* #FAECEC */
+  
+  /* Chart colors using Notion palette */
+  --chart-1: hsl(205, 37%, 47%);   /* Blue */
+  --chart-2: hsl(142, 21%, 41%);   /* Green */
+  --chart-3: hsl(26, 61%, 49%);    /* Orange */
+  --chart-4: hsl(269, 27%, 54%);   /* Purple */
+  --chart-5: hsl(323, 36%, 51%);   /* Pink */
+  
+  --radius: 0.5rem;
+  --sidebar: hsl(45, 25%, 97%);             /* #F7F6F3 - Notion sidebar */
+  --sidebar-foreground: hsl(42, 15%, 20%);
+  --sidebar-primary: hsl(42, 15%, 20%);
+  --sidebar-primary-foreground: hsl(0, 0%, 100%);
+  --sidebar-accent: hsl(0, 0%, 100%);       /* White hover on sidebar */
+  --sidebar-accent-foreground: hsl(42, 15%, 20%);
+  --sidebar-border: hsl(42, 8%, 47%);
+  --sidebar-ring: hsl(42, 8%, 47%);
+}
+
+.dark {
+  /* Dark mode - Notion-inspired */
+  --background: hsl(0, 0%, 9%);             /* Dark background */
+  --foreground: hsl(0, 0%, 95%);            /* Light text for dark mode */
+  --card: hsl(0, 0%, 9%);
+  --card-foreground: hsl(0, 0%, 95%);
+  --popover: hsl(0, 0%, 9%);
+  --popover-foreground: hsl(0, 0%, 95%);
+  --primary: hsl(0, 0%, 95%);
+  --primary-foreground: hsl(0, 0%, 9%);
+  --secondary: hsl(210, 4%, 22%);           /* #373C3F - dark sidebar */
+  --secondary-foreground: hsl(0, 0%, 95%);
+  --muted: hsl(210, 4%, 22%);
+  --muted-foreground: hsl(0, 0%, 65%);
+  --accent: hsl(210, 4%, 26%);              /* #3F4448 - hover state */
+  --accent-foreground: hsl(0, 0%, 95%);
+  --destructive: hsl(4, 43%, 45%);          /* Darker red for dark mode */
+  --destructive-foreground: hsl(0, 0%, 95%);
+  --border: hsl(210, 4%, 22%);
+  --input: hsl(210, 4%, 22%);
+  --ring: hsl(0, 0%, 83%);
+  
+  /* Dark mode accent colors - more vibrant */
+  --accent-gray-text: hsl(0, 0%, 70%);
+  --accent-brown-text: hsl(20, 26%, 60%);
+  --accent-orange-text: hsl(26, 61%, 65%);
+  --accent-yellow-text: hsl(42, 49%, 65%);
+  --accent-green-text: hsl(142, 21%, 55%);
+  --accent-blue-text: hsl(205, 37%, 60%);
+  --accent-purple-text: hsl(269, 27%, 65%);
+  --accent-pink-text: hsl(323, 36%, 65%);
+  --accent-red-text: hsl(4, 43%, 65%);
+  
+  /* Dark mode accent backgrounds - darker versions */
+  --accent-gray-bg: hsl(210, 4%, 18%);
+  --accent-brown-bg: hsl(20, 14%, 15%);
+  --accent-orange-bg: hsl(32, 30%, 15%);
+  --accent-yellow-bg: hsl(48, 30%, 15%);
+  --accent-green-bg: hsl(104, 22%, 15%);
+  --accent-blue-bg: hsl(197, 25%, 15%);
+  --accent-purple-bg: hsl(276, 25%, 15%);
+  --accent-pink-bg: hsl(323, 15%, 15%);
+  --accent-red-bg: hsl(4, 25%, 15%);
+  
+  --chart-1: hsl(205, 37%, 60%);
+  --chart-2: hsl(142, 21%, 55%);
+  --chart-3: hsl(26, 61%, 65%);
+  --chart-4: hsl(269, 27%, 65%);
+  --chart-5: hsl(323, 36%, 65%);
+  --sidebar: hsl(210, 4%, 22%);             /* #373C3F */
+  --sidebar-foreground: hsl(0, 0%, 95%);
+  --sidebar-primary: hsl(205, 37%, 60%);
+  --sidebar-primary-foreground: hsl(0, 0%, 95%);
+  --sidebar-accent: hsl(210, 4%, 26%);      /* #3F4448 - hover */
+  --sidebar-accent-foreground: hsl(0, 0%, 95%);
+  --sidebar-border: hsl(210, 4%, 22%);
+  --sidebar-ring: hsl(0, 0%, 83%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    font-family: var(--font-family-sans);
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-family-sans);
+  }
+  
+  /* Ensure all elements use sans-serif by default */
+  html, body, div, span, h1, h2, h3, h4, h5, h6, p, a, button, input, textarea, select, label {
+    font-family: var(--font-family-sans);
+  }
+}
+
+/**
+ * Base typography. This is not applied to elements which have an ancestor with a Tailwind text class.
+ */
+@layer base {
+  * {
+    font-family: var(--font-family-sans);
+  }
+  
+  :where(
+    :not(:has([class*=" text-"]), :not(:has([class^="text-"])))
+  ) {
+    h1 {
+      font-size: var(--text-2xl);     /* 30px */
+      font-weight: var(--font-weight-bold);
+      line-height: var(--leading-tight);
+    }
+
+    h2 {
+      font-size: var(--text-xl);      /* 24px */
+      font-weight: var(--font-weight-semibold);
+      line-height: var(--leading-tight);
+    }
+
+    h3 {
+      font-size: var(--text-lg);      /* 20px */
+      font-weight: var(--font-weight-semibold);
+      line-height: var(--leading-tight);
+    }
+
+    h4 {
+      font-size: var(--text-base);    /* 16px */
+      font-weight: var(--font-weight-semibold);
+      line-height: var(--leading-normal);
+    }
+
+    p {
+      font-size: var(--text-base);    /* 16px */
+      font-weight: var(--font-weight-medium);  /* Notion uses medium for UI text */
+      line-height: var(--leading-normal);
+    }
+
+    label {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: var(--leading-normal);
+    }
+
+    button {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: var(--leading-normal);
+    }
+
+    input {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);  /* Notion uses medium for input text */
+      line-height: var(--leading-normal);
+    }
+    
+    /* Small text option like Notion */
+    .text-small {
+      font-size: var(--text-sm);      /* 14px */
+    }
+    
+    /* Serif variant for elegant content */
+    .font-serif {
+      font-family: var(--font-family-serif);
+    }
+    
+    /* Mono variant for code */
+    .font-mono {
+      font-family: var(--font-family-mono);
+    }
+  }
+}
+
+html {
+  font-size: var(--font-size);
+}
+
+/* Notion-style microinteraction utilities */
+@layer utilities {
+  /* Smooth hover transitions - 100-150ms as per Notion */
+  .hover-notion {
+    @apply transition-all duration-150 ease-notion-ease-out;
+  }
+  
+  /* Quick click feedback */
+  .click-notion {
+    @apply transition-transform duration-100 ease-out active:animate-button-press;
+  }
+  
+  /* Pill-shaped hover effect for sidebar items */
+  .hover-pill {
+    @apply hover-notion hover:bg-sidebar-accent rounded-[4px] transition-colors duration-150;
+  }
+  
+  /* Drag handle that appears on hover */
+  .drag-handle {
+    @apply opacity-0 transition-opacity duration-100 group-hover:opacity-100;
+  }
+  
+  /* Chevron rotation for expandable items */
+  .chevron-expandable {
+    @apply transition-transform duration-200 ease-out;
+  }
+  
+  .chevron-expanded {
+    @apply rotate-90;
+  }
+  
+  /* Drag indicator lines */
+  .drag-indicator {
+    @apply opacity-0 scale-x-0 transition-all duration-150 ease-out;
+  }
+  
+  .drag-indicator-active {
+    @apply opacity-100 scale-x-100;
+  }
+  
+  /* Skeleton loading states */
+  .skeleton {
+    @apply bg-muted animate-skeleton-pulse rounded;
+  }
+  
+  /* Check animation for completed tasks */
+  .check-animated {
+    @apply animate-check-appear;
+  }
+  
+  /* Subtle highlight for newly created/moved items */
+  .highlight-temporary {
+    @apply bg-notion-yellow-bg transition-colors duration-1000 ease-out;
+  }
+  
+  /* Focus ring that matches Notion's style */
+  .focus-notion {
+    @apply focus:outline-none focus:ring-2 focus:ring-notion-blue-text/30 focus:ring-offset-0;
+  }
+  
+  /* Hover darkening for icons and text */
+  .hover-darken {
+    @apply text-muted-foreground hover:text-foreground transition-colors duration-150;
+  }
+  
+  /* Scale feedback for interactive elements */
+  .interactive-scale {
+    @apply hover:scale-[1.02] active:scale-[0.98] transition-transform duration-100;
+  }
+}
+
+/* Smooth scrolling for the entire application */
+* {
+  scroll-behavior: smooth;
+}
+
+/* Remove focus outline for mouse users, keep for keyboard users */
+.js-focus-visible :focus:not(.focus-visible) {
+  outline: none;
+}
+
+/* Drag and Drop Styles */
+.drag-active {
+  transition: all 0.2s ease;
+}
+
+.drag-over-move {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: rgb(59, 130, 246);
+}
+
+.drag-over-duplicate {
+  background-color: rgba(34, 197, 94, 0.1);
+  border-color: rgb(34, 197, 94);
+}
+
+.drag-drop-zone {
+  pointer-events: auto;
+  position: relative;
+  z-index: 20;
+}
+
+/* View Mode Selector Dropdown */
+.view-mode-dropdown {
+  z-index: 9999 !important;
+  background-color: hsl(var(--background)) !important;
+  opacity: 1 !important;
+}
+
+/* Asegurar que todos los dropdowns tengan z-index alto y fondo opaco */
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}
+
+[data-radix-dropdown-menu-content] {
+  background-color: hsl(var(--background)) !important;
+  opacity: 1 !important;
+}
+
+.view-mode-dropdown-item {
+  cursor: pointer;
+}
+
+.view-mode-dropdown-item[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

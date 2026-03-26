@@ -1,0 +1,58 @@
+/* Day Calendar Specific Styles */
+
+/* Grid base */
+.day-timeline-grid {
+  display: grid;
+  grid-template-columns: repeat(96, 1fr);
+}
+
+/* Week view scroll container */
+.week-timeline-container {
+  overflow-x: auto;
+  overflow-y: auto;
+  min-width: 100%;
+}
+
+/* Week grid - 7 days × 96 slots = 672 columns */
+.week-timeline-grid {
+  display: grid;
+  grid-template-columns: repeat(672, 1fr);
+  min-width: max-content;
+}
+
+/* Shift block */
+.day-shift-block {
+  position: absolute;
+  border-radius: 4px;
+  border-left: 3px solid;
+  transition: all 0.2s;
+}
+
+.day-shift-block:hover {
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Capacity bubble */
+.day-capacity-bubble {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+}
+
+/* Now line */
+.day-now-line {
+  position: absolute;
+  width: 2px;
+  height: 100%;
+  background: hsl(var(--destructive));
+  z-index: 100;
+  pointer-events: none;
+}

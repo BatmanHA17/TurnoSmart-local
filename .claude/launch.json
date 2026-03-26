@@ -1,0 +1,35 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Frontend (Vite Dev Server)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 8080
+    },
+    {
+      "name": "Supabase Local (DB + Auth + API + Studio)",
+      "runtimeExecutable": "supabase",
+      "runtimeArgs": ["start"],
+      "port": 54321
+    },
+    {
+      "name": "Supabase Edge Functions",
+      "runtimeExecutable": "supabase",
+      "runtimeArgs": ["functions", "serve"],
+      "port": 54321
+    },
+    {
+      "name": "Supabase Studio",
+      "runtimeExecutable": "supabase",
+      "runtimeArgs": ["start"],
+      "port": 54323
+    },
+    {
+      "name": "Inbucket (Email testing)",
+      "runtimeExecutable": "supabase",
+      "runtimeArgs": ["start"],
+      "port": 54324
+    }
+  ]
+}
