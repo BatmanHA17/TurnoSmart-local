@@ -207,9 +207,10 @@ export const Register = () => {
 
     try {
       // Crear usuario final con información completa
+      // Se genera un password aleatorio — el usuario autentica vía magic link, nunca lo ve
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email.toLowerCase().trim(),
-        password: "temp-password-123", // Temporal - se puede cambiar después
+        password: crypto.randomUUID() + crypto.randomUUID(),
         options: {
           emailRedirectTo: `${window.location.origin}/dashboard-owner`,
           data: {
@@ -272,10 +273,9 @@ export const Register = () => {
         setTimeout(async () => {
           try {
             // Intentar hacer login automáticamente
-            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-              email: email.toLowerCase().trim(),
-              password: "temp-password-123"
-            });
+            // Auto-login con password no es posible (password aleatorio) — redirigir a magic link
+            const signInData = null;
+            const signInError = new Error('passwordless-only');
             
             if (signInError) {
               console.warn('Auto-login failed:', signInError);

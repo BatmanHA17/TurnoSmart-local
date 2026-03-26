@@ -220,11 +220,12 @@ Deno.serve(async (req) => {
       canonical: canonicalRole,
     });
 
+    // SECURITY: action_link no se devuelve en la respuesta — solo se envía por email.
+    // Exponerlo en HTTP permitiría acceso si alguien intercepta la respuesta.
     return new Response(
       JSON.stringify({
         success: true,
         message: 'Magic link sent to your email. Check your inbox.',
-        action_link: linkData.properties?.action_link,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
