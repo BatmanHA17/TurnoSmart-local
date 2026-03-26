@@ -64,6 +64,16 @@ import { useWeekAudit } from "@/hooks/useShiftAudit";
 import { ShiftForAudit } from "@/utils/shiftAudit";
 import { AuditCellHighlight, EmployeeViolationBadge } from "@/components/audit";
 import { AuditViolationTooltip } from "@/components/audit/AuditViolationTooltip";
+import {
+  ShiftBlock,
+  absenceTypes,
+  isAbsenceType,
+  formatTimeFromDatabase,
+  calculateEndTime,
+  calculateShiftHours,
+  shouldCountHours,
+  getShiftHours,
+} from "@/utils/calendarShiftUtils";
 
 interface Employee {
   id: string;
@@ -72,25 +82,6 @@ interface Employee {
   department: string;
   workingHours: string;
   startDate?: string;
-}
-
-interface ShiftBlock {
-  id: string;
-  employeeId: string;
-  date: Date;
-  startTime?: string;
-  endTime?: string;
-  type: "morning" | "afternoon" | "night" | "absence";
-  color: string;
-  name?: string;
-  organization_id?: string;
-  absenceCode?: string;
-  hasBreak?: boolean;
-  breaks?: any[];
-  totalBreakTime?: number;
-  breakType?: string;
-  breakDuration?: string;
-  notes?: string;
 }
 
 interface GoogleCalendarStyleProps {
@@ -886,50 +877,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     return Math.round(totalHours * 10) / 10; // Redondear a 1 decimal
   };
 
-  // Tipos de ausencias disponibles
-  const absenceTypes = [
-    'Baja por enfermedad',
-    'Descanso semanal', 
-    'Vacaciones',
-    'Accidente laboral',
-    'Ausencia injustificada',
-    'Ausencia justificada',
-    'Baja parental',
-    'Baja por maternidad',
-    'Baja por paternidad',
-    'Día festivo',
-    'Enfermedad profesional',
-    'Excedencia sin sueldo',
-    'Formación',
-    'Indisponibilidad temporal',
-    'Paro parcial',
-    'Permiso retribuido',
-    'Reconocimiento médico',
-    'Recuperación día festivo',
-    'Recuperación por horas de ropa',
-    'Recuperación por horas nocturnas',
-    'Suspensión disciplinaria',
-    'Suspensión preventiva'
-  ];
-
-  // Función para verificar si un tipo de turno es una ausencia
-  const isAbsenceType = (shift: ShiftBlock): boolean => {
-    // Verificar por tipo
-    if (shift.type === 'absence') {
-      return true;
-    }
-    
-    // Verificar por nombre si existe
-    if (shift.name) {
-      return absenceTypes.some(absence => 
-        shift.name!.toLowerCase().includes(absence.toLowerCase()) ||
-        absence.toLowerCase().includes(shift.name!.toLowerCase())
-      );
-    }
-    
-    return false;
-  };
-
   // Función para calcular ausencias realizadas de la semana para un empleado
   const getWeeklyAbsenceHours = (employeeId: string): number => {
     const currentWeekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Lunes
@@ -1627,28 +1574,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
 
   // ❌ REMOVED: Auto-generation functionality causing infinite loop
 
-  // Función para formatear tiempo desde base de datos (remover segundos si existen)
-  const formatTimeFromDatabase = (timeString: string): string => {
-    // Si viene en formato HH:MM:SS, convertir a HH:MM
-    if (timeString.includes(':') && timeString.split(':').length === 3) {
-      const [hours, minutes] = timeString.split(':');
-      return `${hours}:${minutes}`;
-    }
-    return timeString;
-  };
-
-  // Función para calcular la hora de fin basada en hora de inicio y duración
-  const calculateEndTime = (startTime: string, hours: number): string => {
-    const [startHour, startMinute] = startTime.split(':').map(Number);
-    const startTotalMinutes = startHour * 60 + startMinute;
-    const endTotalMinutes = startTotalMinutes + (hours * 60);
-    
-    const endHour = Math.floor(endTotalMinutes / 60) % 24;
-    const endMinute = endTotalMinutes % 60;
-    
-    return `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
-  };
-
   // Efecto para procesar empleados seleccionados desde colaboradores
   useEffect(() => {
     if (selectedFromColaboradores.length > 0) {
@@ -1698,67 +1623,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
 
   // DISABLED: Sincronización automática en tiempo real eliminada para evitar modificaciones automáticas
   // Esta función estaba causando cambios automáticos cuando había modificaciones en la tabla colaboradores
-
-  // Calculate hours between start and end time - MOVED UP to avoid hoisting issue
-  const calculateShiftHours = (startTime?: string | null, endTime?: string | null): number => {
-    // Si alguno de los valores es null/undefined, retornar 8 horas para ausencias de día completo
-    if (!startTime || !endTime) {
-      return 8; // Asumimos 8 horas para ausencias de día completo
-    }
-    
-    const [startHour, startMin] = startTime.split(':').map(Number);
-    const [endHour, endMin] = endTime.split(':').map(Number);
-    
-    const startTotalMin = startHour * 60 + startMin;
-    let endTotalMin = endHour * 60 + endMin;
-    
-    // Handle overnight shifts
-    if (endTotalMin < startTotalMin) {
-      endTotalMin += 24 * 60;
-    }
-    
-    return (endTotalMin - startTotalMin) / 60;
-  };
-
-  // Determinar si un turno debe contar horas trabajadas 
-  const shouldCountHours = (shiftData: ShiftBlock): boolean => {
-    // Si es un turno de ausencia, verificar si es "Curso" que SÍ cuenta horas
-    if (shiftData.type === "absence") {
-      const shiftName = shiftData.name?.trim() || '';
-      // Solo "Curso" cuenta como horas trabajadas entre las ausencias
-      if (shiftName === 'Curso' || shiftName === 'C') {
-        return true;
-      }
-      return false;
-    }
-    
-    // Verificar por el nombre del horario si contiene códigos de ausencia (excepto Curso)
-    const absenceCodes = ['V', 'L', 'E', 'F', 'P', 'H', 'S', 'Vacaciones', 'Libre', 'Día Libre', 'Descanso Semanal', 'Descanso', 'Enfermo', 'Falta', 'Permiso', 'Horas Sindicales', 'Sancionado', 'Baja IT'];
-    const shiftName = shiftData.name?.trim() || '';
-    
-    // "Curso" y "C" SÍ cuentan horas, el resto de ausencias NO
-    if (shiftName === 'Curso' || shiftName === 'C') {
-      return true;
-    }
-    
-    // Si el nombre del horario es otro código de ausencia, NO cuenta horas
-    if (absenceCodes.includes(shiftName)) {
-      return false;
-    }
-    
-    // Si tiene absenceCode que no sea Curso, es una ausencia, NO cuenta horas
-    if (shiftData.absenceCode && shiftData.absenceCode !== 'C' && shiftData.absenceCode !== 'Curso') {
-      return false;
-    }
-    
-    // Solo los turnos de trabajo reales y Curso cuentan horas
-    return true;
-  };
-
-  // Calcular horas reales del turno considerando si debe contar o no
-  const getShiftHours = (shift: ShiftBlock): number => {
-    return shouldCountHours(shift) ? calculateShiftHours(shift.startTime, shift.endTime) : 0;
-  };
 
   // Calculate hours for each employee across the week
   const calculateEmployeeHours = (employeeId: string) => {
