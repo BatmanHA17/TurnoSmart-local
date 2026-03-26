@@ -23,10 +23,33 @@ interface ShiftChange {
   breakDuration?: string;
 }
 
+interface EmployeePublishData {
+  id: string;
+  name: string;
+  [key: string]: unknown;
+}
+
+interface PublishMetadata {
+  totalShifts?: number;
+  employeeCount?: number;
+  weekStart?: string;
+  weekEnd?: string;
+  [key: string]: unknown;
+}
+
+interface CalendarNotificationPayload {
+  org_id: string;
+  week_start: string;
+  week_end: string;
+  isModification: boolean;
+  shifts: ShiftChange[];
+  affectedEmployeeIds?: string[];
+}
+
 interface ShiftDataPayload {
   shifts: ShiftChange[];
-  employees?: any[];
-  metadata?: any;
+  employees?: EmployeePublishData[];
+  metadata?: PublishMetadata;
 }
 
 // Helper para normalizar horarios (HH:MM:SS → HH:MM)
@@ -173,7 +196,7 @@ export const useCalendarPublishState = (currentWeek: Date) => {
   };
 
   // Publish calendar
-  const publishCalendar = async (shiftBlocks: any[], employees: any[]) => {
+  const publishCalendar = async (shiftBlocks: ShiftChange[], employees: EmployeePublishData[]) => {
     if (!currentOrg?.org_id || !isManager) {
       setError('No tiene permisos para publicar calendarios');
       return false;
@@ -315,7 +338,7 @@ export const useCalendarPublishState = (currentWeek: Date) => {
 
       // Enviar notificaciones por email solo a empleados afectados
       try {
-        const notificationPayload: any = {
+        const notificationPayload: CalendarNotificationPayload = {
           org_id: currentOrg.org_id,
           week_start: format(weekStart, 'yyyy-MM-dd'),
           week_end: format(weekEnd, 'yyyy-MM-dd'),

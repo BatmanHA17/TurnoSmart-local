@@ -12,6 +12,16 @@ export interface Permission {
   is_configurable: boolean;
 }
 
+interface RolePermissionRow {
+  permission_name: string;
+  is_enabled: boolean;
+  is_configurable: boolean;
+  permissions?: {
+    category: string;
+    description: string;
+  };
+}
+
 export const useUserPermissions = (colaboradorId?: string) => {
   const { user } = useAuth();
   const { logActivity } = useActivityLog();
@@ -59,7 +69,7 @@ export const useUserPermissions = (colaboradorId?: string) => {
           return;
         }
 
-        const transformedPermissions = (rolePermissions || []).map((rp: any) => ({
+        const transformedPermissions = (rolePermissions as RolePermissionRow[] || []).map((rp) => ({
           permission_name: rp.permission_name,
           is_enabled: rp.is_enabled,
           category: rp.permissions?.category || 'unknown',
@@ -90,9 +100,9 @@ export const useUserPermissions = (colaboradorId?: string) => {
       }
 
       if (!mounted || mounted.current) setPermissions(data || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (import.meta.env.DEV) console.error('[useUserPermissions] Unexpected:', err);
-      if (!mounted || mounted.current) setError(err.message);
+      if (!mounted || mounted.current) setError(err instanceof Error ? err.message : 'Error inesperado');
     } finally {
       if (!mounted || mounted.current) setLoading(false);
     }
@@ -150,7 +160,7 @@ export const useUserPermissions = (colaboradorId?: string) => {
       // Refresh permissions after update
       await fetchPermissions();
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (import.meta.env.DEV) console.error('[useUserPermissions] Error in updatePermission:', err);
       return false;
     }
@@ -186,8 +196,8 @@ export const useUserPermissions = (colaboradorId?: string) => {
       const { error } = await supabase
         .from('user_roles')
         .insert({
-          role: role as any
-        } as any);
+          role: role
+        });
 
       if (error) {
         if (import.meta.env.DEV) console.error('[useUserPermissions] Error assigning role:', error);
@@ -219,7 +229,7 @@ export const useUserPermissions = (colaboradorId?: string) => {
       // Refresh permissions after role change
       await fetchPermissions();
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (import.meta.env.DEV) console.error('[useUserPermissions] Error in assignRole:', err);
       return false;
     }

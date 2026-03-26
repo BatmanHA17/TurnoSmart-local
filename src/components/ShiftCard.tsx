@@ -6,15 +6,22 @@ import { X, MoreVertical, Eye, Edit, Trash2, Plus, Coffee, GripVertical } from "
 import { format, differenceInHours, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { calculateTotalBreakTime, formatBreakTime } from "@/utils/breakCalculations";
+import { ShiftBlockDay } from "@/hooks/useDayCalendarData";
+
+interface ShiftEmployee {
+  id: string;
+  nombre: string;
+  apellidos: string;
+}
 
 interface ShiftCardProps {
-  shift: any;
-  employee: any;
-  onShowDetails: (shift: any) => void;
-  onEdit: (shift: any) => void;
-  onDelete: (shift: any) => void;
-  onAddShift?: (employee: any, date: Date, event?: React.MouseEvent) => void;
-  onSelect?: (shift: any) => void;
+  shift: ShiftBlockDay;
+  employee: ShiftEmployee;
+  onShowDetails: (shift: ShiftBlockDay) => void;
+  onEdit: (shift: ShiftBlockDay) => void;
+  onDelete: (shift: ShiftBlockDay) => void;
+  onAddShift?: (employee: ShiftEmployee, date: Date, event?: React.MouseEvent) => void;
+  onSelect?: (shift: ShiftBlockDay) => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
   isSelected?: boolean;

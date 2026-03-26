@@ -32,7 +32,7 @@ interface DayGridProps {
   shifts: ShiftBlockDay[];
   onUpdate: (shiftId: string, updates: Partial<ShiftBlockDay>) => Promise<void>;
   onDelete: (shiftId: string) => Promise<void>;
-  onCreate?: (employeeId: string, date: Date, shiftData: any) => Promise<void>;
+  onCreate?: (employeeId: string, date: Date, shiftData: Partial<ShiftBlockDay>) => Promise<void>;
   readOnly?: boolean;
   isPublished?: boolean;
 }
@@ -43,9 +43,9 @@ export function DayGrid({ employees, selectedDate, shifts, onUpdate, onDelete, o
   
   const [showShiftSelector, setShowShiftSelector] = useState<{position: {x: number, y: number}, employeeId: string, date: Date} | null>(null);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<{employeeId: string, date: Date} | null>(null);
-  const [showShiftDetails, setShowShiftDetails] = useState<{shift: any, employee: any} | null>(null);
-  const [editingShift, setEditingShift] = useState<any | null>(null);
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState<any>(null);
+  const [showShiftDetails, setShowShiftDetails] = useState<{shift: ShiftBlockDay, employee: Employee} | null>(null);
+  const [editingShift, setEditingShift] = useState<ShiftBlockDay | null>(null);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState<ShiftBlockDay | null>(null);
   
   // Estado para almacenar fechas de inicio de contrato
   const [contractStartDates, setContractStartDates] = useState<Record<string, string>>({});
@@ -157,7 +157,7 @@ export function DayGrid({ employees, selectedDate, shifts, onUpdate, onDelete, o
     });
   };
 
-  const handleShiftSelected = async (shiftData: any) => {
+  const handleShiftSelected = async (shiftData: Partial<ShiftBlockDay>) => {
     if (!showShiftSelector || !onCreate) return;
     
     const { employeeId, date } = showShiftSelector;
@@ -176,7 +176,7 @@ export function DayGrid({ employees, selectedDate, shifts, onUpdate, onDelete, o
     setShowShiftSelector(null);
   };
 
-  const handleShowDetails = (shift: any, employee: Employee) => {
+  const handleShowDetails = (shift: ShiftBlockDay, employee: Employee) => {
     // 🔒 Si está publicado, mostrar advertencia para roles con permisos
     if (isPublished && !permissions.isEmployee) {
       toast({
@@ -190,7 +190,7 @@ export function DayGrid({ employees, selectedDate, shifts, onUpdate, onDelete, o
     setShowShiftDetails({ shift, employee });
   };
 
-  const handleEditShift = (shift: any) => {
+  const handleEditShift = (shift: ShiftBlockDay) => {
     // 🔒 Solo permitir si tiene permisos de edición
     if (!permissions.canEditShifts) {
       toast({
@@ -203,7 +203,7 @@ export function DayGrid({ employees, selectedDate, shifts, onUpdate, onDelete, o
     setEditingShift(shift);
   };
 
-  const handleDeleteShift = (shift: any) => {
+  const handleDeleteShift = (shift: ShiftBlockDay) => {
     // 🔒 Solo permitir si tiene permisos de eliminación
     if (!permissions.canDeleteShifts) {
       toast({
@@ -287,7 +287,7 @@ export function DayGrid({ employees, selectedDate, shifts, onUpdate, onDelete, o
           const newEndTime = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}:00`;
           
           // Preparar actualizaciones
-          const updates: any = {
+          const updates: Partial<ShiftBlockDay> = {
             start_time: newStartTime,
             end_time: newEndTime
           };

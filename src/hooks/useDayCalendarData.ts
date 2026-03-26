@@ -18,6 +18,22 @@ export interface ShiftBlockDay {
   isOvernight: boolean;
 }
 
+interface CalendarShiftRow {
+  id: string;
+  employee_id: string;
+  shift_name: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  break_duration: string | null;
+  color: string;
+  notes: string | null;
+  colaboradores?: {
+    nombre: string;
+    apellidos: string;
+  } | null;
+}
+
 export function useDayCalendarData(selectedDate: Date, orgId: string) {
   const [shifts, setShifts] = useState<ShiftBlockDay[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +78,7 @@ export function useDayCalendarData(selectedDate: Date, orgId: string) {
         if (fetchError) throw fetchError;
 
         // Transform data to ShiftBlockDay format
-        const transformedShifts: ShiftBlockDay[] = (data || []).map((shift: any) => {
+        const transformedShifts: ShiftBlockDay[] = (data || []).map((shift: CalendarShiftRow) => {
           const startMinutes = timeToMinutes(shift.start_time || "00:00");
           const endMinutes = timeToMinutes(shift.end_time || "23:59");
           
@@ -92,9 +108,9 @@ export function useDayCalendarData(selectedDate: Date, orgId: string) {
         });
 
         setShifts(transformedShifts);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error fetching day shifts:", err);
-        setError(err.message);
+        setError(err instanceof Error ? err.message : String(err));
         setShifts([]);
       } finally {
         setLoading(false);
@@ -168,7 +184,7 @@ export function useWeekCalendarData(selectedDate: Date, orgId: string) {
         // Group shifts by day
         const grouped: Record<string, ShiftBlockDay[]> = {};
         
-        (data || []).forEach((shift: any) => {
+        (data || []).forEach((shift: CalendarShiftRow) => {
           const startMinutes = timeToMinutes(shift.start_time || "00:00");
           const endMinutes = timeToMinutes(shift.end_time || "23:59");
           
@@ -203,9 +219,9 @@ export function useWeekCalendarData(selectedDate: Date, orgId: string) {
         });
 
         setShiftsByDay(grouped);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error fetching week shifts:", err);
-        setError(err.message);
+        setError(err instanceof Error ? err.message : String(err));
         setShiftsByDay({});
       } finally {
         setLoading(false);
