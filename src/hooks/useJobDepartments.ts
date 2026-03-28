@@ -14,7 +14,7 @@ export function useJobDepartments() {
   const [departments, setDepartments] = useState<JobDepartment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
 
   const fetchDepartments = async () => {
     if (!currentOrg?.org_id) {

@@ -12,7 +12,7 @@ export interface TeamAssignment {
 }
 
 const useTeamAssignments = (colaboradorId: string) => {
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
   const [assignments, setAssignments] = useState<TeamAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

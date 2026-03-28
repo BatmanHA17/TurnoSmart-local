@@ -77,15 +77,15 @@ export const RotaFilter = ({ selectedRotaId, onRotaChange, currentUserRole }: Ro
         <Calendar className="h-4 w-4 text-primary" />
         <span className="text-sm font-medium">Rota:</span>
       </div>
-      <Select 
-        value={selectedRotaId || ''} 
-        onValueChange={(value) => onRotaChange(value === '' ? null : value)}
+      <Select
+        value={selectedRotaId ?? 'all'}
+        onValueChange={(value) => onRotaChange(value === 'all' ? null : value)}
       >
         <SelectTrigger className="w-[200px]">
           <SelectValue placeholder="Seleccionar rota" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">Todas las rotas</SelectItem>
+          <SelectItem value="all">Todas las rotas</SelectItem>
           {availableRotas.map((rota) => (
             <SelectItem key={rota.id} value={rota.id}>
               <div className="flex items-center gap-2">

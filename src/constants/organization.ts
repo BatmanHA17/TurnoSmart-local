@@ -1,28 +1,18 @@
 // ============= Organization Constants =============
 // Constantes centralizadas para evitar datos hardcodeados
 
-// Default organization data
-export const DEFAULT_ORGANIZATION = {
-  id: 'default-org',
-  name: 'GOTHAM',
-  type: 'establishment' as const
-};
+// Default organization data - NOW LOADED FROM DATABASE
+// DO NOT HARDCODE - Load from useCurrentOrganization() hook
+export const DEFAULT_ORGANIZATION = null;
 
-// Equipos predeterminados (anteriormente teams/planning)
-export const DEFAULT_TEAMS = [
-  { id: "cocina", name: "Cocina" },
-  { id: "bares", name: "Bares" },
-  { id: "recepcion", name: "Recepción" },
-  { id: "limpieza", name: "Limpieza" },
-  { id: "mantenimiento", name: "Mantenimiento" },
-  { id: "administracion", name: "Administración" }
-];
+// Teams/Departments - NOW LOADED FROM job_titles TABLE IN DATABASE
+// DO NOT HARDCODE - Load from useJobTitles() hook
+export const DEFAULT_TEAMS = [];
 
 // Filter options that appear across the app
 export const ORGANIZATION_FILTER_OPTIONS = {
   ALL: 'all',
-  GOTHAM: 'gotham',
-  DEFAULT: 'default'
+  RECEPTION: 'recepcion'
 } as const;
 
 // Organization roles hierarchy

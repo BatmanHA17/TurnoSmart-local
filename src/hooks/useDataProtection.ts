@@ -21,7 +21,7 @@ interface OperationBackup {
 export function useDataProtection() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
   const { user } = useAuth();
 
   /**

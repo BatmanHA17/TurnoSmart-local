@@ -26,6 +26,8 @@ import { ShiftSelectorPopup } from "./ShiftSelectorPopup";
 import { UnifiedCalendarHeader } from "./calendar/UnifiedCalendarHeader";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRoleCanonical } from "@/hooks/useUserRoleCanonical";
+import { useCalendarEmployeeFilter } from "@/hooks/useCalendarEmployeeFilter";
+import { useEmployeeSortOrder } from "@/hooks/useEmployeeSortOrder";
 
 import { cn } from "@/lib/utils";
 import { getSavedShifts } from "@/store/savedShiftsStore";
@@ -119,7 +121,7 @@ const getShiftCode = (shift: ShiftBlock): { letter: string; time?: string } => {
 };
 
 export function MonthlyCalendarView() {
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
   const { user } = useAuth();
   const { role } = useUserRoleCanonical();
   const isEmployee = role === 'EMPLOYEE';
@@ -133,6 +135,13 @@ export function MonthlyCalendarView() {
   
   const [currentDate, setCurrentDate] = useState(new Date());
   const [employees, setEmployees] = useState<Employee[]>([]);
+
+  // 🆕 Hook para sincronizar filtro de empleados eliminados entre vistas
+  const { filteredEmployees } = useCalendarEmployeeFilter(employees, currentOrg?.org_id || null);
+
+  // 🆕 Hook para sincronizar ordenamiento entre TODAS las vistas
+  const { sortedEmployees } = useEmployeeSortOrder(filteredEmployees);
+
   const [shiftBlocks, setShiftBlocks] = useState<ShiftBlock[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedShift, setSelectedShift] = useState<ShiftBlock | null>(null);
@@ -517,12 +526,12 @@ export function MonthlyCalendarView() {
             className="flex-1 overflow-y-auto overflow-x-hidden"
             style={{ scrollbarWidth: 'none' }}
           >
-            {employees.length === 0 ? (
+            {sortedEmployees.length === 0 ? (
               <div className="p-4 text-center text-muted-foreground text-sm">
                 No hay empleados disponibles
               </div>
             ) : (
-              employees.map((employee) => {
+              sortedEmployees.map((employee) => {
                 const stats = getMonthlyStats(employee.id);
                 const contractHours = employee.contractHours || 40;
                 const monthlyContractHours = contractHours * 4;
@@ -646,7 +655,7 @@ export function MonthlyCalendarView() {
             </div>
 
             {/* Filas de empleados */}
-            {employees.map((employee) => (
+            {sortedEmployees.map((employee) => (
               <div key={employee.id} className="flex border-b h-[44px]">
                 {monthDays.map((day, dayIndex) => {
                   const shifts = getShiftsForCell(employee.id, day);

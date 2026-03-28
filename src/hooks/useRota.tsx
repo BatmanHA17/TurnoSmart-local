@@ -37,7 +37,7 @@ export interface RotaMember {
 export const useRota = (orgId?: string) => {
   const [rotas, setRotas] = useState<Rota[]>([]);
   const [loading, setLoading] = useState(true);
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
 
   const effectiveOrgId = orgId || currentOrg?.org_id;
 
@@ -210,7 +210,7 @@ export const useRota = (orgId?: string) => {
 export const useColaboradorRotas = (colaboradorId?: string) => {
   const [colaboradorRotas, setColaboradorRotas] = useState<Rota[]>([]);
   const [loading, setLoading] = useState(false);
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
 
   const fetchColaboradorRotas = async () => {
     if (!colaboradorId || !currentOrg?.org_id) return;

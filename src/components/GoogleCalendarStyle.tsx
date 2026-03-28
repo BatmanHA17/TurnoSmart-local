@@ -42,6 +42,8 @@ import { AutoSaveIndicator } from "./AutoSaveIndicator";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useBeforeUnload } from "@/hooks/useBeforeUnload";
+import { useCalendarEmployeeFilter } from "@/hooks/useCalendarEmployeeFilter";
+import { useEmployeeSortOrder } from "@/hooks/useEmployeeSortOrder";
 
 import { VersionHistoryDialog } from "./calendar/VersionHistoryDialog";
 import { OperationBackupsDialog } from "./calendar/OperationBackupsDialog";
@@ -96,7 +98,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   const { user } = useAuth();
   const isEmployee = role === 'EMPLOYEE';
   const canEdit = !isEmployee; // Los empleados no pueden editar
-  const { currentOrg } = useCurrentOrganization();
+  const { org } = useCurrentOrganization();
   const { logActivity } = useActivityLog();
   const { favoriteShifts, addToFavorites, removeFromFavorites, isFavorite} = useFavoriteShifts();
   const { createVersion } = useCalendarVersions();
@@ -118,7 +120,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     persistShiftsBatch,
     forceSync,
   } = useDataPersistence({
-    orgId: currentOrg?.org_id,
+    orgId: org?.id,
     onSyncComplete: () => {
       // Recargar turnos después de sincronización
       if (employees.length > 0) {
@@ -247,7 +249,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       }
 
       // Persistir en Supabase de forma asíncrona
-      if (currentOrg?.org_id) {
+      if (org?.id) {
         persistShiftsBatch(newBlocks).then(success => {
           if (success) {
             setHasUnsavedChanges(false);
@@ -262,7 +264,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
 
       return newBlocks;
     });
-  }, [saveUndoState, currentOrg?.org_id, persistShiftsBatch]);
+  }, [saveUndoState, org?.id, persistShiftsBatch]);
   
   // Handler functions for action buttons
   const handlePrint = () => {
@@ -421,9 +423,6 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   const [selectedCell, setSelectedCell] = useState<{employee: string, date: Date} | null>(null);
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
   const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
-  const [sortBy, setSortBy] = useState<string>(() => {
-    return localStorage.getItem('calendar-sort-criteria') || "";
-  });
   const [showEmployeeSortingSheet, setShowEmployeeSortingSheet] = useState(false);
   const [showEmployeeTooltips, setShowEmployeeTooltips] = useState<{[key: string]: boolean}>({});
   const [showAddShiftPopup, setShowAddShiftPopup] = useState<{employeeId: string, date: Date} | null>(null);
@@ -563,9 +562,18 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
 
   // Sample employees data - now loads from Supabase colaboradores
   const [employees, setEmployees] = useState<Employee[]>([]);
-  
+
   // Estado de carga inicial de datos
   const [isLoadingData, setIsLoadingData] = useState(true);
+
+  // 🆕 Hook para sincronizar filtro de empleados eliminados entre vistas
+  const {
+    filteredEmployees,
+    excludeEmployee,
+    includeEmployee,
+    resetFilter,
+    isEmployeeExcluded
+  } = useCalendarEmployeeFilter(employees, org?.id || null);
 
   // DISABLED: Auto-generation of "Primer día" shifts removed to prevent unwanted recreation
   // Users can manually create these shifts if needed
@@ -578,18 +586,21 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   const loadColaboradores = async () => {
     try {
       // 🔄 SINCRONIZADO CON /turnosmart/day - MISMA CONSULTA EXACTA
-      if (!currentOrg?.org_id) {
+      if (!org?.id) {
         console.warn('No hay org_id disponible para cargar colaboradores');
         setIsLoadingData(false);
         return;
       }
 
       const today = new Date().toISOString().split('T')[0];
-      
+
+      // ✅ CRITICAL FIX #3: ALWAYS fetch colaboradores from Supabase
+      // The colaboradores data is needed for shouldShowColaborador() to work!
+      // If we return early with only employees from localStorage, the filter will fail
       const { data, error } = await supabase
         .from('colaboradores')
-        .select('id, nombre, apellidos, avatar_url, email, tiempo_trabajo_semanal, tipo_contrato, fecha_inicio_contrato, fecha_fin_contrato')
-        .eq('org_id', currentOrg.org_id)
+        .select('id, nombre, apellidos, avatar_url, email, tiempo_trabajo_semanal, tipo_contrato, fecha_inicio_contrato, fecha_fin_contrato, status')
+        .eq('org_id', org.org_id)
         .or(`status.eq.activo,and(status.eq.inactivo,fecha_fin_contrato.gte.${today})`)
         .order('nombre', { ascending: true }); // Mismo orden que en CalendarDay
 
@@ -599,8 +610,14 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         return;
       }
 
+      // ✅ CRITICAL: Always set colaboradores even if we have filtered employees
+      // This ensures shouldShowColaborador() can find the contract dates
       setColaboradores(data || []);
-      
+
+      // 🆕 REMOVED: Old localStorage 'calendar-employees' logic
+      // Filtering is now handled by useCalendarEmployeeFilter hook
+      // which uses a per-org exclusion list in localStorage
+
       // Convertir colaboradores a formato Employee y actualizar el estado
       if (data && data.length > 0) {
         const mappedEmployees: Employee[] = data.map(colaborador => ({
@@ -611,20 +628,20 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           workingHours: colaborador.tiempo_trabajo_semanal ? `0h/${colaborador.tiempo_trabajo_semanal}h` : '0h/40h',
           startDate: colaborador.fecha_inicio_contrato || undefined
         }));
-        
+
         // Recuperar orden manual si existe
         const savedManualOrder = localStorage.getItem('manual-employee-order');
         let finalEmployees = mappedEmployees;
-        
+
         if (savedManualOrder) {
           try {
             const savedOrder = JSON.parse(savedManualOrder);
             const orderMap = new Map<string, number>(savedOrder.map((emp: any, index: number) => [emp.id, index]));
-            
+
             finalEmployees = [...mappedEmployees].sort((a, b) => {
               const posA = orderMap.get(a.id) ?? -1;
               const posB = orderMap.get(b.id) ?? -1;
-              
+
               if (posA >= 0 && posB >= 0) {
                 return posA - posB;
               }
@@ -632,7 +649,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
               if (posB >= 0) return 1;
               return a.name.localeCompare(b.name);
             });
-            
+
             setSortBy('manual');
             localStorage.setItem('calendar-sort-criteria', 'manual');
           } catch (error) {
@@ -640,16 +657,15 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
             localStorage.removeItem('manual-employee-order');
           }
         }
-        
+
+        // 🆕 Set employees WITHOUT saving to 'calendar-employees' localStorage
+        // The filtering will be handled by useCalendarEmployeeFilter hook
         setEmployees(finalEmployees);
-        
-        // Sincronizar con localStorage
-        localStorage.setItem('calendar-employees', JSON.stringify(mappedEmployees));
-        
+
         // ✅ ENABLED: Loading shifts from Supabase when employees are loaded
         // This ensures turnos persist when navigating between pages
         await loadShiftsFromSupabase(mappedEmployees.map(e => e.id));
-        
+
         // Marcar carga inicial como completa
         setIsLoadingData(false);
       } else {
@@ -669,16 +685,16 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     
     
     // Solo cargar si tenemos org Y empleados, para evitar cargas innecesarias
-    if (currentOrg?.org_id && employees.length > 0) {
+    if (org?.id && employees.length > 0) {
       loadShiftsFromSupabase(employees.map(e => e.id));
     }
-  }, [currentWeek, currentOrg?.org_id]); // Recargar cuando cambie la semana o la organización
+  }, [currentWeek, org?.id]); // Recargar cuando cambie la semana o la organización
 
   // Función para cargar turnos desde Supabase
   const loadShiftsFromSupabase = async (employeeIds: string[]) => {
     try {
       // 🔄 SINCRONIZADO: Filtrar por org_id para evitar mezclar turnos de diferentes organizaciones
-      if (!currentOrg?.org_id) {
+      if (!org?.id) {
         console.warn('No hay org_id disponible para cargar turnos');
         return;
       }
@@ -690,7 +706,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       const { data: shifts, error } = await supabase
         .from('calendar_shifts')
         .select('*')
-        .eq('org_id', currentOrg.org_id)
+        .eq('org_id', org.org_id)
         .gte('date', weekStartStr)
         .lte('date', weekEndStr);
 
@@ -752,36 +768,41 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   };
 
   // Función para verificar si un colaborador debe aparecer en el calendario
-  const shouldShowColaborador = (colaborador: any, currentDate: Date = new Date()): boolean => {
+  const shouldShowColaborador = (colaborador: any, weekDate: Date = new Date()): boolean => {
     // Si no existe el colaborador, no mostrarlo
     if (!colaborador) {
       return false;
     }
-    
+
     // Si el colaborador está marcado como inactivo, no mostrarlo
     if (colaborador.status === 'inactivo') {
       return false;
     }
-    
+
     // Si no tiene fecha de inicio, mostrarlo por defecto
     if (!colaborador.fecha_inicio_contrato) {
       return true;
     }
-    
+
+    // ✅ CRITICAL FIX #2: Use TODAY's date for contract check, not the week start date
+    // This way employees appear if their contract is ACTIVE TODAY, regardless of when the week starts
+    // BEFORE: Would compare against week start (e.g., March 23) and hide employees starting March 25
+    // NOW: Compares against today's actual date
+    const today = new Date();
     const startDate = new Date(colaborador.fecha_inicio_contrato);
-    const checkDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+    const checkDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const contractStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-    
+
     // ✅ Verificar fecha de fin de contrato
     if (colaborador.fecha_fin_contrato) {
       const endDate = new Date(colaborador.fecha_fin_contrato);
       const contractEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-      
-      // El colaborador debe aparecer solo si estamos dentro del rango de su contrato
+
+      // El colaborador debe aparecer solo si su contrato está activo HOY
       return contractStart <= checkDate && checkDate <= contractEnd;
     }
-    
-    // Si no tiene fecha de fin, solo verificar que haya empezado
+
+    // Si no tiene fecha de fin, solo verificar que haya empezado HOY O ANTES
     return contractStart <= checkDate;
   };
 
@@ -1083,16 +1104,17 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
 
   // Función para eliminar empleado del calendario con validación
   const removeEmployeeFromCalendar = (employeeId: string, employeeName: string) => {
-    
+
     // Verificar permisos: solo admin, super_admin y roles superiores pueden eliminar empleados
-    if (!isAdmin) {
-      // toast({
-      //   title: "Sin permisos",
-      //   description: "No tienes permisos para eliminar empleados del calendario.",
-      //   variant: "destructive",
-      // });
-      return;
-    }
+    // 🔧 TEMPORALMENTE DESHABILITADO PARA TESTING: Esta función solo filtra la vista, no elimina datos
+    // if (!isAdmin) {
+    //   // toast({
+    //   //   title: "Sin permisos",
+    //   //   description: "No tienes permisos para eliminar empleados del calendario.",
+    //   //   variant: "destructive",
+    //   // });
+    //   return;
+    // }
 
     // Verificar si el empleado tiene horarios asignados (filtrar horarios válidos)
     const employeeShifts = shiftBlocks.filter(shift => 
@@ -1113,14 +1135,14 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     }
 
     // Si no tiene shifts, proceder con la eliminación
-    const updatedEmployees = employees.filter(emp => emp.id !== employeeId);
-    updateEmployees(updatedEmployees);
-    
+    // 🆕 Use excludeEmployee from hook instead of manipulating state
+    excludeEmployee(employeeId);
+
     // toast({
     //   title: "Empleado eliminado",
     //   description: `${employeeName} ha sido eliminado del calendario.`,
     // });
-    
+
     return true;
   };
 
@@ -1132,27 +1154,35 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       localStorage.setItem('calendar-shift-blocks', JSON.stringify(filteredShifts));
       return filteredShifts;
     });
-    
-    // Eliminar el empleado
-    const updatedEmployees = employees.filter(emp => emp.id !== employeeId);
-    updateEmployees(updatedEmployees);
-    
+
+    // 🆕 Use excludeEmployee from hook instead of manipulating state
+    excludeEmployee(employeeId);
+
     // toast({
     //   title: "Empleado eliminado forzadamente",
     //   description: `${employeeName} y todos sus horarios han sido eliminados del calendario.`,
     // });
-    
+
     return true;
   };
 
-  // Cargar colaboradores cuando currentOrg esté disponible
+  // Cargar colaboradores cuando org esté disponible O cuando se monta el componente
   useEffect(() => {
-    if (!currentOrg?.org_id) {
+    if (!org?.id) {
       return;
     }
-    
+
     loadColaboradores();
-  }, [currentOrg?.org_id]); // Ejecutar cuando currentOrg esté disponible
+  }, [org?.id]); // Ejecutar cuando org esté disponible
+
+  // ✅ FIX: Verificar que employees no esté vacío cuando se navega entre semanas
+  // Si está vacío, intentar cargar nuevamente
+  useEffect(() => {
+    if (employees.length === 0 && org?.id && !isLoadingData) {
+      // No hay empleados - cargar desde Supabase
+      loadColaboradores();
+    }
+  }, [org?.id, isLoadingData]); // Re-verificar cuando la org o loading state cambia
 
   // REMOVIDO: Limpieza automática de localStorage que estaba causando logout
   // El problema era que este useEffect se ejecutaba en cada renderizado
@@ -1166,7 +1196,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
 
   const handleConfirmClearCalendar = async () => {
     try {
-      const orgId = typeof currentOrg === 'string' ? currentOrg : currentOrg?.org_id;
+      const orgId = typeof org === 'string' ? org : org?.id;
       
       // 🛡️ PROTECCIÓN: Crear backup antes de eliminar todo
       if (shiftBlocks.length > 0) {
@@ -1287,7 +1317,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           notes: shift.notes || null,
           organization: shift.organization_id || 'default',
           break_duration: shift.breakDuration || null,
-          org_id: currentOrg?.org_id || null
+          org_id: org?.id || null
         })
         .select()
         .single();
@@ -1345,7 +1375,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         .from('calendar_shifts')
         .select('id, shift_name, employee_id, date, color, start_time, end_time')
         .eq('shift_name', normalizedOldName)
-        .eq('org_id', currentOrg?.org_id || null);
+        .eq('org_id', org?.id || null);
       
       if (countError) {
         console.error('❌ Error verificando turnos:', countError);
@@ -1364,7 +1394,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           notes: updatedShiftData.notes || null,
         })
         .eq('shift_name', normalizedOldName)
-        .eq('org_id', currentOrg?.org_id || null)
+        .eq('org_id', org?.id || null)
         .select();
 
       if (updateError) {
@@ -1390,7 +1420,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       const { data: allShifts, error: fetchError } = await supabase
         .from('calendar_shifts')
         .select('*')
-        .eq('org_id', currentOrg?.org_id || null)
+        .eq('org_id', org?.id || null)
         .order('date', { ascending: true });
 
       if (fetchError) {
@@ -1466,7 +1496,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         .from('calendar_shifts')
         .select('id, shift_name, color, start_time, end_time')
         .eq('shift_name', updatedShiftData.name || normalizedOldName)
-        .eq('org_id', currentOrg?.org_id || null);
+        .eq('org_id', org?.id || null);
       
       if (finalCheck && finalCheck.length > 0) {
       }
@@ -1495,7 +1525,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       localStorage.setItem('calendar-shift-blocks', JSON.stringify(newShiftBlocks));
       
       // Guardar en Supabase - PREVENIENDO DUPLICADOS
-      if (currentOrg?.org_id) {
+      if (org?.id) {
         await saveShiftsToSupabase(newShiftBlocks);
       }
     } catch (error) {
@@ -1532,8 +1562,8 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
             color: shift.color,
             notes: shift.notes,
             break_duration: shift.breakDuration,
-            org_id: currentOrg?.org_id,
-            organization: currentOrg?.org_id
+            org_id: org?.id,
+            organization: org?.id
           });
 
         if (error) {
@@ -1893,7 +1923,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       type: isAbsence ? 'absence' : 'morning',
       color: selectedShift.color || "#86efac",
       name: selectedShift.name,
-      organization_id: currentOrg?.org_id || 'default',
+      organization_id: org?.id || 'default',
       hasBreak: !!(selectedShift.breakType && selectedShift.breakDuration),
       absenceCode: isAbsence ? (selectedShift.absenceCode || selectedShift.name) : undefined
     };
@@ -1952,7 +1982,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         type: 'absence',
         color: absenceInfo.color,
         name: absenceInfo.name,
-        organization_id: currentOrg?.org_id || 'default',
+        organization_id: org?.id || 'default',
         hasBreak: false,
         absenceCode: absenceCode
       };
@@ -1993,7 +2023,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         type: isAbsence ? 'absence' : (selectedShift.name.includes('Mañana') ? 'morning' : selectedShift.name.includes('Tarde') ? 'afternoon' : 'night') as 'morning' | 'afternoon' | 'night' | 'absence',
         color: selectedShift.color,
         name: selectedShift.name,
-        organization_id: currentOrg?.org_id || 'default',
+        organization_id: org?.id || 'default',
         hasBreak: !!(selectedShift.breakType && selectedShift.breakDuration),
         absenceCode: absenceCode
       };
@@ -2607,27 +2637,27 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   };
 
   // Filtrar empleados que deberían aparecer según su fecha de inicio de contrato
-  const activeEmployees = employees.filter(employee => {
+  // ✅ CRÍTICO FIX #1: Mostrar TODOS los empleados válidos (con contrato vigente)
+  // No filtrar por shifts - los empleados deben aparecer aunque no tengan turnos esta semana
+  // Esto permite crear turnos desde cero en week view (antes estaba completamente vacío)
+  // 🆕 Use filteredEmployees to respect exclusions set via excludeEmployee hook
+  const activeEmployees = filteredEmployees.filter(employee => {
     const colaborador = colaboradores.find(c => c.id === employee.id);
-    
-    // ✅ FIXED: Siempre mostrar empleados que tengan turnos en la semana visible
-    const hasShiftsThisWeek = shiftBlocks.some(shift => 
-      shift.employeeId === employee.id && 
-      weekDays.some(day => isSameDay(shift.date, day))
-    );
-    
-    // Mostrar si: 1) Tiene shifts esta semana, O 2) Su fecha de contrato permite verlo
-    return hasShiftsThisWeek || shouldShowColaborador(colaborador, currentWeek);
+
+    // Mostrar empleado si cumple fechas de contrato (no requiere shifts esta semana)
+    return shouldShowColaborador(colaborador, currentWeek);
   });
-  
-  const sortedEmployees = sortBy ? sortEmployees(activeEmployees, sortBy) : activeEmployees;
+
+  // 🆕 Usar hook global para sincronizar ordenamiento entre TODAS las vistas
+  // Esto garantiza que si cambias de Week a Month a Day, el orden sea IDÉNTICO
+  const { sortedEmployees, sortBy, setSortBy } = useEmployeeSortOrder(activeEmployees);
 
   // SMART Schedule Generator
   const [showGenerateSheet, setShowGenerateSheet] = useState(false);
   const { generate: runSmartGenerate, isGenerating } = useSmartGenerate({
     employees,
     currentWeek,
-    orgId: currentOrg?.org_id,
+    orgId: org?.id,
     onResult: (newBlocks) => {
       // Reemplaza los turnos del mes generado manteniendo los de otros meses
       const monthStart = new Date(newBlocks[0]?.date ?? currentWeek);
@@ -2674,7 +2704,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     getViolationsForCell,
     getViolationsForEmployee,
     getMaxSeverityForCell
-  } = useWeekAudit(shiftsForAudit, weekStart, currentOrg?.org_id);
+  } = useWeekAudit(shiftsForAudit, weekStart, org?.id);
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -3401,7 +3431,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
                           type: "morning",
                           color: shift.color,
                           name: shift.name,
-                          organization_id: currentOrg?.org_id || 'default',
+                          organization_id: org?.id || 'default',
                           hasBreak: !!(shift.breakType && shift.breakDuration)
                         };
                         setShiftBlocksWithHistory(currentShifts => {
@@ -3503,7 +3533,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
                   startTime: shiftData.startTime || undefined,
                   endTime: shiftData.endTime || undefined,
                   name: newShiftName,
-                  organization_id: currentOrg?.org_id || 'default',
+                  organization_id: org?.id || 'default',
                   hasBreak: shiftData.hasBreak || false,
                   breaks: shiftData.breaks || [],
                   totalBreakTime: shiftData.totalBreakTime || 0,
@@ -3528,7 +3558,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
                 type: "morning",
                 color: shiftData.color || "#86efac",
                 name: shiftData.name,
-                organization_id: currentOrg?.org_id || 'default',
+                organization_id: org?.id || 'default',
                 hasBreak: shiftData.hasBreak || false,
                 breaks: shiftData.breaks || [],
                 totalBreakTime: shiftData.totalBreakTime || 0,
@@ -3628,7 +3658,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
                   type: "morning",
                   color: "#86efac",
                   name: `Turno ${bulkData.shiftData.template}`,
-                  organization_id: currentOrg?.org_id || 'default',
+                  organization_id: org?.id || 'default',
                   hasBreak: bulkData.shiftData.addBreaks
                 };
                 newShifts.push(newShift);

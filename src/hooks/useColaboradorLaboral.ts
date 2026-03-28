@@ -23,7 +23,7 @@ export interface ColaboradorLaboralData {
  * Consolida datos de jobs, teams y departments en una sola fuente
  */
 export const useColaboradorLaboral = (colaboradorId: string | undefined) => {
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
   const [refetchTrigger, setRefetchTrigger] = useState(0);
   const [data, setData] = useState<ColaboradorLaboralData>({
     assignments: [],

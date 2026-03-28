@@ -9,14 +9,14 @@ import { TurnoSmartLanding } from "@/components/turnosmart/TurnoSmartLanding";
 import NotFound from "@/pages/NotFound";
 import Auth from "@/pages/Auth";
 import { SectionErrorBoundary } from "@/components/ErrorBoundary";
+import { ReceptionEmployeeManager } from "@/components/ReceptionEmployeeManager";
+import { TestReceptionEmployeeManager } from "@/pages/TestReceptionEmployeeManager";
 
 // Lazy imports — se cargan solo cuando el usuario navega a esa ruta
 const Index = React.lazy(() => import("@/pages/Index"));
 const Dashboard = React.lazy(() => import("@/pages/Dashboard"));
 const Login = React.lazy(() => import("@/pages/Login"));
 const PasswordReset = React.lazy(() => import("@/pages/PasswordReset"));
-const TestPasswordFlow = React.lazy(() => import("@/pages/TestPasswordFlow"));
-const DatabaseCleanup = React.lazy(() => import("@/pages/DatabaseCleanup"));
 const TurnoPublicView = React.lazy(() => import("@/pages/TurnoPublicView"));
 const AdminDashboard = React.lazy(() => import("@/pages/AdminDashboard"));
 const AdminUserManagement = React.lazy(() => import("@/pages/AdminUserManagement"));
@@ -39,7 +39,6 @@ const DashboardAdministrator = React.lazy(() => import("@/pages/DashboardAdminis
 const DashboardOwner = React.lazy(() => import("@/pages/DashboardOwner"));
 const RoleBasedRedirect = React.lazy(() => import("@/components/RoleBasedRedirect"));
 const RoleBasedDashboard = React.lazy(() => import("@/components/RoleBasedDashboard"));
-const DebugEmails = React.lazy(() => import("@/pages/DebugEmails"));
 const MiActividad = React.lazy(() => import("@/pages/MiActividad"));
 
 // Colaboradores
@@ -95,7 +94,6 @@ const CalendarMonth = React.lazy(() => import("@/pages/CalendarMonth"));
 const BiWeeklyCalendarPage = React.lazy(() =>
   import("@/components/BiWeeklyCalendarView").then(m => ({ default: m.BiWeeklyCalendarView }))
 );
-const DevLogin = React.lazy(() => import("@/pages/DevLogin"));
 const BancoHoras = React.lazy(() => import("@/pages/BancoHoras"));
 const GestionJornadaLaboralCrear = React.lazy(() => import("@/pages/GestionJornadaLaboralCrear"));
 const SolicitudesCambio = React.lazy(() => import("@/pages/SolicitudesCambio"));
@@ -183,12 +181,14 @@ export const AppRoutes = () => {
           {/* Landing Page - Pública */}
           <Route path="/home" element={<TurnoSmartLanding />} />
 
+          {/* Test Pages - Pública para testing sin auth */}
+          <Route path="/test/reception-employees" element={<TestReceptionEmployeeManager />} />
+
           {/* Ruta raíz - Decide entre landing o dashboard */}
           <Route path="/" element={<LandingOrDashboard />} />
 
           {/* Authentication */}
           <Route path="/auth" element={<Auth />} />
-          <Route path="/dev-login" element={<DevLogin />} />
           <Route path="/login" element={<Navigate to="/auth" replace />} />
           <Route path="/password-reset" element={<PasswordReset />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
@@ -204,17 +204,12 @@ export const AppRoutes = () => {
           <Route path="/onboarding" element={<ProtectedRoute><OnboardingWizard /></ProtectedRoute>} />
 
           {/* Legacy redirects */}
-          <Route path="/register" element={<Navigate to="/auth" replace />} />
+          <Route path="/register" element={<Navigate to="/auth?mode=register" replace />} />
           <Route path="/users/sign_in" element={<Navigate to="/auth" replace />} />
 
           {/* Legal pages */}
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
-
-          {/* Dev/debug pages */}
-          <Route path="/test-password-flow" element={<TestPasswordFlow />} />
-          <Route path="/database-cleanup" element={<DatabaseCleanup />} />
-          <Route path="/debug-emails" element={<DebugEmails />} />
 
           {/* Dashboard */}
           <Route path="/dashboard" element={<ProtectedRoute><SectionErrorBoundary label="dashboard"><RoleBasedDashboard /></SectionErrorBoundary></ProtectedRoute>} />
@@ -234,24 +229,31 @@ export const AppRoutes = () => {
           <Route path="/mi-actividad" element={<ProtectedRoute><MiActividad /></ProtectedRoute>} />
 
           {/* Colaboradores */}
-          <Route path="/colaboradores">
+          <Route path="/turnosmart/collaborators">
             <Route index element={<ProtectedRoute><SectionErrorBoundary label="colaboradores"><Colaboradores /></SectionErrorBoundary></ProtectedRoute>} />
             <Route path="new" element={<ProtectedRoute><AddColaboradorSheetRoute /></ProtectedRoute>} />
           </Route>
 
+          {/* Reception Employee Manager - Phase 3 Testing */}
+          <Route path="/turnosmart/reception-employees" element={<ProtectedRoute><ReceptionEmployeeManager /></ProtectedRoute>} />
+
           {/* Ausencias routes */}
-          <Route path="/ausencias">
+          <Route path="/turnosmart/absences">
             <Route path="request/new" element={<ProtectedRoute><AddAbsenceRequestRoute /></ProtectedRoute>} />
             <Route path=":requestId" element={<ProtectedRoute><AbsenceDetailRoute /></ProtectedRoute>} />
           </Route>
 
           {/* Legacy redirects */}
-          <Route path="/equipo" element={<Navigate to="/colaboradores" replace />} />
-          <Route path="/equipo/new" element={<Navigate to="/colaboradores/new" replace />} />
-          <Route path="/equipo/:id/*" element={<Navigate to="/colaboradores/:id" replace />} />
+          <Route path="/colaboradores" element={<Navigate to="/turnosmart/collaborators" replace />} />
+          <Route path="/colaboradores/new" element={<Navigate to="/turnosmart/collaborators/new" replace />} />
+          <Route path="/colaboradores/:id/*" element={<Navigate to="/turnosmart/collaborators/:id" replace />} />
+          <Route path="/equipo" element={<Navigate to="/turnosmart/collaborators" replace />} />
+          <Route path="/equipo/new" element={<Navigate to="/turnosmart/collaborators/new" replace />} />
+          <Route path="/equipo/:id/*" element={<Navigate to="/turnosmart/collaborators/:id" replace />} />
+          <Route path="/ausencias" element={<Navigate to="/turnosmart/absences" replace />} />
 
           {/* Colaborador detail con tabs */}
-          <Route path="/colaboradores/:id" element={<ProtectedRoute><ColaboradorDetailLayout /></ProtectedRoute>}>
+          <Route path="/turnosmart/collaborators/:id" element={<ProtectedRoute><ColaboradorDetailLayout /></ProtectedRoute>}>
             <Route index element={<LegacyTabRedirect />} />
             <Route path="profile" element={<ProfileTab />} />
             <Route path="contract" element={<ContractTab />} />
@@ -261,56 +263,84 @@ export const AppRoutes = () => {
             <Route path="system" element={<SystemTab />} />
           </Route>
 
-          <Route path="/colaboradores/:empleadoId/tiempo-trabajo" element={<ProtectedRoute><TiempoTrabajo /></ProtectedRoute>} />
+          <Route path="/turnosmart/collaborators/:empleadoId/work-time" element={<ProtectedRoute><TiempoTrabajo /></ProtectedRoute>} />
 
           {/* HR */}
-          <Route path="/hr" element={<ProtectedRoute><HR /></ProtectedRoute>} />
-          <Route path="/hr/home" element={<ProtectedRoute><HRResumen /></ProtectedRoute>} />
-          <Route path="/hr/onboarding" element={<ProtectedRoute><HROnboarding /></ProtectedRoute>} />
-          <Route path="/hr/exits" element={<ProtectedRoute><HRExits /></ProtectedRoute>} />
-          <Route path="/hr/fin-periodo-prueba" element={<ProtectedRoute><HRFinPeriodoPrueba /></ProtectedRoute>} />
-          <Route path="/hr/incomplete-profiles" element={<ProtectedRoute><HRIncompleteProfiles /></ProtectedRoute>} />
-          <Route path="/hr/vacation-counter" element={<ProtectedRoute><HRVacationCounter /></ProtectedRoute>} />
-          <Route path="/hr/absence-log" element={<ProtectedRoute><HRAbsenceLog /></ProtectedRoute>} />
-          <Route path="/hr/work-permits" element={<ProtectedRoute><HRWorkPermits /></ProtectedRoute>} />
-          <Route path="/hr/contract-modifications" element={<ProtectedRoute><HRContractModifications /></ProtectedRoute>} />
-          <Route path="/hr/clock-in-tracking" element={<ProtectedRoute><HRClockInTracking /></ProtectedRoute>} />
-          <Route path="/hr/document-signing" element={<ProtectedRoute><HRDocumentSigning /></ProtectedRoute>} />
-          <Route path="/hr/payroll-distribution" element={<ProtectedRoute><HRPayrollDistribution /></ProtectedRoute>} />
-          <Route path="/hr/overview" element={<ProtectedRoute><HROverview /></ProtectedRoute>} />
-          <Route path="/hr/team" element={<ProtectedRoute><HRTeam /></ProtectedRoute>} />
-          <Route path="/hr/hours-worked" element={<ProtectedRoute><HRHoursWorked /></ProtectedRoute>} />
-          <Route path="/hr/absences" element={<ProtectedRoute><HRAbsences /></ProtectedRoute>} />
-          <Route path="/hr/audit-policies" element={<ProtectedRoute><HRAuditPolicies /></ProtectedRoute>} />
+          <Route path="/turnosmart/hr" element={<ProtectedRoute><HR /></ProtectedRoute>} />
+          <Route path="/turnosmart/hr/home" element={<ProtectedRoute><HRResumen /></ProtectedRoute>} />
+          <Route path="/turnosmart/hr/onboarding" element={<ProtectedRoute><HROnboarding /></ProtectedRoute>} />
+          <Route path="/turnosmart/hr/exits" element={<ProtectedRoute><HRExits /></ProtectedRoute>} />
+          <Route path="/turnosmart/hr/fin-periodo-prueba" element={<ProtectedRoute><HRFinPeriodoPrueba /></ProtectedRoute>} />
+          <Route path="/turnosmart/hr/incomplete-profiles" element={<ProtectedRoute><HRIncompleteProfiles /></ProtectedRoute>} />
+          <Route path="/turnosmart/hr/vacation-counter" element={<ProtectedRoute><HRVacationCounter /></ProtectedRoute>} />
+          <Route path="/turnosmart/hr/absence-log" element={<ProtectedRoute><HRAbsenceLog /></ProtectedRoute>} />
+          <Route path="/turnosmart/hr/work-permits" element={<ProtectedRoute><HRWorkPermits /></ProtectedRoute>} />
+          <Route path="/turnosmart/hr/contract-modifications" element={<ProtectedRoute><HRContractModifications /></ProtectedRoute>} />
+          <Route path="/turnosmart/hr/clock-in-tracking" element={<ProtectedRoute><HRClockInTracking /></ProtectedRoute>} />
+          <Route path="/turnosmart/hr/document-signing" element={<ProtectedRoute><HRDocumentSigning /></ProtectedRoute>} />
+          <Route path="/turnosmart/hr/payroll-distribution" element={<ProtectedRoute><HRPayrollDistribution /></ProtectedRoute>} />
+          <Route path="/turnosmart/hr/overview" element={<ProtectedRoute><HROverview /></ProtectedRoute>} />
+          <Route path="/turnosmart/hr/team" element={<ProtectedRoute><HRTeam /></ProtectedRoute>} />
+          <Route path="/turnosmart/hr/hours-worked" element={<ProtectedRoute><HRHoursWorked /></ProtectedRoute>} />
+          <Route path="/turnosmart/hr/absences" element={<ProtectedRoute><HRAbsences /></ProtectedRoute>} />
+          <Route path="/turnosmart/hr/audit-policies" element={<ProtectedRoute><HRAuditPolicies /></ProtectedRoute>} />
+
+          {/* Legacy HR redirects */}
+          <Route path="/hr" element={<Navigate to="/turnosmart/hr" replace />} />
+          <Route path="/hr/home" element={<Navigate to="/turnosmart/hr/home" replace />} />
+          <Route path="/hr/onboarding" element={<Navigate to="/turnosmart/hr/onboarding" replace />} />
+          <Route path="/hr/exits" element={<Navigate to="/turnosmart/hr/exits" replace />} />
+          <Route path="/hr/fin-periodo-prueba" element={<Navigate to="/turnosmart/hr/fin-periodo-prueba" replace />} />
+          <Route path="/hr/incomplete-profiles" element={<Navigate to="/turnosmart/hr/incomplete-profiles" replace />} />
+          <Route path="/hr/vacation-counter" element={<Navigate to="/turnosmart/hr/vacation-counter" replace />} />
+          <Route path="/hr/absence-log" element={<Navigate to="/turnosmart/hr/absence-log" replace />} />
+          <Route path="/hr/work-permits" element={<Navigate to="/turnosmart/hr/work-permits" replace />} />
+          <Route path="/hr/contract-modifications" element={<Navigate to="/turnosmart/hr/contract-modifications" replace />} />
+          <Route path="/hr/clock-in-tracking" element={<Navigate to="/turnosmart/hr/clock-in-tracking" replace />} />
+          <Route path="/hr/document-signing" element={<Navigate to="/turnosmart/hr/document-signing" replace />} />
+          <Route path="/hr/payroll-distribution" element={<Navigate to="/turnosmart/hr/payroll-distribution" replace />} />
+          <Route path="/hr/overview" element={<Navigate to="/turnosmart/hr/overview" replace />} />
+          <Route path="/hr/team" element={<Navigate to="/turnosmart/hr/team" replace />} />
+          <Route path="/hr/hours-worked" element={<Navigate to="/turnosmart/hr/hours-worked" replace />} />
+          <Route path="/hr/absences" element={<Navigate to="/turnosmart/hr/absences" replace />} />
+          <Route path="/hr/audit-policies" element={<Navigate to="/turnosmart/hr/audit-policies" replace />} />
 
           {/* Turnos y calendario */}
-          <Route path="/cuadrante" element={<ProtectedRoute><Turnos /></ProtectedRoute>} />
+          <Route path="/turnosmart/schedule" element={<ProtectedRoute><Turnos /></ProtectedRoute>} />
           <Route path="/turnosmart">
             <Route index element={<Navigate to="/turnosmart/week" replace />} />
             <Route path="week" element={<ProtectedRoute><SectionErrorBoundary label="calendar-week"><MainLayout><TurnosCrear /></MainLayout></SectionErrorBoundary></ProtectedRoute>} />
             <Route path="day" element={<ProtectedRoute><SectionErrorBoundary label="calendar-day"><MainLayout><CalendarDay /></MainLayout></SectionErrorBoundary></ProtectedRoute>} />
             <Route path="month" element={<ProtectedRoute><SectionErrorBoundary label="calendar-month"><MainLayout><CalendarMonth /></MainLayout></SectionErrorBoundary></ProtectedRoute>} />
-            <Route path="biweek" element={<ProtectedRoute><SectionErrorBoundary label="calendar-biweek"><MainLayout><BiWeeklyCalendarPage /></MainLayout></SectionErrorBoundary></ProtectedRoute>} />
+            <Route path="biweekly" element={<ProtectedRoute><SectionErrorBoundary label="calendar-biweek"><MainLayout><BiWeeklyCalendarPage /></MainLayout></SectionErrorBoundary></ProtectedRoute>} />
+            <Route path="biweek" element={<Navigate to="/turnosmart/biweekly" replace />} />
             <Route path="tags" element={<Navigate to="/turnosmart/week" replace />} />
             <Route path="attendance" element={<Navigate to="/turnosmart/week" replace />} />
           </Route>
 
-          <Route path="/turnos">
-            <Route index element={<Navigate to="/turnosmart/day" replace />} />
-            <Route path="day" element={<Navigate to="/turnosmart/day" replace />} />
-            <Route path="week" element={<Navigate to="/turnosmart/week" replace />} />
-          </Route>
+          {/* Legacy schedule redirects */}
+          <Route path="/cuadrante" element={<Navigate to="/turnosmart/schedule" replace />} />
 
-          <Route path="/turnos/guardados" element={<ProtectedRoute><TurnosGuardados /></ProtectedRoute>} />
-          <Route path="/turnos/crear" element={<ProtectedRoute><TurnosCrear /></ProtectedRoute>} />
-          <Route path="/planificacion-automatica" element={<ProtectedRoute><PlanificacionAutomatica /></ProtectedRoute>} />
-          <Route path="/banco-horas" element={<ProtectedRoute><BancoHoras /></ProtectedRoute>} />
-          <Route path="/solicitudes-cambio" element={<ProtectedRoute><SolicitudesCambio /></ProtectedRoute>} />
-          <Route path="/solicitudes-ausencia" element={<ProtectedRoute><SolicitudesAusencia /></ProtectedRoute>} />
-          <Route path="/balance-anual" element={<ProtectedRoute><BalanceAnual /></ProtectedRoute>} />
+          <Route path="/turnosmart/saved-shifts" element={<ProtectedRoute><TurnosGuardados /></ProtectedRoute>} />
+          <Route path="/turnosmart/create-shift" element={<ProtectedRoute><TurnosCrear /></ProtectedRoute>} />
+          <Route path="/turnosmart/auto-planning" element={<ProtectedRoute><PlanificacionAutomatica /></ProtectedRoute>} />
+          <Route path="/turnosmart/hours-bank" element={<ProtectedRoute><BancoHoras /></ProtectedRoute>} />
+          <Route path="/turnosmart/change-requests" element={<ProtectedRoute><SolicitudesCambio /></ProtectedRoute>} />
+          <Route path="/turnosmart/absence-requests" element={<ProtectedRoute><SolicitudesAusencia /></ProtectedRoute>} />
+          <Route path="/turnosmart/annual-balance" element={<ProtectedRoute><BalanceAnual /></ProtectedRoute>} />
+
+          {/* Legacy shifts redirects */}
+          <Route path="/turnos" element={<Navigate to="/turnosmart/schedule" replace />} />
+          <Route path="/turnos/guardados" element={<Navigate to="/turnosmart/saved-shifts" replace />} />
+          <Route path="/turnos/crear" element={<Navigate to="/turnosmart/create-shift" replace />} />
+          <Route path="/planificacion-automatica" element={<Navigate to="/turnosmart/auto-planning" replace />} />
+          <Route path="/banco-horas" element={<Navigate to="/turnosmart/hours-bank" replace />} />
+          <Route path="/solicitudes-cambio" element={<Navigate to="/turnosmart/change-requests" replace />} />
+          <Route path="/solicitudes-ausencia" element={<Navigate to="/turnosmart/absence-requests" replace />} />
+          <Route path="/balance-anual" element={<Navigate to="/turnosmart/annual-balance" replace />} />
 
           {/* Settings */}
-          <Route path="/settings" element={<ProtectedRoute><SettingsLayout /></ProtectedRoute>}>
+          <Route path="/turnosmart/settings" element={<ProtectedRoute><SettingsLayout /></ProtectedRoute>}>
             <Route index element={null} />
             <Route path="contact" element={<ContactSettings />} />
             <Route path="collective-agreement" element={<CollectiveAgreementSettings />} />
@@ -331,7 +361,7 @@ export const AppRoutes = () => {
             <Route path="RGPD" element={<RGPDSettings />} />
           </Route>
 
-          <Route path="/settings/schedules" element={<ProtectedRoute><SettingsSchedulesLayout /></ProtectedRoute>}>
+          <Route path="/turnosmart/settings/schedules" element={<ProtectedRoute><SettingsSchedulesLayout /></ProtectedRoute>}>
             <Route path="shifts" element={<Turnos />} />
             <Route path="saved" element={<TurnosGuardados />} />
             <Route path="night" element={<TurnosNocturnos />} />
@@ -340,27 +370,55 @@ export const AppRoutes = () => {
             <Route path="workday" element={<GestionJornadaLaboral />} />
           </Route>
 
-          {/* Legacy schedule redirects */}
-          <Route path="/turnos" element={<Navigate to="/settings/schedules/shifts" replace />} />
-          <Route path="/turnos-guardados" element={<Navigate to="/settings/schedules/saved" replace />} />
-          <Route path="/turnos-nocturnos" element={<Navigate to="/settings/schedules/night" replace />} />
-          <Route path="/turnos-rotativos" element={<Navigate to="/settings/schedules/rotating" replace />} />
-          <Route path="/politicas-laborales" element={<Navigate to="/settings/schedules/policies" replace />} />
-          <Route path="/gestion-jornada-laboral/crear" element={<Navigate to="/settings/schedules/workday" replace />} />
+          {/* Legacy settings redirects */}
+          <Route path="/settings" element={<Navigate to="/turnosmart/settings" replace />} />
+          <Route path="/settings/contact" element={<Navigate to="/turnosmart/settings/contact" replace />} />
+          <Route path="/settings/collective-agreement" element={<Navigate to="/turnosmart/settings/collective-agreement" replace />} />
+          <Route path="/settings/productivity" element={<Navigate to="/turnosmart/settings/productivity" replace />} />
+          <Route path="/settings/locations" element={<Navigate to="/turnosmart/settings/locations" replace />} />
+          <Route path="/settings/locations/new" element={<Navigate to="/turnosmart/settings/locations/new" replace />} />
+          <Route path="/settings/print" element={<Navigate to="/turnosmart/settings/print" replace />} />
+          <Route path="/settings/preferences" element={<Navigate to="/turnosmart/settings/preferences" replace />} />
+          <Route path="/settings/notifications" element={<Navigate to="/turnosmart/settings/notifications" replace />} />
+          <Route path="/settings/wage-analysis" element={<Navigate to="/turnosmart/settings/wage-analysis" replace />} />
+          <Route path="/settings/payment-preferences" element={<Navigate to="/turnosmart/settings/payment-preferences" replace />} />
+          <Route path="/settings/timeoff-rules" element={<Navigate to="/turnosmart/settings/timeoff-rules" replace />} />
+          <Route path="/settings/templates-docus" element={<Navigate to="/turnosmart/settings/templates-docus" replace />} />
+          <Route path="/settings/jobs" element={<Navigate to="/turnosmart/settings/jobs" replace />} />
+          <Route path="/settings/clockin-clockout" element={<Navigate to="/turnosmart/settings/clockin-clockout" replace />} />
+          <Route path="/settings/marketplace" element={<Navigate to="/turnosmart/settings/marketplace" replace />} />
+          <Route path="/settings/RGPD" element={<Navigate to="/turnosmart/settings/RGPD" replace />} />
+          <Route path="/settings/schedules" element={<Navigate to="/turnosmart/settings/schedules" replace />} />
+          <Route path="/settings/schedules/shifts" element={<Navigate to="/turnosmart/settings/schedules/shifts" replace />} />
+          <Route path="/settings/schedules/saved" element={<Navigate to="/turnosmart/settings/schedules/saved" replace />} />
+          <Route path="/settings/schedules/night" element={<Navigate to="/turnosmart/settings/schedules/night" replace />} />
+          <Route path="/settings/schedules/rotating" element={<Navigate to="/turnosmart/settings/schedules/rotating" replace />} />
+          <Route path="/settings/schedules/policies" element={<Navigate to="/turnosmart/settings/schedules/policies" replace />} />
+          <Route path="/settings/schedules/workday" element={<Navigate to="/turnosmart/settings/schedules/workday" replace />} />
+          <Route path="/turnos" element={<Navigate to="/turnosmart/settings/schedules/shifts" replace />} />
+          <Route path="/turnos-guardados" element={<Navigate to="/turnosmart/settings/schedules/saved" replace />} />
+          <Route path="/turnos-nocturnos" element={<Navigate to="/turnosmart/settings/schedules/night" replace />} />
+          <Route path="/turnos-rotativos" element={<Navigate to="/turnosmart/settings/schedules/rotating" replace />} />
+          <Route path="/politicas-laborales" element={<Navigate to="/turnosmart/settings/schedules/policies" replace />} />
+          <Route path="/gestion-jornada-laboral/crear" element={<Navigate to="/turnosmart/settings/schedules/workday" replace />} />
 
-          <Route path="/configuracion-legacy" element={<ProtectedRoute><ConfigurationLegacy /></ProtectedRoute>} />
-          <Route path="/ausencias" element={<ProtectedRoute><Ausencias /></ProtectedRoute>} />
-          <Route path="/exportar" element={<ProtectedRoute><Exportar /></ProtectedRoute>} />
+          <Route path="/turnosmart/export" element={<ProtectedRoute><Exportar /></ProtectedRoute>} />
+          <Route path="/turnosmart/help" element={<ProtectedRoute><Ayuda /></ProtectedRoute>} />
+          <Route path="/turnosmart/faq" element={<ProtectedRoute><FAQ /></ProtectedRoute>} />
+          <Route path="/turnosmart/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
+          <Route path="/turnosmart/preferences" element={<ProtectedRoute><MisPreferencias /></ProtectedRoute>} />
 
-          {/* Help */}
-          <Route path="/ayuda" element={<ProtectedRoute><Ayuda /></ProtectedRoute>} />
-          <Route path="/faq" element={<ProtectedRoute><FAQ /></ProtectedRoute>} />
-
-          {/* Misc protected */}
-          <Route path="/perfil-admin" element={<ProtectedRoute><PerfilAdmin /></ProtectedRoute>} />
-          <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
-          <Route path="/mis-preferencias" element={<ProtectedRoute><MisPreferencias /></ProtectedRoute>} />
-          <Route path="/old-turnosmart" element={<ProtectedRoute><MainLayout><OldTurnosmart /></MainLayout></ProtectedRoute>} />
+          {/* Legacy misc redirects */}
+          <Route path="/configuracion-legacy" element={<Navigate to="/turnosmart/settings" replace />} />
+          <Route path="/configuracion" element={<Navigate to="/turnosmart/settings" replace />} />
+          <Route path="/turnosmart/configuracion" element={<Navigate to="/turnosmart/settings" replace />} />
+          <Route path="/exportar" element={<Navigate to="/turnosmart/export" replace />} />
+          <Route path="/ayuda" element={<Navigate to="/turnosmart/help" replace />} />
+          <Route path="/faq" element={<Navigate to="/turnosmart/faq" replace />} />
+          <Route path="/perfil-admin" element={<Navigate to="/turnosmart/settings" replace />} />
+          <Route path="/activity" element={<Navigate to="/turnosmart/activity" replace />} />
+          <Route path="/mis-preferencias" element={<Navigate to="/turnosmart/preferences" replace />} />
+          <Route path="/old-turnosmart" element={<Navigate to="/turnosmart/week" replace />} />
 
           {/* Public views */}
           <Route path="/turno/:id" element={<TurnoPublicView />} />

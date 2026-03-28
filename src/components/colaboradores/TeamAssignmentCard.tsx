@@ -25,7 +25,7 @@ interface AssignedDepartment {
 
 export function TeamAssignmentCard({ colaboradorId, colaboradorName, onAssignmentChange }: TeamAssignmentCardProps) {
   const { departments } = useJobDepartments();
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
   const [isAssigning, setIsAssigning] = useState(false);
   const [isRemoving, setIsRemoving] = useState<string | null>(null);

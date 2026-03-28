@@ -16,7 +16,7 @@ import { ApprovalPanel } from "@/components/collective-agreement/ApprovalPanel";
 import { Play, Square, Trash2, CheckCircle, MessageSquare, Send, ChevronDown, HelpCircle } from "lucide-react";
 
 export default function CollectiveAgreementSettings() {
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
   const { toast } = useToast();
 
   const [agreements, setAgreements] = useState([]);

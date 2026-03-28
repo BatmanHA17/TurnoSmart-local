@@ -62,10 +62,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Cerrar sesión en Supabase
       await supabase.auth.signOut();
       
-      // Limpiar datos adicionales de la app
-      try { 
-        localStorage.removeItem('turnosmart_configuration'); 
-        localStorage.removeItem('calendar-employees');
+      // Limpiar todos los datos de localStorage (km 0 cleanup)
+      try {
+        const keysToRemove = [
+          'turnosmart_configuration',
+          'calendar-employees',
+          'calendar-shift-blocks',
+          'calendar-shifts-backup-timestamp',
+          'calendar_shifts_backup',
+          'calendar-sort-criteria',
+          'calendar-employee-sort-criteria',
+          'calendar-employee-exclusions',
+          'gestion-jornada-periods',
+          'leaveRequests',
+          'absenceRequests',
+          'processed-leave-requests',
+          'absenceRequestsCleaned',
+          'saved-shifts-updated',
+          'turnosmart-favorite-shifts',
+          'selectedEmployeesForCalendar',
+          'updatedEmployeeForCalendar',
+          'manual-employee-order'
+        ];
+        keysToRemove.forEach(key => localStorage.removeItem(key));
       } catch {}
       
       toast.success("Sesión cerrada correctamente");

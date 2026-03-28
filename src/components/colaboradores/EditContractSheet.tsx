@@ -40,7 +40,7 @@ export const EditContractSheet = ({
     organizations,
     currentOrganizationName
   } = useOrganizations();
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
   const { assignments, loading: loadingAssignments, refetch: refetchAssignments } = useTeamAssignments(colaborador?.id);
   const { departments: availableDepartments } = useJobDepartments();
   

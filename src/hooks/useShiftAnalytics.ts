@@ -46,7 +46,7 @@ export function useShiftAnalytics(params: AnalyticsDateParams | number = { mode:
     ? { mode: 'relative', monthsBack: params }
     : params;
 
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
   const [shifts, setShifts] = useState<ShiftForAnalytics[]>([]);
   const [absenceRequests, setAbsenceRequests] = useState<AbsenceRequest[]>([]);
   const [loading, setLoading] = useState(true);

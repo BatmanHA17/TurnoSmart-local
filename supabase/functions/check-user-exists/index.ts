@@ -77,21 +77,30 @@ serve(async (req) => {
 
     if (profileError) {
       console.error("Error checking profiles:", profileError);
-      return new Response(
-        JSON.stringify({ exists: false, note: "DB error while checking profiles" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-      );
     }
 
     const existsInProfiles = !!profileData;
-    console.log("Profile check result for", email, ":", existsInProfiles);
+
+    // Always check auth.users as well to ensure we catch all valid users
+    let existsInAuth = false;
+    try {
+      const { data: authUsers } = await supabase.auth.admin.listUsers();
+      const authUser = authUsers?.users?.find(u => u.email === email);
+      existsInAuth = !!authUser;
+      console.log("Auth check result for", email, ":", existsInAuth);
+    } catch (authError) {
+      console.error("Error checking auth.users:", authError);
+    }
+
+    const finalExists = existsInProfiles || existsInAuth;
+    console.log("Final user check for", email, "- profiles:", existsInProfiles, "auth:", existsInAuth, "result:", finalExists);
 
     return new Response(
-      JSON.stringify({ 
-        exists: existsInProfiles,
+      JSON.stringify({
+        exists: finalExists,
         isColaborador: false,
         hasPassword: false,
-        note: existsInProfiles ? "User exists in profiles" : "User not found"
+        note: finalExists ? "User exists" : "User not found"
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );

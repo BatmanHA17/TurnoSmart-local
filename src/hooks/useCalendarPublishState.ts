@@ -143,7 +143,7 @@ export const useCalendarPublishState = (currentWeek: Date) => {
   const [error, setError] = useState<string | null>(null);
   const [hasUnpublishedChanges, setHasUnpublishedChanges] = useState(false);
   
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
   const { isManager } = useUserRoleCanonical();
   const { logActivity } = useActivityLog();
 

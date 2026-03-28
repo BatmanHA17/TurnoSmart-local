@@ -101,7 +101,7 @@ export default function JobsSettings() {
   const [newCategory, setNewCategory] = useState({ name: "", code: "", description: "", level_id: "" });
   
   const { permissions } = useAdminPermissions();
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
 
   const hoursOptions = [
     { value: 8, label: "8 horas (Tiempo completo)", ratio: 1.0 },

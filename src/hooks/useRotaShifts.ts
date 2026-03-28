@@ -50,7 +50,7 @@ export interface RotaScheduleAssignment {
 export const useRotaShifts = (rotaId?: string, colaboradorId?: string) => {
   const [rotaShifts, setRotaShifts] = useState<RotaShift[]>([]);
   const [loading, setLoading] = useState(false);
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
 
   const fetchRotaShifts = async () => {
     if (!currentOrg?.org_id) return;
@@ -194,7 +194,7 @@ export const useRotaShifts = (rotaId?: string, colaboradorId?: string) => {
 export const useRotaSchedule = (rotaId?: string, startDate?: string, endDate?: string) => {
   const [scheduleAssignments, setScheduleAssignments] = useState<RotaScheduleAssignment[]>([]);
   const [loading, setLoading] = useState(false);
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
 
   const fetchScheduleAssignments = async () => {
     if (!currentOrg?.org_id || !rotaId) return;

@@ -311,7 +311,8 @@ export const ColaboradoresView = () => {
     // Filtro de estado de usuario
     const matchesEstadoUsuario = selectedEstadoUsuario === "todos-usuarios" ||
       (selectedEstadoUsuario === "usuarios-activos" && colaborador.status === "activo") ||
-      (selectedEstadoUsuario === "usuarios-inactivos" && colaborador.status === "inactivo");
+      (selectedEstadoUsuario === "usuarios-inactivos" && colaborador.status === "inactivo") ||
+      (selectedEstadoUsuario === "usuarios-pendientes" && colaborador.status === "pendiente");
 
     return matchesSearch && matchesTipoContrato && matchesEstadoUsuario;
   });
@@ -569,9 +570,9 @@ export const ColaboradoresView = () => {
           <SelectTrigger className="h-9 w-auto min-w-[140px] bg-background/60 border-border/30 rounded-full text-sm font-medium shadow-sm hover:shadow-md transition-shadow">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent 
+          <SelectContent
             className="shadow-lg rounded-xl"
-            style={{ 
+            style={{
               backgroundColor: 'rgb(255, 255, 255)',
               color: 'rgb(0, 0, 0)',
               zIndex: 9999,
@@ -580,6 +581,7 @@ export const ColaboradoresView = () => {
           >
             <SelectItem value="usuarios-activos" className="rounded-lg">Usuarios activos</SelectItem>
             <SelectItem value="todos-usuarios" className="rounded-lg">Todos los usuarios</SelectItem>
+            <SelectItem value="usuarios-pendientes" className="rounded-lg">Usuarios pendientes</SelectItem>
             <SelectItem value="usuarios-inactivos" className="rounded-lg">Usuarios inactivos</SelectItem>
           </SelectContent>
         </Select>
@@ -740,7 +742,10 @@ export const ColaboradoresView = () => {
                       {colaborador.jobs?.title || 'Sin puesto asignado'}
                     </TableCell>
                   <TableCell className="text-foreground">
-                    {colaborador.email}
+                    {colaborador.email && !colaborador.email.includes('setup.turnosmart.app')
+                      ? colaborador.email
+                      : <span className="text-muted-foreground italic">No especificado</span>
+                    }
                   </TableCell>
                   <TableCell className="text-foreground">
                     {colaborador.telefono_movil || 'No especificado'}
@@ -750,16 +755,24 @@ export const ColaboradoresView = () => {
                    </TableCell>
                    <TableCell>
                      {(() => {
-                       const hasRequiredData = colaborador.fecha_inicio_contrato && 
-                                               colaborador.tiempo_trabajo_semanal && 
-                                               colaborador.tipo_contrato &&
-                                               colaborador.status === 'activo';
+                       const missingFields: string[] = [];
+                       if (!colaborador.fecha_inicio_contrato) missingFields.push("fecha inicio");
+                       if (!colaborador.tiempo_trabajo_semanal) missingFields.push("horas semanales");
+                       if (!colaborador.tipo_contrato) missingFields.push("tipo contrato");
+                       if (colaborador.status !== 'activo') missingFields.push("estado activo");
+
+                       const hasRequiredData = missingFields.length === 0;
+                       const tooltipText = hasRequiredData
+                         ? 'Datos completos'
+                         : `Falta: ${missingFields.join(', ')}`;
+
                        return (
-                         <Badge 
-                           className={hasRequiredData 
-                             ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100" 
+                         <Badge
+                           className={hasRequiredData
+                             ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
                              : "bg-amber-100 text-amber-800 hover:bg-amber-100"
                            }
+                           title={tooltipText}
                          >
                            {hasRequiredData ? 'Listo' : 'Incompleto'}
                          </Badge>
@@ -768,13 +781,31 @@ export const ColaboradoresView = () => {
                     </TableCell>
                      <TableCell>
                        <div className="flex flex-col gap-1">
-                         <Badge className={
-                           colaborador.status === 'inactivo' 
-                             ? "bg-gray-100 text-gray-600 hover:bg-gray-100" 
-                             : "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
-                         }>
-                           {colaborador.status === 'inactivo' ? 'Inactivo' : 'Aceptada'}
-                         </Badge>
+                         {(() => {
+                           const isPendiente = colaborador.nombre.includes('(pendiente)') || colaborador.apellidos.includes('(pendiente)');
+                           const status = isPendiente ? 'pendiente' : colaborador.status;
+
+                           return (
+                             <Badge
+                               className={
+                                 status === 'inactivo'
+                                   ? "bg-gray-100 text-gray-600 hover:bg-gray-100"
+                                   : status === 'pendiente'
+                                   ? "bg-amber-100 text-amber-700 hover:bg-amber-100"
+                                   : "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
+                               }
+                               title={
+                                 status === 'inactivo'
+                                   ? "Usuario desactivado o no activo"
+                                   : status === 'pendiente'
+                                   ? "Pendiente de confirmación de email o validación. Requiere completar datos de perfil."
+                                   : "Perfil confirmado y activo"
+                               }
+                             >
+                               {status === 'inactivo' ? 'Inactivo' : status === 'pendiente' ? 'Pendiente' : 'Aceptada'}
+                             </Badge>
+                           );
+                         })()}
                          {colaborador.status === 'activo' && isContractEndingSoon(colaborador) && (
                            <Badge 
                              variant="outline" 

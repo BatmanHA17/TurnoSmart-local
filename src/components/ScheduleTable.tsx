@@ -26,12 +26,12 @@ export function ScheduleTable() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const { user } = useAuth();
   const { role } = useUserRole();
-  const { currentOrg } = useCurrentOrganization();
+  const { org } = useCurrentOrganization();
 
   // Fetch colaboradores from database with contract start date filtering
   useEffect(() => {
     const fetchColaboradores = async () => {
-      if (!currentOrg?.org_id) {
+      if (!org?.id) {
         setColaboradores([]);
         return;
       }
@@ -82,7 +82,7 @@ export function ScheduleTable() {
     };
 
     fetchColaboradores();
-  }, [currentOrg?.org_id]);
+  }, [org?.id]);
 
   // Debug effect para monitorear cambios
   useEffect(() => {

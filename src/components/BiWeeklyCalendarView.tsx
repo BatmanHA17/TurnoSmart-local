@@ -43,6 +43,8 @@ import { AutoSaveIndicator } from "./AutoSaveIndicator";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useBeforeUnload } from "@/hooks/useBeforeUnload";
+import { useCalendarEmployeeFilter } from "@/hooks/useCalendarEmployeeFilter";
+import { useEmployeeSortOrder } from "@/hooks/useEmployeeSortOrder";
 
 import { VersionHistoryDialog } from "./calendar/VersionHistoryDialog";
 import { OperationBackupsDialog } from "./calendar/OperationBackupsDialog";
@@ -105,7 +107,7 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
   const { user } = useAuth();
   const isEmployee = role === 'EMPLOYEE';
   const canEdit = !isEmployee;
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
   const { logActivity } = useActivityLog();
   const { favoriteShifts, addToFavorites, removeFromFavorites, isFavorite } = useFavoriteShifts();
   const { createVersion } = useCalendarVersions();
@@ -162,9 +164,6 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
   const [selectedCell, setSelectedCell] = useState<{employee: string, date: Date} | null>(null);
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
   const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
-  const [sortBy, setSortBy] = useState<string>(() => {
-    return localStorage.getItem('calendar-sort-criteria') || "";
-  });
   const [showEmployeeSortingSheet, setShowEmployeeSortingSheet] = useState(false);
   const [showAddShiftPopup, setShowAddShiftPopup] = useState<{employeeId: string, date: Date} | null>(null);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState<{employeeId: string, date: Date} | null>(null);
@@ -215,6 +214,12 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
   const [colaboradores, setColaboradores] = useState<any[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
+
+  // 🆕 Hook para sincronizar filtro de empleados eliminados entre vistas
+  const { filteredEmployees } = useCalendarEmployeeFilter(employees, currentOrg?.org_id || null);
+
+  // 🆕 Hook para sincronizar ordenamiento entre TODAS las vistas
+  const { sortedEmployees, sortBy, setSortBy, resetSort, sortEmployees } = useEmployeeSortOrder(filteredEmployees);
 
   // BI-WEEKLY: Navegación por bloques de 2 semanas
   const goToPreviousBiWeek = () => setCurrentWeek(subWeeks(currentWeek, 1));
@@ -1060,49 +1065,9 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
     setDayCounters(counters);
   }, [shiftBlocks, currentWeek]);
 
-  // Función de ordenación de empleados (igual que en GoogleCalendarStyle)
-  const sortEmployees = (employees: Employee[], sortType: string) => {
-    return [...employees].sort((a, b) => {
-      switch (sortType) {
-        case "name-asc":
-          return a.name.localeCompare(b.name, 'es', { numeric: true });
-        case "name-desc":
-          return b.name.localeCompare(a.name, 'es', { numeric: true });
-        case "surname-asc":
-          return a.name.split(' ').slice(-1)[0].localeCompare(b.name.split(' ').slice(-1)[0], 'es', { numeric: true });
-        case "surname-desc":
-          return b.name.split(' ').slice(-1)[0].localeCompare(a.name.split(' ').slice(-1)[0], 'es', { numeric: true });
-        case "role-asc":
-          return a.role.localeCompare(b.role);
-        case "role-desc":
-          return b.role.localeCompare(a.role);
-        case "seniority-recent":
-          return new Date(b.startDate || '1900-01-01').getTime() - new Date(a.startDate || '1900-01-01').getTime();
-        case "seniority-old":
-          return new Date(a.startDate || '1900-01-01').getTime() - new Date(b.startDate || '1900-01-01').getTime();
-        default:
-          return 0;
-      }
-    });
-  };
+  // ✅ Sorting now handled globally by useEmployeeSortOrder hook above
 
-  // Ordenar empleados
-  const sortedEmployees = sortBy ? sortEmployees(employees, sortBy) : employees;
-
-  // Handle sort change from EmployeeSortingSheet
-  const handleSortChange = (newSortBy: string) => {
-    setSortBy(newSortBy);
-    localStorage.setItem('calendar-sort-criteria', newSortBy);
-    setShowEmployeeSortingSheet(false);
-  };
-
-  // Handle manual order change
-  const handleManualOrderChange = (newOrder: Employee[]) => {
-    setEmployees(newOrder);
-    localStorage.setItem('manual-employee-order', JSON.stringify(newOrder));
-    setSortBy('manual');
-    localStorage.setItem('calendar-sort-criteria', 'manual');
-  };
+  // ✅ Sort change is now handled by EmployeeSortingSheet's onApplySort callback below
 
   // Calcular altura dinámica de filas basada en número de empleados (debe estar antes de cualquier return)
   const rowMinHeight = useMemo(() => {
@@ -1695,6 +1660,9 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
               startDate: emp.fecha_inicio_contrato || undefined
             }));
             setEmployees(mapped);
+            // ✅ Save the manual order to global state (hook will sync across all views)
+            localStorage.setItem('manual-employee-order', JSON.stringify(mapped));
+            setSortBy('manual');
             setShowEmployeeSortingSheet(false);
           }}
           employees={colaboradores.map(c => ({

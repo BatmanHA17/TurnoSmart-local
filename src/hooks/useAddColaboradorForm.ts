@@ -492,7 +492,7 @@ export function useAddColaboradorForm({
           entityType: "colaborador",
           entityId: colaboradorData.id,
           entityName: `${formData.nombre} ${formData.apellidos}`,
-          establishment: currentOrganizationName || "GOTHAM",
+          establishment: currentOrganizationName || "Recepción",
         });
 
         if (emailHasChanged) {
@@ -501,7 +501,7 @@ export function useAddColaboradorForm({
             entityType: "colaborador",
             entityId: colaboradorData.id,
             entityName: `${formData.nombre} ${formData.apellidos}`,
-            establishment: currentOrganizationName || "GOTHAM",
+            establishment: currentOrganizationName || "Recepción",
             details: {
               old_email: colaboradorData.email,
               new_email: formData.email,
@@ -532,7 +532,7 @@ export function useAddColaboradorForm({
           entityType: "colaborador",
           entityId: insertedColaborador.id,
           entityName: `${formData.nombre} ${formData.apellidos}`,
-          establishment: currentOrganizationName || "GOTHAM",
+          establishment: currentOrganizationName || "Recepción",
         });
 
         if (formData.jobId) {

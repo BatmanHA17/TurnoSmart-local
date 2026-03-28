@@ -43,7 +43,7 @@ export function CleanShiftsDialog({
   employees,
   onSuccess 
 }: CleanShiftsDialogProps) {
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
   
   const [cleanMode, setCleanMode] = useState<CleanMode>("month");
   const [selectedMonth, setSelectedMonth] = useState<Date>(currentDate);

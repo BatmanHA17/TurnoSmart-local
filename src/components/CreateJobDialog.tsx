@@ -41,7 +41,7 @@ const hoursOptions = [
 ];
 
 export function CreateJobDialog({ open, onOpenChange, onJobCreated, departments, canEdit }: CreateJobDialogProps) {
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
   const [loading, setLoading] = useState(false);
   const [predefinedJobs, setPredefinedJobs] = useState<PredefinedJob[]>([]);
   const [predefinedJobComboOpen, setPredefinedJobComboOpen] = useState(false);

@@ -46,7 +46,7 @@ export const useCalendarVersions = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { profile } = useUserProfile();
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
 
   const createVersion = async (
     shiftBlocks: ShiftBlock[],

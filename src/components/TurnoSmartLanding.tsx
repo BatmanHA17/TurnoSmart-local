@@ -128,11 +128,11 @@ export function TurnoSmartLanding() {
               >
                 Iniciar Sesión
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 className="border-gray-300 bg-[#0F62FE] text-white hover:bg-[#0F62FE]/90"
-                onClick={() => navigate('/auth')}
+                onClick={() => navigate('/register')}
               >
                 Probar Gratis
               </Button>
@@ -170,11 +170,11 @@ export function TurnoSmartLanding() {
                 >
                   Iniciar Sesión
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   className="w-full border-gray-300 bg-[#0F62FE] text-white hover:bg-[#0F62FE]/90"
-                  onClick={() => navigate('/auth')}
+                  onClick={() => navigate('/register')}
                 >
                   Probar Gratis
                 </Button>
@@ -208,10 +208,10 @@ export function TurnoSmartLanding() {
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-              <Button 
-                size="lg" 
+              <Button
+                size="lg"
                 className="flex items-center gap-2 border border-gray-300 bg-[#0F62FE] text-white hover:bg-[#0F62FE]/90"
-                onClick={() => navigate('/auth')}
+                onClick={() => navigate('/register')}
               >
                 Empezar gratis ahora
                 <ArrowRight className="h-4 w-4" />
@@ -340,10 +340,10 @@ export function TurnoSmartLanding() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button 
-              size="lg" 
+            <Button
+              size="lg"
               className="flex items-center gap-2 border border-gray-300 bg-[#0F62FE] text-white hover:bg-[#0F62FE]/90"
-              onClick={() => navigate('/auth')}
+              onClick={() => navigate('/register')}
             >
               Empezar gratis ahora
               <ArrowRight className="h-4 w-4" />

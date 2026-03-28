@@ -32,7 +32,7 @@ export const ContractDetailsSheet = ({
   const { organizations } = useOrganizations();
   const { assignments, getJobStatus, refetch: refetchAssignments } = useTeamAssignments(colaborador?.id);
   const { departments } = useJobDepartments();
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
   
   // Estado local para manejar equipos seleccionados
   const [selectedDepartments, setSelectedDepartments] = useState<{id: string, name: string}[]>([]);

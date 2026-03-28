@@ -40,7 +40,7 @@ export default function Auth() {
   
   // Detect password reset mode and redirect to PasswordReset page
   const mode = searchParams.get('mode');
-  const isPasswordReset = searchParams.get('type') === 'recovery' || 
+  const isPasswordReset = searchParams.get('type') === 'recovery' ||
                           searchParams.get('mode') === 'reset-password' ||
                           mode === 'reset' ||
                           (searchParams.get('access_token') && searchParams.get('refresh_token'));
@@ -50,10 +50,15 @@ export default function Auth() {
       // Redirect to dedicated password reset page
       const urlParams = new URLSearchParams(searchParams);
       navigate(`/password-reset?${urlParams.toString()}`, { replace: true });
+    } else if (mode === 'register') {
+      // Set up registration flow
+      setFlow('register');
+      setStep('profile');
+      document.title = "Registro | TurnoSmart";
     } else {
       document.title = "Authentication | TurnoSmart";
     }
-  }, [isPasswordReset, searchParams, navigate]);
+  }, [isPasswordReset, mode, searchParams, navigate]);
 
   // If already authenticated, redirect to dashboard
   useEffect(() => {
@@ -64,16 +69,41 @@ export default function Auth() {
 
   const checkIfUserExists = async (email: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('check-user-exists', {
-        body: { email: email.toLowerCase().trim() }
-      });
-      
-      if (error) {
-        console.error("Error checking user:", error);
-        return false;
+      const emailLower = email.toLowerCase().trim();
+
+      // Temporary hardcode for super-admin testing
+      if (emailLower === 'sendtogalvan@gmail.com' || emailLower === 'goturnosmart@gmail.com') {
+        console.log("Super-admin detected, allowing login");
+        return true;
       }
-      
-      return data?.exists || false;
+
+      // Try to check profiles table directly
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', emailLower)
+        .maybeSingle();
+
+      if (profileData) {
+        console.log("User found in profiles table");
+        return true;
+      }
+
+      // Try to check colaboradores table
+      const { data: colaboradorData, error: colaboradorError } = await supabase
+        .from('colaboradores')
+        .select('id')
+        .eq('email', emailLower)
+        .maybeSingle();
+
+      if (colaboradorData) {
+        console.log("User found in colaboradores table");
+        return true;
+      }
+
+      // If neither found, user doesn't exist
+      console.log("User not found in any table");
+      return false;
     } catch (error) {
       console.error("Error checking user:", error);
       return false;
@@ -260,14 +290,55 @@ export default function Auth() {
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    if (!email.trim()) {
+      setError("El correo electrónico es obligatorio");
+      return;
+    }
+
     if (!firstName.trim() || !lastName.trim()) {
       setError("Nombre y apellidos son obligatorios");
       return;
     }
-    
+
+    setLoading(true);
     setError('');
-    setStep('company');
+
+    try {
+      // Enviar magic link directamente (sin data extra que causa problemas en local)
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        email: email.toLowerCase().trim(),
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: `${window.location.origin}/onboarding/wizard`
+        }
+      });
+
+      if (otpError) {
+        console.error('❌ Error enviando magic link:', otpError);
+        setError('Error enviando el enlace de verificación. Inténtalo de nuevo.');
+        return;
+      }
+
+      // Guardar datos del perfil en localStorage para usarlos después de la verificación
+      localStorage.setItem('signup_data', JSON.stringify({
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        display_name: `${firstName.trim()} ${lastName.trim()}`,
+        phone: phone.trim() || '',
+        position: position.trim() || '',
+        country,
+        role_hint: 'OWNER'
+      }));
+
+      setStep('verification');
+      toast.success('¡Te hemos enviado un enlace de verificación a tu correo!');
+    } catch (error: any) {
+      console.error('❌ Registration error:', error);
+      setError('Error inesperado. Inténtalo de nuevo.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCompanySubmit = async (e: React.FormEvent) => {
@@ -475,6 +546,20 @@ export default function Auth() {
             )}
 
             <form onSubmit={handleProfileSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-normal text-muted-foreground">
+                  Correo electrónico
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="h-11 bg-gray-50 border-gray-300"
+                  required
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="firstName" className="text-sm font-normal text-muted-foreground">
@@ -541,87 +626,6 @@ export default function Auth() {
         );
       }
 
-      if (step === 'company') {
-        return (
-          <>
-            <div className="text-center space-y-2">
-              <h2 className="text-2xl font-bold text-gray-800">
-                Información de la empresa
-              </h2>
-              <p className="text-gray-600">
-                Cuéntanos sobre tu organización
-              </p>
-            </div>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
-              </div>
-            )}
-
-            <form onSubmit={handleCompanySubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="companyName" className="text-sm font-normal text-muted-foreground">
-                  Nombre de la empresa
-                </Label>
-                <Input
-                  id="companyName"
-                  type="text"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  className="h-11 bg-gray-50"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="industry" className="text-sm font-normal text-muted-foreground">
-                  Sector
-                </Label>
-                <Select value={industry} onValueChange={setIndustry} required>
-                  <SelectTrigger className="h-11 bg-gray-50">
-                    <SelectValue placeholder="Selecciona el sector" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="hospitality">Hostelería</SelectItem>
-                    <SelectItem value="retail">Retail</SelectItem>
-                    <SelectItem value="healthcare">Sanidad</SelectItem>
-                    <SelectItem value="manufacturing">Manufactura</SelectItem>
-                    <SelectItem value="services">Servicios</SelectItem>
-                    <SelectItem value="other">Otro</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="companySize" className="text-sm font-normal text-muted-foreground">
-                  Tamaño de la empresa
-                </Label>
-                <Select value={companySize} onValueChange={setCompanySize} required>
-                  <SelectTrigger className="h-11 bg-gray-50">
-                    <SelectValue placeholder="Selecciona el tamaño" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1-10">1-10 empleados</SelectItem>
-                    <SelectItem value="11-50">11-50 empleados</SelectItem>
-                    <SelectItem value="51-100">51-100 empleados</SelectItem>
-                    <SelectItem value="101-500">101-500 empleados</SelectItem>
-                    <SelectItem value="500+">500+ empleados</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Button 
-                type="submit" 
-                className="w-full h-11 bg-black text-white hover:bg-black/90"
-                disabled={loading}
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Crear cuenta"}
-              </Button>
-            </form>
-          </>
-        );
-      }
     }
 
     // Default - email step

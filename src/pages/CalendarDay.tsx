@@ -4,15 +4,23 @@ import { DayCalendarView } from "@/components/calendar/day/DayCalendarView";
 import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
 import { useUserRoleCanonical } from "@/hooks/useUserRoleCanonical";
 import { useAuth } from "@/hooks/useAuth";
+import { useCalendarEmployeeFilter } from "@/hooks/useCalendarEmployeeFilter";
+import { useEmployeeSortOrder } from "@/hooks/useEmployeeSortOrder";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function CalendarDay() {
   const { role } = useUserRoleCanonical();
   const { user } = useAuth();
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
   const [employees, setEmployees] = useState<any[]>([]);
+
+  // 🆕 Hook para sincronizar filtro de empleados eliminados entre vistas
+  const { filteredEmployees } = useCalendarEmployeeFilter(employees, selectedOrgId);
+
+  // 🆕 Hook para sincronizar ordenamiento consistente entre todas las vistas
+  const { sortedEmployees } = useEmployeeSortOrder(filteredEmployees);
 
   useEffect(() => {
     document.title = "Calendario Día – TurnoSmart";
@@ -68,7 +76,7 @@ export default function CalendarDay() {
       onDateChange={setSelectedDate}
       selectedOrgId={selectedOrgId}
       onOrgChange={setSelectedOrgId}
-      employees={employees}
+      employees={sortedEmployees}
     />
   );
 }

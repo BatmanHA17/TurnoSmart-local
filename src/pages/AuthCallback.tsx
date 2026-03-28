@@ -18,6 +18,40 @@ export default function AuthCallback() {
 
     const waitForSession = async () => {
       try {
+        // First, check if this is a magic link callback
+        const hash = window.location.hash;
+        const params = new URLSearchParams(hash.substring(1)); // Remove #
+        const accessToken = params.get('access_token');
+        const type = params.get('type');
+
+        if (accessToken && type === 'magiclink') {
+          console.log('⚡ Magic link callback detected');
+
+          // Try to manually verify OTP using the token
+          try {
+            // For local Supabase, we need to use the refresh token approach
+            // or verify the OTP directly
+            const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+              email: params.get('email') || '',
+              token: params.get('token') || accessToken,
+              type: 'magiclink'
+            });
+
+            if (verifyError) {
+              console.warn('verifyOtp failed, trying alternative approach:', verifyError);
+              // If verifyOtp fails, try extracting email from the hash/params and checking if we can auto-login
+              // For super-admin testing, we can use a workaround
+              const storedEmail = localStorage.getItem('signup_email_temp');
+              if (storedEmail?.toLowerCase() === 'sendtogalvan@gmail.com') {
+                console.log('Super-admin attempting to access callback');
+                // Let the normal session check happen
+              }
+            }
+          } catch (e) {
+            console.error('Magic link verification attempt failed:', e);
+          }
+        }
+
         // Give Supabase a brief moment to parse the URL hash and store the session
         for (let i = 0; i < 20; i++) { // up to ~2s
           const { data } = await supabase.auth.getSession();

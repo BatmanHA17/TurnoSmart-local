@@ -112,7 +112,7 @@ const jsonToStringArray = (json: Json): string[] | null => {
 };
 
 export default function HRAuditPolicies() {
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
   const [auditPolicies, setAuditPolicies] = useState<AuditPolicy[]>([]);
   const [coveragePolicies, setCoveragePolicies] = useState<CoveragePolicy[]>([]);
   const [employeeRestrictions, setEmployeeRestrictions] = useState<EmployeeRestriction[]>([]);

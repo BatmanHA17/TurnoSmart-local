@@ -58,7 +58,7 @@ interface RenderableShift {
 
 export function EmployeeScheduleView() {
   const { user } = useAuth();
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
   const { role } = useUserRoleCanonical();
   const isEmployee = role === 'EMPLOYEE';
   const navigate = useNavigate();

@@ -28,7 +28,7 @@ export function EmployeePlanningConfig({
   onOpenAccessManagement,
   onOpenEditContract
 }: EmployeePlanningConfigProps) {
-  const { currentOrg } = useCurrentOrganization();
+  const { org: currentOrg } = useCurrentOrganization();
   const { departments, loading: loadingDepartments } = useJobDepartments();
   const { assignments, loading: loadingAssignments } = useTeamAssignments(colaboradorId);
   const [departmentPlanning, setDepartmentPlanning] = useState<Record<string, boolean>>({});
