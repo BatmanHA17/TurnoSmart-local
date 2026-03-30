@@ -626,7 +626,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       if (data && data.length > 0) {
         const mappedEmployees: Employee[] = data.map(colaborador => ({
           id: colaborador.id,
-          name: `${colaborador.nombre} ${colaborador.apellidos}`,
+          name: `${colaborador.nombre}${colaborador.apellidos ? ' ' + colaborador.apellidos : ''}`,
           role: colaborador.tipo_contrato || 'Empleado',
           department: 'General',
           workingHours: colaborador.tiempo_trabajo_semanal ? `0h/${colaborador.tiempo_trabajo_semanal}h` : '0h/40h',
@@ -859,8 +859,8 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   // Función para obtener horas semanales de un empleado desde colaboradores
   const getWeeklyHoursFromColaborador = (employeeName: string): number => {
     const colaborador = colaboradores.find(col => 
-      `${col.nombre} ${col.apellidos}`.toLowerCase().includes(employeeName.toLowerCase()) ||
-      employeeName.toLowerCase().includes(`${col.nombre} ${col.apellidos}`.toLowerCase())
+      `${col.nombre}${col.apellidos ? ' ' + col.apellidos : ''}`.toLowerCase().includes(employeeName.toLowerCase()) ||
+      employeeName.toLowerCase().includes(`${col.nombre}${col.apellidos ? ' ' + col.apellidos : ''}`.toLowerCase())
     );
     
     return colaborador?.tiempo_trabajo_semanal || 0;
@@ -945,8 +945,8 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   // Función para navegar al perfil del colaborador
   const navigateToColaborador = (employeeName: string) => {
     const colaborador = colaboradores.find(c => 
-      c.nombre && c.apellidos && 
-      `${c.nombre} ${c.apellidos}` === employeeName
+      c.nombre &&
+      `${c.nombre}${c.apellidos ? ' ' + c.apellidos : ''}` === employeeName
     );
     
     if (!colaborador) return;
@@ -1616,7 +1616,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       // Convertir empleados de colaboradores al formato del calendario
       const newEmployees = selectedFromColaboradores.map(colaborador => ({
         id: colaborador.id,
-        name: `${colaborador.nombre} ${colaborador.apellidos}`,
+        name: `${colaborador.nombre}${colaborador.apellidos ? ' ' + colaborador.apellidos : ''}`,
         role: colaborador.tipo_contrato || "Sin definir",
         department: "Bares", // Por defecto
         workingHours: `0h/${colaborador.tiempo_trabajo_semanal || 40}h`
@@ -4016,7 +4016,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
             // Convert back to Employee format and update the calendar
             const sortedCalendarEmployees = sortedEmployees.map(emp => ({
               id: emp.id,
-              name: `${emp.nombre} ${emp.apellidos}`,
+              name: `${emp.nombre}${emp.apellidos ? ' ' + emp.apellidos : ''}`,
               role: emp.tipo_contrato || "Sin definir",
               department: emp.departamento || "Bares",
               workingHours: `0h/${emp.tiempo_trabajo_semanal || 40}h`,
