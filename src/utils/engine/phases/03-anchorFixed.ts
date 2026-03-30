@@ -61,9 +61,8 @@ export function anchorFixed(ctx: PipelineContext): PipelineContext {
 
       if (isWeekend(year, month, d)) {
         if (guardiaDays.has(d)) {
-          // FOM tiene guardia este día → G (sábado) o GT (domingo)
-          const guardiaCode = isSaturday(year, month, d) ? "G" : "GT";
-          grid[fom.id][d] = makeAssignment(guardiaCode, "engine");
+          // FOM tiene guardia este día → siempre G (tanto sábado como domingo)
+          grid[fom.id][d] = makeAssignment("G", "engine");
           // NO locked: Phase 04 necesita saber que FOM trabaja este fds
           // y asignará 2 libres entre semana
         } else {
@@ -97,7 +96,7 @@ export function anchorFixed(ctx: PipelineContext): PipelineContext {
         fomCode = grid[fom.id][d]?.code ?? "M";
       }
 
-      if (fomCode === "G" || fomCode === "GT") {
+      if (fomCode === "G") {
         // FOM en guardia → AFOM libra (su FDS largo ideal)
         grid[afom.id][d] = makeAssignment("D", "engine");
       } else if (fomCode === "D" || fomCode === "V" || fomCode === "E") {

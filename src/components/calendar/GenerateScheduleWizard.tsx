@@ -411,7 +411,7 @@ function Step3Guardias({
                       disabled={weekendsWithGuardia >= 2 && !guardiaDays.includes(w.sunDay)}
                     />
                     <span className="text-sm">Dom {w.sunDate}</span>
-                    <Badge variant="outline" className="text-[9px]">GT</Badge>
+                    <Badge variant="outline" className="text-[9px]">G</Badge>
                   </label>
                 )}
               </div>

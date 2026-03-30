@@ -131,8 +131,7 @@ export const TRANSITION_SHIFT = "11x19" as const;
 export const FOM_AFOM_MIRROR: Record<string, ShiftCode> = {
   M:  "T",    // FOM mañana → AFOM tarde
   T:  "M",    // FOM tarde → AFOM mañana
-  G:  "M",    // FOM guardia → AFOM cubre mañana o tarde según necesidad
-  GT: "M",    // FOM guardia tarde → AFOM mañana
+  G:  "M",    // FOM guardia (S o D) → AFOM cubre mañana
   D:  "M",    // FOM libre → AFOM trabaja (M o T según cobertura)
   V:  "M",    // FOM vacaciones → AFOM cubre
   E:  "M",    // FOM baja → AFOM cubre
