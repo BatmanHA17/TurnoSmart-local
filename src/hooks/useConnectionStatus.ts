@@ -35,7 +35,7 @@ export function useConnectionStatus(): UseConnectionStatusReturn {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
       
-      await fetch('https://povgwdbnyqdcygedcijl.supabase.co/rest/v1/', {
+      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/`, {
         method: 'HEAD',
         signal: controller.signal,
         cache: 'no-store',

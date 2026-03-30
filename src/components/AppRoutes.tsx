@@ -51,6 +51,8 @@ const PlanningTab = React.lazy(() => import("@/components/colaboradores/tabs/Pla
 const AbsencesTab = React.lazy(() => import("@/components/colaboradores/tabs/AbsencesTab"));
 const PermissionsTab = React.lazy(() => import("@/components/colaboradores/tabs/PermissionsTab"));
 const SystemTab = React.lazy(() => import("@/components/colaboradores/tabs/SystemTab"));
+const NominasTab = React.lazy(() => import("@/components/colaboradores/tabs/NominasTab"));
+const Nominas = React.lazy(() => import("@/pages/Nominas"));
 const AddColaboradorSheetRoute = React.lazy(() =>
   import("@/components/colaboradores/AddColaboradorSheetRoute").then(m => ({ default: m.AddColaboradorSheetRoute }))
 );
@@ -94,6 +96,12 @@ const CalendarMonth = React.lazy(() => import("@/pages/CalendarMonth"));
 const BiWeeklyCalendarPage = React.lazy(() =>
   import("@/components/BiWeeklyCalendarView").then(m => ({ default: m.BiWeeklyCalendarView }))
 );
+const TagsCalendarPage = React.lazy(() =>
+  import("@/components/calendar/TagsCalendarView").then(m => ({ default: m.TagsCalendarView }))
+);
+const AttendanceCalendarPage = React.lazy(() =>
+  import("@/components/calendar/AttendanceCalendarView").then(m => ({ default: m.AttendanceCalendarView }))
+);
 const BancoHoras = React.lazy(() => import("@/pages/BancoHoras"));
 const GestionJornadaLaboralCrear = React.lazy(() => import("@/pages/GestionJornadaLaboralCrear"));
 const SolicitudesCambio = React.lazy(() => import("@/pages/SolicitudesCambio"));
@@ -129,6 +137,15 @@ const MarketplaceSettings = React.lazy(() => import("@/pages/MarketplaceSettings
 const RGPDSettings = React.lazy(() => import("@/pages/RGPDSettings"));
 const AddEstablishment = React.lazy(() => import("@/pages/AddEstablishment"));
 const ConfigurationLegacy = React.lazy(() => import("@/pages/ConfigurationLegacy"));
+
+// Mensajería interna
+const Mensajes = React.lazy(() => import("@/pages/Mensajes"));
+
+// Productividad
+const Productividad = React.lazy(() => import("@/pages/Productividad"));
+
+// Wiki
+const Wiki = React.lazy(() => import("@/pages/Wiki"));
 
 // Misc
 const Exportar = React.lazy(() => import("@/pages/Exportar"));
@@ -261,6 +278,7 @@ export const AppRoutes = () => {
             <Route path="absences" element={<AbsencesTab />} />
             <Route path="permissions" element={<PermissionsTab />} />
             <Route path="system" element={<SystemTab />} />
+            <Route path="nominas" element={<NominasTab />} />
           </Route>
 
           <Route path="/turnosmart/collaborators/:empleadoId/work-time" element={<ProtectedRoute><TiempoTrabajo /></ProtectedRoute>} />
@@ -314,8 +332,8 @@ export const AppRoutes = () => {
             <Route path="month" element={<ProtectedRoute><SectionErrorBoundary label="calendar-month"><MainLayout><CalendarMonth /></MainLayout></SectionErrorBoundary></ProtectedRoute>} />
             <Route path="biweekly" element={<ProtectedRoute><SectionErrorBoundary label="calendar-biweek"><MainLayout><BiWeeklyCalendarPage /></MainLayout></SectionErrorBoundary></ProtectedRoute>} />
             <Route path="biweek" element={<Navigate to="/turnosmart/biweekly" replace />} />
-            <Route path="tags" element={<Navigate to="/turnosmart/week" replace />} />
-            <Route path="attendance" element={<Navigate to="/turnosmart/week" replace />} />
+            <Route path="tags" element={<ProtectedRoute><SectionErrorBoundary label="calendar-tags"><MainLayout><TagsCalendarPage /></MainLayout></SectionErrorBoundary></ProtectedRoute>} />
+            <Route path="attendance" element={<ProtectedRoute><SectionErrorBoundary label="calendar-attendance"><MainLayout><AttendanceCalendarPage /></MainLayout></SectionErrorBoundary></ProtectedRoute>} />
           </Route>
 
           {/* Legacy schedule redirects */}
@@ -432,6 +450,18 @@ export const AppRoutes = () => {
           <Route path="/admin/user-management" element={<ProtectedRoute><AdminRoute><AdminUserManagement /></AdminRoute></ProtectedRoute>} />
           <Route path="/admin/stats" element={<ProtectedRoute><AdminRoute><AdminStats /></AdminRoute></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute><AdminRoute><AdminSettings /></AdminRoute></ProtectedRoute>} />
+
+          {/* Nóminas — OWNER/ADMIN/MANAGER */}
+          <Route path="/turnosmart/nominas" element={<ProtectedRoute><Nominas /></ProtectedRoute>} />
+
+          {/* Mensajería interna */}
+          <Route path="/turnosmart/mensajes" element={<ProtectedRoute><Mensajes /></ProtectedRoute>} />
+
+          {/* Wiki / Knowledge Base */}
+          <Route path="/turnosmart/wiki" element={<ProtectedRoute><Wiki /></ProtectedRoute>} />
+
+          {/* Productividad — OWNER/ADMIN/MANAGER */}
+          <Route path="/turnosmart/productividad" element={<ProtectedRoute><Productividad /></ProtectedRoute>} />
 
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />

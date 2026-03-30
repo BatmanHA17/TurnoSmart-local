@@ -7,6 +7,7 @@ import { format, differenceInHours, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { calculateTotalBreakTime, formatBreakTime } from "@/utils/breakCalculations";
 import { ShiftBlockDay } from "@/hooks/useDayCalendarData";
+import { ShiftValidationBadge, ValidationStatus } from "@/components/calendar/ShiftValidationBadge";
 
 interface ShiftEmployee {
   id: string;
@@ -24,12 +25,13 @@ interface ShiftCardProps {
   onSelect?: (shift: ShiftBlockDay) => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
+  onValidationChange?: (shiftId: string, newStatus: ValidationStatus) => void;
   isSelected?: boolean;
   shiftsCount?: number;
   readOnly?: boolean;
 }
 
-export function ShiftCard({ shift, employee, onShowDetails, onEdit, onDelete, onAddShift, onSelect, onDragStart, onDragEnd, isSelected = false, shiftsCount = 1, readOnly = false }: ShiftCardProps) {
+export function ShiftCard({ shift, employee, onShowDetails, onEdit, onDelete, onAddShift, onSelect, onDragStart, onDragEnd, onValidationChange, isSelected = false, shiftsCount = 1, readOnly = false }: ShiftCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isBannerHovered, setIsBannerHovered] = useState(false);
@@ -163,6 +165,21 @@ export function ShiftCard({ shift, employee, onShowDetails, onEdit, onDelete, on
           </div>
         )}
         
+        {/* Validation badge — top-left corner, visible on hover (or always when not pending) */}
+        {shift.type !== 'absence' && (shift as any).validation_status !== undefined && (
+          <div
+            className="absolute top-0.5 left-0.5 z-20 pointer-events-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ShiftValidationBadge
+              status={((shift as any).validation_status as ValidationStatus) || 'pending'}
+              canEdit={!readOnly}
+              onStatusChange={onValidationChange ? (s) => onValidationChange(shift.id, s) : undefined}
+              size="xs"
+            />
+          </div>
+        )}
+
         {/* Three dots menu usando Popover - Solución definitiva - OCULTO en modo readOnly */}
         {!readOnly && (
           <div

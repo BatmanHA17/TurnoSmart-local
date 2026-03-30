@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { MultiDatePicker } from "@/components/calendar/MultiDatePicker";
+import { ShiftBlock } from "@/utils/calendarShiftUtils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOrganizationsUnified } from "@/hooks/useOrganizationsUnified";
 import { useJobDepartments } from "@/hooks/useJobDepartments";
@@ -15,7 +17,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { format, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { calculateTotalBreakTime, formatBreakTime, hasValidBreaks, type Break } from "@/utils/breakCalculations";
 import { 
@@ -69,9 +71,15 @@ interface AdvancedShiftDialogProps {
   date: Date;
   editingShift?: any;
   onShiftAssigned?: (shiftData: any) => void;
+  /** All 14 days of the current biweek — enables multi-date mode */
+  biWeekDays?: Date[];
+  /** Current shift blocks — used to show indicators in MultiDatePicker */
+  shiftBlocks?: ShiftBlock[];
+  /** If true, the multi-date toggle is pre-enabled when dialog opens */
+  defaultMultiDate?: boolean;
 }
 
-export function AdvancedShiftDialog({ isOpen, onClose, employee, date, editingShift, onShiftAssigned }: AdvancedShiftDialogProps) {
+export function AdvancedShiftDialog({ isOpen, onClose, employee, date, editingShift, onShiftAssigned, biWeekDays, shiftBlocks, defaultMultiDate }: AdvancedShiftDialogProps) {
   const { currentOrganizationName } = useOrganizationsUnified();
   const { departments } = useJobDepartments();
   
@@ -100,6 +108,10 @@ export function AdvancedShiftDialog({ isOpen, onClose, employee, date, editingSh
   const [overtimeShift, setOvertimeShift] = useState<boolean>(false);
   const [savedShifts, setSavedShifts] = useState<any[]>([]);
   const [refreshShifts, setRefreshShifts] = useState(0);
+
+  // Multi-date state
+  const [multiDateEnabled, setMultiDateEnabled] = useState(false);
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
 
   // Helper functions for team selection
   const parseTeamsFromString = (teamsString: string): string[] => {
@@ -197,42 +209,53 @@ export function AdvancedShiftDialog({ isOpen, onClose, employee, date, editingSh
       setBreaks([]);
       setShouldSaveShift(!employee);
       setActiveTab(employee ? "saved" : "scratch");
+      // Reset multi-date: pre-select the initial date, honour defaultMultiDate
+      setMultiDateEnabled(!!defaultMultiDate);
+      setSelectedDates([date]);
     }
-  }, [editingShift, employee, isOpen]);
+  }, [editingShift, employee, isOpen, date, defaultMultiDate]);
 
   const handleAddShift = async () => {
+    // Determine which dates to use
+    const datesToApply =
+      multiDateEnabled && biWeekDays && selectedDates.length > 0
+        ? selectedDates
+        : [date];
+
     // Para la pestaña "Horarios guardados", verificar que hay horarios seleccionados
     if (activeTab === "saved") {
       if (selectedShifts.size === 0) {
         toast.error("Selecciona al menos un horario guardado para continuar");
         return;
       }
-      
-      // Procesar cada horario seleccionado
+
+      // Procesar cada horario seleccionado × cada fecha seleccionada
       const savedShiftsData = getSavedShiftsSync();
       selectedShifts.forEach(shiftId => {
         const selectedShift = savedShiftsData.find(s => s.id === shiftId);
         if (selectedShift && onShiftAssigned) {
-          const shiftData = {
-            name: selectedShift.name,
-            startTime: selectedShift.startTime,
-            endTime: selectedShift.endTime,
-            organization: selectedOrgId === "all" ? currentOrganizationName : selectedOrgId,
-            department: selectedShift.department,
-            notes: selectedShift.notes,
-            breakType: selectedShift.breakType,
-            breakDuration: selectedShift.breakDuration,
-            breaks: selectedShift.breaks || [],
-            hasBreak: hasValidBreaks(selectedShift.breaks || []),
-            totalBreakTime: calculateTotalBreakTime(selectedShift.breaks || []),
-            employeeId: employee?.id,
-            date: date.toISOString(),
-            color: selectedShift.color,
-          };
-          onShiftAssigned(shiftData);
+          datesToApply.forEach(applyDate => {
+            const shiftData = {
+              name: selectedShift.name,
+              startTime: selectedShift.startTime,
+              endTime: selectedShift.endTime,
+              organization: selectedOrgId === "all" ? currentOrganizationName : selectedOrgId,
+              department: selectedShift.department,
+              notes: selectedShift.notes,
+              breakType: selectedShift.breakType,
+              breakDuration: selectedShift.breakDuration,
+              breaks: selectedShift.breaks || [],
+              hasBreak: hasValidBreaks(selectedShift.breaks || []),
+              totalBreakTime: calculateTotalBreakTime(selectedShift.breaks || []),
+              employeeId: employee?.id,
+              date: applyDate.toISOString(),
+              color: selectedShift.color,
+            };
+            onShiftAssigned(shiftData);
+          });
         }
       });
-      
+
       // Registro de actividad sin toast
       onClose();
       return;
@@ -252,26 +275,29 @@ export function AdvancedShiftDialog({ isOpen, onClose, employee, date, editingSh
       return;
     }
 
-    const shiftData = {
-      name: shiftName,
-      startTime,
-      endTime,
-      color: selectedColor,
-      organization: selectedOrgId === "all" ? currentOrganizationName : selectedOrgId,
-      department,
-      notes,
-      breakType,
-      breakDuration,
-      breaks: convertTempBreaksToBreaks(breaks),
-      hasBreak: hasValidBreaks(convertTempBreaksToBreaks(breaks)),
-      totalBreakTime: calculateTotalBreakTime(convertTempBreaksToBreaks(breaks)),
-      employeeId: employee?.id,
-      date: date.toISOString(),
-    };
+    const convertedBreaks = convertTempBreaksToBreaks(breaks);
 
-    // Lógica 1: Siempre añadir al día correspondiente
+    // Lógica 1: Siempre añadir al día correspondiente (o a múltiples días)
     if (onShiftAssigned) {
-      onShiftAssigned(shiftData);
+      datesToApply.forEach(applyDate => {
+        const shiftData = {
+          name: shiftName,
+          startTime,
+          endTime,
+          color: selectedColor,
+          organization: selectedOrgId === "all" ? currentOrganizationName : selectedOrgId,
+          department,
+          notes,
+          breakType,
+          breakDuration,
+          breaks: convertedBreaks,
+          hasBreak: hasValidBreaks(convertedBreaks),
+          totalBreakTime: calculateTotalBreakTime(convertedBreaks),
+          employeeId: employee?.id,
+          date: applyDate.toISOString(),
+        };
+        onShiftAssigned(shiftData);
+      });
     }
 
     // Lógica 2: Si debe guardarse, añadir o actualizar el listado de horarios guardados
@@ -287,9 +313,9 @@ export function AdvancedShiftDialog({ isOpen, onClose, employee, date, editingSh
         organization: selectedOrgId === "all" ? currentOrganizationName : selectedOrgId,
         breakType,
         breakDuration,
-        breaks: convertTempBreaksToBreaks(breaks),
-        hasBreak: hasValidBreaks(convertTempBreaksToBreaks(breaks)),
-        totalBreakTime: calculateTotalBreakTime(convertTempBreaksToBreaks(breaks)),
+        breaks: convertedBreaks,
+        hasBreak: hasValidBreaks(convertedBreaks),
+        totalBreakTime: calculateTotalBreakTime(convertedBreaks),
         notes,
       };
 
@@ -395,6 +421,36 @@ export function AdvancedShiftDialog({ isOpen, onClose, employee, date, editingSh
                 <div>Empleado/a: <span className="font-medium">{employee?.name}</span></div>
                 <div>{format(date, "EEEE, d MMMM yyyy", { locale: es })}</div>
               </div>
+
+              {/* Multi-date toggle — only available when biWeekDays are provided */}
+              {biWeekDays && biWeekDays.length === 14 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-2 border rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-3 w-3 text-primary" />
+                      <span className="text-[10px] font-medium">Aplicar a múltiples fechas</span>
+                    </div>
+                    <Switch
+                      checked={multiDateEnabled}
+                      onCheckedChange={(val) => {
+                        setMultiDateEnabled(val);
+                        if (val && !selectedDates.some(d => isSameDay(d, date))) {
+                          setSelectedDates([date]);
+                        }
+                      }}
+                    />
+                  </div>
+                  {multiDateEnabled && (
+                    <MultiDatePicker
+                      initialDate={date}
+                      biWeekDays={biWeekDays}
+                      selectedDates={selectedDates}
+                      onSelectionChange={setSelectedDates}
+                      employeeShifts={shiftBlocks?.filter(s => s.employeeId === employee?.id)}
+                    />
+                  )}
+                </div>
+              )}
 
               {/* Search */}
               <div className="relative">
@@ -510,6 +566,36 @@ export function AdvancedShiftDialog({ isOpen, onClose, employee, date, editingSh
                 <div className="text-[8px] text-muted-foreground">
                   <div>Empleado/a: <span className="font-medium">{employee.name}</span></div>
                   <div>{format(date, "EEEE, d MMMM yyyy", { locale: es })}</div>
+                </div>
+              )}
+
+              {/* Multi-date toggle — only available when biWeekDays are provided */}
+              {biWeekDays && biWeekDays.length === 14 && !editingShift && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-2 border rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-3 w-3 text-primary" />
+                      <span className="text-[10px] font-medium">Aplicar a múltiples fechas</span>
+                    </div>
+                    <Switch
+                      checked={multiDateEnabled}
+                      onCheckedChange={(val) => {
+                        setMultiDateEnabled(val);
+                        if (val && !selectedDates.some(d => isSameDay(d, date))) {
+                          setSelectedDates([date]);
+                        }
+                      }}
+                    />
+                  </div>
+                  {multiDateEnabled && (
+                    <MultiDatePicker
+                      initialDate={date}
+                      biWeekDays={biWeekDays}
+                      selectedDates={selectedDates}
+                      onSelectionChange={setSelectedDates}
+                      employeeShifts={shiftBlocks?.filter(s => s.employeeId === employee?.id)}
+                    />
+                  )}
                 </div>
               )}
 

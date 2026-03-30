@@ -293,9 +293,9 @@ export const ColaboradoresView = () => {
   // Filtrar colaboradores basado en todos los filtros
   const filteredColaboradores = colaboradores.filter(colaborador => {
     // Filtro de búsqueda
-    const matchesSearch = colaborador.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      colaborador.apellidos.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      colaborador.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = (colaborador.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (colaborador.apellidos || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (colaborador.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       colaborador.empleado_id?.toLowerCase().includes(searchTerm.toLowerCase());
 
     // Filtro de tipo de contrato
@@ -321,9 +321,9 @@ export const ColaboradoresView = () => {
   const sortedColaboradores = [...filteredColaboradores].sort((a, b) => {
     switch (selectedOrden) {
       case "ordenar-nombre":
-        return a.nombre.localeCompare(b.nombre);
+        return (a.nombre || '').localeCompare(b.nombre || '');
       case "ordenar-apellido":
-        return a.apellidos.localeCompare(b.apellidos);
+        return (a.apellidos || a.nombre || '').localeCompare(b.apellidos || b.nombre || '');
       case "ordenar-fecha":
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       case "ordenar-rol":
@@ -332,7 +332,7 @@ export const ColaboradoresView = () => {
         const bRole = b.role || 'empleado';
         return (roleOrder[aRole] || 6) - (roleOrder[bRole] || 6);
       default:
-        return a.apellidos.localeCompare(b.apellidos);
+        return (a.apellidos || a.nombre || '').localeCompare(b.apellidos || b.nombre || '');
     }
   });
 
@@ -782,7 +782,7 @@ export const ColaboradoresView = () => {
                      <TableCell>
                        <div className="flex flex-col gap-1">
                          {(() => {
-                           const isPendiente = colaborador.nombre.includes('(pendiente)') || colaborador.apellidos.includes('(pendiente)');
+                           const isPendiente = (colaborador.nombre || '').includes('(pendiente)') || (colaborador.apellidos || '').includes('(pendiente)');
                            const status = isPendiente ? 'pendiente' : colaborador.status;
 
                            return (

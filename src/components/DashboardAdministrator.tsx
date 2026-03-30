@@ -2,15 +2,18 @@ import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Shield, Database, Users, Settings, BarChart3, Lock, Globe, Wrench, HelpCircle, Crown } from "lucide-react";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 const DashboardAdministrator = () => {
+  const { displayName } = useUserProfile();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       <div className="container mx-auto p-6 space-y-8">
         {/* Header Section */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div className="space-y-2">
-            <h1 className="text-4xl font-bold text-foreground">Hola Administrador,</h1>
+            <h1 className="text-4xl font-bold text-foreground">Hola {displayName || 'Administrador'},</h1>
             <p className="text-lg text-muted-foreground">
               Puede acceder a toda la aplicación con permisos completos
             </p>

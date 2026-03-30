@@ -4,10 +4,10 @@ import { useCurrentOrganization } from './useCurrentOrganization';
 
 export interface JobDepartment {
   id: string;
-  value: string;
+  name: string;
+  value: string; // alias for name, for backwards compat
   org_id: string;
   created_at: string;
-  created_by?: string;
 }
 
 export function useJobDepartments() {
@@ -31,13 +31,14 @@ export function useJobDepartments() {
         .from('job_departments')
         .select('*')
         .eq('org_id', currentOrg.org_id)
-        .order('value', { ascending: true });
+        .order('name', { ascending: true });
 
       if (fetchError) {
         throw fetchError;
       }
 
-      setDepartments(data || []);
+      // Map 'name' to 'value' for backwards compat
+      setDepartments((data || []).map((d: any) => ({ ...d, value: d.name })));
     } catch (err) {
       console.error('Error fetching job departments:', err);
       setError(err instanceof Error ? err.message : 'Error desconocido');

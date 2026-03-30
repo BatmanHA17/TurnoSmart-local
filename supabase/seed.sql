@@ -1,0 +1,167 @@
+-- =============================================================================
+-- SEED: Datos de prueba para TurnoSmart® — Motor SMART v2.0
+-- Org: Recepción (eb228f04-a473-4d2d-8bf8-99c7f08d8c5c)
+-- 7 empleados: 1 FOM + 1 AFOM + 1 Night Agent + 1 GEX + 3 Front Desk Agents
+-- =============================================================================
+
+DO $$
+DECLARE
+  v_org_id UUID;
+  v_admin_id UUID := '00000000-0000-0000-0000-000000000001';
+  v_fom_id UUID := gen_random_uuid();
+  v_afom_id UUID := gen_random_uuid();
+  v_night_id UUID := gen_random_uuid();
+  v_gex_id UUID := gen_random_uuid();
+  v_fda1_id UUID := gen_random_uuid();
+  v_fda2_id UUID := gen_random_uuid();
+  v_fda3_id UUID := gen_random_uuid();
+BEGIN
+  -- Obtener org_id dinámicamente (cambia en cada reset)
+  SELECT id INTO v_org_id FROM organizations WHERE slug = 'recepcion' LIMIT 1;
+  IF v_org_id IS NULL THEN
+    RAISE EXCEPTION 'Org recepcion no encontrada — ejecutar km0 migrations primero';
+  END IF;
+
+-- ----------------------------------------------------------------
+-- 0. USUARIO ADMIN (persiste tras db reset)
+-- ----------------------------------------------------------------
+-- Crear usuario admin en auth.users con UUID fijo para desarrollo local
+INSERT INTO auth.users (
+  id, instance_id, email, encrypted_password, email_confirmed_at,
+  role, aud, created_at, updated_at,
+  raw_app_meta_data, raw_user_meta_data, is_super_admin,
+  confirmation_token, recovery_token, email_change_token_new, email_change
+)
+VALUES (
+  v_admin_id,
+  '00000000-0000-0000-0000-000000000000',
+  'goturnosmart@gmail.com',
+  crypt('TurnoSmart2026!', gen_salt('bf')),
+  now(),
+  'authenticated', 'authenticated',
+  now(), now(),
+  '{"provider":"email","providers":["email"]}',
+  '{"display_name":"Super Admin"}',
+  false,
+  '', '', '', ''
+) ON CONFLICT (id) DO NOTHING;
+
+-- Crear identidad para el usuario (necesaria para magic link)
+INSERT INTO auth.identities (
+  id, user_id, identity_data, provider, provider_id, created_at, updated_at, last_sign_in_at
+)
+VALUES (
+  v_admin_id,
+  v_admin_id,
+  jsonb_build_object('sub', v_admin_id::text, 'email', 'goturnosmart@gmail.com'),
+  'email',
+  'goturnosmart@gmail.com',
+  now(), now(), now()
+) ON CONFLICT DO NOTHING;
+
+-- Perfil
+INSERT INTO profiles (id, email, display_name, is_active)
+VALUES (v_admin_id, 'goturnosmart@gmail.com', 'Super Admin TurnoSmart', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Super admin
+INSERT INTO super_admins (user_id)
+VALUES (v_admin_id)
+ON CONFLICT DO NOTHING;
+
+-- Membership OWNER en la org
+INSERT INTO memberships (user_id, org_id, role, status)
+VALUES (v_admin_id, v_org_id, 'OWNER'::app_role_canonical, 'active')
+ON CONFLICT (user_id, org_id) DO UPDATE SET role = 'OWNER', status = 'active';
+
+-- ----------------------------------------------------------------
+-- 1. COLABORADORES (empleados de recepción)
+-- ----------------------------------------------------------------
+INSERT INTO colaboradores (id, org_id, nombre, apellidos, email, department, status, tipo_contrato, tiempo_trabajo_semanal, fecha_inicio_contrato) VALUES
+  (v_fom_id,   v_org_id, 'FOM',              NULL, 'fom@hotel.com',          'Recepción', 'activo', 'Indefinido', 40, '2023-01-15'),
+  (v_afom_id,  v_org_id, 'AFOM',             NULL, 'afom@hotel.com',         'Recepción', 'activo', 'Indefinido', 40, '2023-03-01'),
+  (v_night_id, v_org_id, 'Night Agent',      NULL, 'night@hotel.com',        'Recepción', 'activo', 'Indefinido', 40, '2022-09-01'),
+  (v_gex_id,   v_org_id, 'GEX',              NULL, 'gex@hotel.com',          'Recepción', 'activo', 'Parcial',    20, '2024-02-01'),
+  (v_fda1_id,  v_org_id, 'Front Desk',       '1',  'fda1@hotel.com',         'Recepción', 'activo', 'Indefinido', 40, '2023-06-15'),
+  (v_fda2_id,  v_org_id, 'Front Desk',       '2',  'fda2@hotel.com',         'Recepción', 'activo', 'Indefinido', 40, '2024-01-10'),
+  (v_fda3_id,  v_org_id, 'Front Desk',       '3',  'fda3@hotel.com',         'Recepción', 'activo', 'Indefinido', 40, '2023-11-01')
+ON CONFLICT DO NOTHING;
+
+-- ----------------------------------------------------------------
+-- 2. EQUITY inicial (para que el motor arranque con historial cero)
+-- ----------------------------------------------------------------
+INSERT INTO employee_equity (
+  employee_id, organization_id,
+  period_start, period_end,
+  morning_count, afternoon_count, night_count,
+  long_weekend_count, weekend_worked_count
+) VALUES
+  (v_fom_id,   v_org_id, '2026-02-01', '2026-02-28', 18, 0, 0, 1, 8),
+  (v_afom_id,  v_org_id, '2026-02-01', '2026-02-28', 8, 14, 0, 1, 6),
+  (v_night_id, v_org_id, '2026-02-01', '2026-02-28', 0, 0, 20, 0, 12),
+  (v_gex_id,   v_org_id, '2026-02-01', '2026-02-28', 10, 8, 0, 1, 4),
+  (v_fda1_id,  v_org_id, '2026-02-01', '2026-02-28', 10, 8, 5, 1, 6),
+  (v_fda2_id,  v_org_id, '2026-02-01', '2026-02-28', 8, 10, 5, 1, 5),
+  (v_fda3_id,  v_org_id, '2026-02-01', '2026-02-28', 9, 9, 5, 0, 7)
+ON CONFLICT DO NOTHING;
+
+-- ----------------------------------------------------------------
+-- 3. PETICIONES de prueba — marzo 2026
+-- ----------------------------------------------------------------
+-- Laura (FOM): petición dura — libre el día 15 (festivo local)
+INSERT INTO schedule_petitions (
+  organization_id, employee_id, type, status,
+  days, period_start, period_end, reason
+) VALUES (
+  v_org_id, v_fom_id, 'A', 'approved',
+  ARRAY[15]::int[],
+  '2026-03-01', '2026-03-31',
+  'Festivo local — La Palma'
+) ON CONFLICT DO NOTHING;
+
+-- María López (FDA1): petición blanda — prefiere mañanas semana del 17
+INSERT INTO schedule_petitions (
+  organization_id, employee_id, type, status,
+  days, requested_shift, period_start, period_end, reason
+) VALUES (
+  v_org_id, v_fda1_id, 'B', 'approved',
+  ARRAY[17, 18, 19, 20, 21]::int[],
+  'M',
+  '2026-03-01', '2026-03-31',
+  'Cita médica por las tardes esa semana'
+) ON CONFLICT DO NOTHING;
+
+-- Jorge García (FDA2): solicita vacaciones días 25-28
+INSERT INTO schedule_petitions (
+  organization_id, employee_id, type, status,
+  days, period_start, period_end, reason
+) VALUES (
+  v_org_id, v_fda2_id, 'A', 'approved',
+  ARRAY[25, 26, 27, 28]::int[],
+  '2026-03-01', '2026-03-31',
+  'Vacaciones — semana santa'
+) ON CONFLICT DO NOTHING;
+
+-- ----------------------------------------------------------------
+-- 4. OCUPACIÓN diaria — marzo 2026 (simulación check-ins típicos)
+-- ----------------------------------------------------------------
+INSERT INTO daily_occupancy (organization_id, date, check_ins, check_outs, notes)
+SELECT
+  v_org_id,
+  ('2026-03-' || LPAD(d::text, 2, '0'))::date,
+  CASE
+    WHEN d IN (7, 8, 14, 15, 21, 22, 28, 29) THEN 45  -- fines de semana: más ocupación
+    WHEN d BETWEEN 24 AND 28 THEN 55                   -- semana santa: pico
+    ELSE 25                                             -- días laborables: normal
+  END,
+  CASE
+    WHEN d IN (7, 8, 14, 15, 21, 22, 28, 29) THEN 40
+    WHEN d BETWEEN 24 AND 28 THEN 50
+    ELSE 20
+  END,
+  NULL
+FROM generate_series(1, 31) AS d
+ON CONFLICT (organization_id, date) DO NOTHING;
+
+RAISE NOTICE '✅ Seed completado: 7 empleados, equity feb-2026, 3 peticiones, 31 días ocupación';
+END $$;

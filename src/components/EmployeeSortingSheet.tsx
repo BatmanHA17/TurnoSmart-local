@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { GripVertical, ChevronDown, ChevronUp } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -73,18 +74,89 @@ const sortOptions: SortOption[] = [
   { id: 'status-desc', label: 'Estado (Inactivo primero)', field: 'status', category: 'Estado' },
 ];
 
-export function EmployeeSortingSheet({ 
-  isOpen, 
-  onClose, 
-  employees, 
-  onApplySort, 
-  currentSortCriteria 
+interface ActiveFilters {
+  status: string[];
+  departamentos: string[];
+  tiposContrato: string[];
+}
+
+export function EmployeeSortingSheet({
+  isOpen,
+  onClose,
+  employees,
+  onApplySort,
+  currentSortCriteria
 }: EmployeeSortingSheetProps) {
   const [selectedSort, setSelectedSort] = useState<string>(currentSortCriteria);
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set(['Datos Personales']));
   const [manualOrderEmployees, setManualOrderEmployees] = useState<Employee[]>([]);
   const [isManualMode, setIsManualMode] = useState(true); // Por defecto en modo manual
   const [draggedEmployeeId, setDraggedEmployeeId] = useState<string | null>(null);
+  const [activeFilters, setActiveFilters] = useState<ActiveFilters>({
+    status: [],
+    departamentos: [],
+    tiposContrato: [],
+  });
+
+  // Derived unique values from employees
+  const uniqueDepartamentos = Array.from(
+    new Set(employees.map(e => e.departamento).filter((d): d is string => !!d && d.trim() !== ''))
+  ).sort();
+
+  const uniqueTiposContrato = Array.from(
+    new Set(employees.map(e => e.tipo_contrato).filter((t): t is string => !!t && t.trim() !== ''))
+  ).sort();
+
+  const activeFilterCount =
+    activeFilters.status.length +
+    activeFilters.departamentos.length +
+    activeFilters.tiposContrato.length;
+
+  const applyFilters = (emps: Employee[], filters: ActiveFilters): Employee[] => {
+    return emps.filter(emp => {
+      const statusMatch =
+        filters.status.length === 0 ||
+        filters.status.includes(emp.status ?? '');
+      const deptMatch =
+        filters.departamentos.length === 0 ||
+        filters.departamentos.includes(emp.departamento ?? '');
+      const contratoMatch =
+        filters.tiposContrato.length === 0 ||
+        filters.tiposContrato.includes(emp.tipo_contrato ?? '');
+      return statusMatch && deptMatch && contratoMatch;
+    });
+  };
+
+  const toggleFilterValue = (
+    key: keyof ActiveFilters,
+    value: string
+  ) => {
+    setActiveFilters(prev => {
+      const current = prev[key] as string[];
+      const updated = current.includes(value)
+        ? current.filter(v => v !== value)
+        : [...current, value];
+      return { ...prev, [key]: updated };
+    });
+  };
+
+  const clearFilters = () => {
+    setActiveFilters({ status: [], departamentos: [], tiposContrato: [] });
+  };
+
+  // Re-apply filter+sort whenever filters change
+  useEffect(() => {
+    if (!isOpen) return;
+    if (isManualMode) {
+      const filtered = applyFilters(manualOrderEmployees, activeFilters);
+      onApplySort(filtered);
+    } else {
+      const filtered = applyFilters(employees, activeFilters);
+      const sorted = sortEmployees(filtered, selectedSort);
+      onApplySort(sorted);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFilters]);
 
   // Initialize manual order when opening sheet
   useEffect(() => {
@@ -136,7 +208,7 @@ export function EmployeeSortingSheet({
       try {
         const parsedOrder = JSON.parse(savedManualOrder);
         setManualOrderEmployees(parsedOrder);
-        onApplySort(parsedOrder); // Apply the saved order immediately
+        onApplySort(applyFilters(parsedOrder, activeFilters)); // Apply the saved order immediately
       } catch (error) {
         console.error('Error parsing saved manual order:', error);
       }
@@ -199,9 +271,10 @@ export function EmployeeSortingSheet({
     
     // Save manual order to localStorage for persistence
     localStorage.setItem('manual-employee-order', JSON.stringify(newOrder));
-    
-    // Apply to calendar
-    onApplySort(newOrder);
+
+    // Apply to calendar (filtered first, then in manual order)
+    const filtered = applyFilters(newOrder, activeFilters);
+    onApplySort(filtered);
     
     setDraggedEmployeeId(null);
     
@@ -211,35 +284,32 @@ export function EmployeeSortingSheet({
     setDraggedEmployeeId(null);
   };
 
-  const applySortCriteria = (sortId: string) => {
-    setSelectedSort(sortId);
-    
+  const sortEmployees = (emps: Employee[], sortId: string): Employee[] => {
     const sortOption = sortOptions.find(option => option.id === sortId);
-    if (!sortOption) return;
+    if (!sortOption) return emps;
 
-    const sorted = [...employees].sort((a, b) => {
+    return [...emps].sort((a, b) => {
       const aValue = a[sortOption.field];
       const bValue = b[sortOption.field];
-      
+
       // Handle null/undefined values
       if (!aValue && !bValue) return 0;
       if (!aValue) return 1;
       if (!bValue) return -1;
-      
+
       // Special handling for dates
       if (sortOption.field === 'fecha_nacimiento' || sortOption.field === 'fecha_inicio_contrato') {
         const aDate = new Date(aValue as string);
         const bDate = new Date(bValue as string);
-        
-        // Ensure valid dates before comparison
+
         if (isNaN(aDate.getTime()) && isNaN(bDate.getTime())) return 0;
         if (isNaN(aDate.getTime())) return 1;
         if (isNaN(bDate.getTime())) return -1;
-        
+
         const result = aDate.getTime() - bDate.getTime();
         return sortId.endsWith('-desc') ? -result : result;
       }
-      
+
       // Special handling for numbers (tiempo_trabajo_semanal)
       if (sortOption.field === 'tiempo_trabajo_semanal') {
         const aNum = Number(aValue) || 0;
@@ -247,15 +317,19 @@ export function EmployeeSortingSheet({
         const result = aNum - bNum;
         return sortId.endsWith('-desc') ? -result : result;
       }
-      
+
       // String comparison
       const aStr = String(aValue || '').toLowerCase();
       const bStr = String(bValue || '').toLowerCase();
       const result = aStr.localeCompare(bStr, 'es', { numeric: true });
       return sortId.endsWith('-desc') ? -result : result;
     });
-    
-    // Apply the sort directly to the calendar
+  };
+
+  const applySortCriteria = (sortId: string) => {
+    setSelectedSort(sortId);
+    const filtered = applyFilters(employees, activeFilters);
+    const sorted = sortEmployees(filtered, sortId);
     onApplySort(sorted);
   };
 
@@ -271,13 +345,92 @@ export function EmployeeSortingSheet({
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent side="right" className="w-[500px] sm:w-[600px] overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>Ordenar empleados en el calendario</SheetTitle>
+          <SheetTitle>Filtrar y ordenar empleados</SheetTitle>
           <p className="text-sm text-muted-foreground">
             Personalizar el orden de los empleados en la Rota. Esta lista contiene los empleados cuya cuenta es activada, incluso si no están planificados esta semana.
           </p>
         </SheetHeader>
 
         <div className="space-y-6 mt-6">
+
+          {/* ── FILTER SECTION ── */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-medium">Filtrar</h3>
+                {activeFilterCount > 0 && (
+                  <Badge variant="secondary" className="text-xs">
+                    {activeFilterCount}
+                  </Badge>
+                )}
+              </div>
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="text-xs text-primary underline-offset-2 hover:underline"
+                >
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+
+            {/* Estado */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Estado</p>
+              <div className="flex flex-col gap-2">
+                {(['activo', 'inactivo'] as const).map(val => (
+                  <label key={val} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={activeFilters.status.includes(val)}
+                      onCheckedChange={() => toggleFilterValue('status', val)}
+                    />
+                    <span className="text-sm capitalize">{val.charAt(0).toUpperCase() + val.slice(1)}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Departamento */}
+            {uniqueDepartamentos.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Departamento</p>
+                <div className="flex flex-col gap-2">
+                  {uniqueDepartamentos.map(dept => (
+                    <label key={dept} className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox
+                        checked={activeFilters.departamentos.includes(dept)}
+                        onCheckedChange={() => toggleFilterValue('departamentos', dept)}
+                      />
+                      <span className="text-sm">{dept}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tipo de contrato */}
+            {uniqueTiposContrato.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tipo de contrato</p>
+                <div className="flex flex-col gap-2">
+                  {uniqueTiposContrato.map(tipo => (
+                    <label key={tipo} className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox
+                        checked={activeFilters.tiposContrato.includes(tipo)}
+                        onCheckedChange={() => toggleFilterValue('tiposContrato', tipo)}
+                      />
+                      <span className="text-sm">{tipo}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="border-t" />
+
+          {/* ── SORT SECTION ── */}
           <div className="flex gap-2">
             <Button
               variant={isManualMode ? "default" : "outline"}
@@ -385,9 +538,19 @@ export function EmployeeSortingSheet({
             </p>
           </div>
 
-          {/* Botón de cerrar */}
-          <div className="flex pt-4 border-t">
-            <Button variant="outline" onClick={onClose} className="w-full">
+          {/* Footer buttons */}
+          <div className="flex gap-2 pt-4 border-t">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                clearFilters();
+                setSelectedSort('');
+              }}
+              className="flex-1"
+            >
+              Limpiar todo
+            </Button>
+            <Button variant="outline" onClick={onClose} className="flex-1">
               Cerrar
             </Button>
           </div>

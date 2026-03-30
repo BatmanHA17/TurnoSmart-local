@@ -114,23 +114,23 @@ ALTER TABLE schedule_generations ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view own org equity"
   ON employee_equity FOR SELECT
   USING (organization_id IN (
-    SELECT organization_id FROM organization_members WHERE user_id = auth.uid()
+    SELECT m.org_id FROM memberships m WHERE m.user_id = auth.uid()
   ));
 
 CREATE POLICY "Users can manage own org equity"
   ON employee_equity FOR ALL
   USING (organization_id IN (
-    SELECT organization_id FROM organization_members WHERE user_id = auth.uid()
+    SELECT m.org_id FROM memberships m WHERE m.user_id = auth.uid()
   ));
 
 CREATE POLICY "Users can view own org generations"
   ON schedule_generations FOR SELECT
   USING (organization_id IN (
-    SELECT organization_id FROM organization_members WHERE user_id = auth.uid()
+    SELECT m.org_id FROM memberships m WHERE m.user_id = auth.uid()
   ));
 
 CREATE POLICY "Users can manage own org generations"
   ON schedule_generations FOR ALL
   USING (organization_id IN (
-    SELECT organization_id FROM organization_members WHERE user_id = auth.uid()
+    SELECT m.org_id FROM memberships m WHERE m.user_id = auth.uid()
   ));

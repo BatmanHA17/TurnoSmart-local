@@ -14,6 +14,7 @@ import {
 import { useUserRoleCanonical } from "@/hooks/useUserRoleCanonical";
 import { Copy, ChevronRight, Calendar } from "lucide-react";
 import { toast } from "sonner";
+import { PushNotificationToggle } from "@/components/notifications/PushNotificationToggle";
 
 export default function MisPreferencias() {
   const { isAdmin } = useUserRoleCanonical();
@@ -111,6 +112,17 @@ export default function MisPreferencias() {
             </div>
           </Card>
         )}
+
+        {/* Push Notifications — visible to all roles */}
+        <Card className="p-6 mb-4 rounded-xl border border-border">
+          <h2 className="text-xl font-semibold mb-4 text-foreground">
+            Notificaciones push
+          </h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Recibe avisos de turnos y cambios directamente en este navegador, incluso con la app cerrada.
+          </p>
+          <PushNotificationToggle />
+        </Card>
 
         {/* Calendar Sync Section */}
         <Card className="p-6 mb-4 rounded-xl border border-border">

@@ -12,7 +12,8 @@ import {
   Users,
   Calendar as CalendarIcon,
   Eraser,
-  Wand2
+  Wand2,
+  Copy,
 } from "lucide-react";
 import { format, addDays, subDays, addWeeks, subWeeks, startOfWeek, addMonths, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
@@ -85,6 +86,12 @@ interface UnifiedCalendarHeaderProps {
   onGenerate?: () => void;
   isGenerating?: boolean;
 
+  // Duplicate week (biweek view only)
+  onDuplicateWeek?: () => void;
+
+  // iCal export button (passed as a ReactNode slot)
+  exportButton?: React.ReactNode;
+
   // Badges
   employeeCount?: number;
   dayCount?: number;
@@ -124,6 +131,8 @@ export function UnifiedCalendarHeader({
   onRefreshAudit,
   onGenerate,
   isGenerating = false,
+  onDuplicateWeek,
+  exportButton,
   employeeCount,
   dayCount,
 }: UnifiedCalendarHeaderProps) {
@@ -221,6 +230,9 @@ export function UnifiedCalendarHeader({
               <DropdownMenuItem onClick={onExport}>Excel</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* iCal export slot — rendered only when provided */}
+          {exportButton}
         </div>
 
         {/* CENTRO: Navegación + Selector de vista */}
@@ -346,8 +358,21 @@ export function UnifiedCalendarHeader({
               Backups
             </Button>
           )}
-          
-          
+
+          {/* Duplicate week — only shown in biweek view when handler is provided */}
+          {onDuplicateWeek && viewMode === 'biweek' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onDuplicateWeek}
+              className="h-8 gap-1.5"
+            >
+              <Copy className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Duplicar semana</span>
+            </Button>
+          )}
+
+
           <div className="flex-1" />
           
           {/* Auditoría - ahora a la izquierda de badges */}

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Users, Calendar, FileText, HelpCircle, Settings } from "lucide-react";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { TimezoneMismatchBanner } from "@/components/TimezoneMismatchBanner";
 
 const DashboardManager = () => {
   const navigate = useNavigate();
@@ -18,6 +19,8 @@ const DashboardManager = () => {
       </div>
       
       <div className="relative max-w-7xl mx-auto px-6 py-12 sm:py-16 lg:py-20">
+        <TimezoneMismatchBanner />
+
         {/* Header Section */}
         <div className="mb-12 sm:mb-16 animate-fade-in">
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground mb-3">

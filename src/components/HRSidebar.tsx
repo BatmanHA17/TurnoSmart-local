@@ -5,7 +5,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 
 export function HRSidebar() {
   const [seguimientoExpanded, setSeguimientoExpanded] = useState(true);
-  const [auditExpanded, setAuditExpanded] = useState(true);
+  const [documentosExpanded, setDocumentosExpanded] = useState(true);
+  const [analisisExpanded, setAnalisisExpanded] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -97,66 +98,82 @@ export function HRSidebar() {
         </Collapsible>
 
         {/* Documentos */}
-        <div className="space-y-1">
-          <div className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-md cursor-pointer">
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Documentos</span>
+        <Collapsible open={documentosExpanded} onOpenChange={setDocumentosExpanded}>
+          <CollapsibleTrigger className="w-full">
+            <div className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-md cursor-pointer">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Documentos</span>
+              </div>
+              {documentosExpanded ? (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              )}
             </div>
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          </div>
-          <div className="ml-6 space-y-1">
-            <div 
-              className={`p-2 hover:bg-muted/50 rounded-md cursor-pointer ${location.pathname === "/hr/document-signing" ? "bg-primary/10 text-primary" : ""}`}
-              onClick={() => navigate("/hr/document-signing")}
-            >
-              <span className="text-xs text-muted-foreground">Firma de documentos</span>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="ml-6 space-y-1">
+              <div
+                className={`p-2 hover:bg-muted/50 rounded-md cursor-pointer ${location.pathname === "/hr/document-signing" ? "bg-primary/10 text-primary" : ""}`}
+                onClick={() => navigate("/hr/document-signing")}
+              >
+                <span className="text-xs">Firma de documentos</span>
+              </div>
+              <div
+                className={`p-2 hover:bg-muted/50 rounded-md cursor-pointer ${location.pathname === "/hr/payroll-distribution" ? "bg-primary/10 text-primary" : ""}`}
+                onClick={() => navigate("/hr/payroll-distribution")}
+              >
+                <span className="text-xs">Distribución de nóminas</span>
+              </div>
             </div>
-            <div 
-              className={`p-2 hover:bg-muted/50 rounded-md cursor-pointer ${location.pathname === "/hr/payroll-distribution" ? "bg-primary/10 text-primary" : ""}`}
-              onClick={() => navigate("/hr/payroll-distribution")}
-            >
-              <span className="text-xs text-muted-foreground">Distribución de nóminas</span>
-            </div>
-          </div>
-        </div>
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* Análisis de RRHH */}
-        <div className="space-y-1">
-          <div className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-md cursor-pointer">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Análisis de RRHH</span>
+        <Collapsible open={analisisExpanded} onOpenChange={setAnalisisExpanded}>
+          <CollapsibleTrigger className="w-full">
+            <div className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-md cursor-pointer">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Análisis de RRHH</span>
+              </div>
+              {analisisExpanded ? (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              )}
             </div>
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          </div>
-          <div className="ml-6 space-y-1">
-            <div 
-              className={`p-2 hover:bg-muted/50 rounded-md cursor-pointer ${location.pathname === "/hr/overview" ? "bg-primary/10 text-primary" : ""}`}
-              onClick={() => navigate("/hr/overview")}
-            >
-              <span className="text-xs">Visión general</span>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="ml-6 space-y-1">
+              <div
+                className={`p-2 hover:bg-muted/50 rounded-md cursor-pointer ${location.pathname === "/hr/overview" ? "bg-primary/10 text-primary" : ""}`}
+                onClick={() => navigate("/hr/overview")}
+              >
+                <span className="text-xs">Visión general</span>
+              </div>
+              <div
+                className={`p-2 hover:bg-muted/50 rounded-md cursor-pointer ${location.pathname === "/hr/team" ? "bg-primary/10 text-primary" : ""}`}
+                onClick={() => navigate("/hr/team")}
+              >
+                <span className="text-xs">Plantilla</span>
+              </div>
+              <div
+                className={`p-2 hover:bg-muted/50 rounded-md cursor-pointer ${location.pathname === "/hr/hours-worked" ? "bg-primary/10 text-primary" : ""}`}
+                onClick={() => navigate("/hr/hours-worked")}
+              >
+                <span className="text-xs">Horas trabajadas</span>
+              </div>
+              <div
+                className={`p-2 hover:bg-muted/50 rounded-md cursor-pointer ${location.pathname === "/hr/absences" ? "bg-primary/10 text-primary" : ""}`}
+                onClick={() => navigate("/hr/absences")}
+              >
+                <span className="text-xs">Ausencias</span>
+              </div>
             </div>
-            <div 
-              className={`p-2 hover:bg-muted/50 rounded-md cursor-pointer ${location.pathname === "/hr/team" ? "bg-primary/10 text-primary" : ""}`}
-              onClick={() => navigate("/hr/team")}
-            >
-              <span className="text-xs">Plantilla</span>
-            </div>
-            <div 
-              className={`p-2 hover:bg-muted/50 rounded-md cursor-pointer ${location.pathname === "/hr/hours-worked" ? "bg-primary/10 text-primary" : ""}`}
-              onClick={() => navigate("/hr/hours-worked")}
-            >
-              <span className="text-xs">Horas trabajadas</span>
-            </div>
-            <div 
-              className={`p-2 hover:bg-muted/50 rounded-md cursor-pointer ${location.pathname === "/hr/absences" ? "bg-primary/10 text-primary" : ""}`}
-              onClick={() => navigate("/hr/absences")}
-            >
-              <span className="text-xs">Ausencias</span>
-            </div>
-          </div>
-        </div>
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* Auditoría de Turnos */}
         <div 

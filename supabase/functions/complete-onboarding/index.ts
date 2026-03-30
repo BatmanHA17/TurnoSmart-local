@@ -69,10 +69,18 @@ serve(async (req) => {
     console.log("Received data:", { organization, departments: departments.length, jobs: jobs.length });
 
     // 1. Create organization
+    const slug = organization.name
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      || `org-${Date.now()}`;
+
     const { data: orgData, error: orgError } = await supabase
       .from("organizations")
       .insert({
         name: organization.name,
+        slug: slug,
         country: organization.country,
       })
       .select()
@@ -160,9 +168,8 @@ serve(async (req) => {
       const { error: jobDeptError } = await supabase
         .from("job_departments")
         .insert({
-          value: dept.name,
+          name: dept.name,
           org_id: orgId,
-          created_by: user.id,
         });
 
       if (jobDeptError) {

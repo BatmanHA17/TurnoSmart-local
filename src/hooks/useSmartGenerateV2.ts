@@ -107,12 +107,16 @@ const SHIFT_TYPE_MAP: Record<string, ShiftBlock["type"]> = {
 // ---------------------------------------------------------------------------
 
 function mapRole(calEmp: CalendarEmployee): EmployeeRoleV2 {
-  // Si tiene job_title, mapear directamente
+  // Buscar en job_title Y en nombre del empleado (permite seed con nombres de rol)
   const jt = calEmp.job_title?.toUpperCase() ?? "";
-  if (jt.includes("FOM") || jt.includes("FRONT OFFICE MANAGER")) return "FOM";
-  if (jt.includes("AFOM") || jt.includes("ASSISTANT")) return "AFOM";
-  if (jt.includes("NIGHT") || jt.includes("NOCTURNO")) return "NIGHT_SHIFT_AGENT";
-  if (jt.includes("GEX") || jt.includes("GUEST EXPERIENCE")) return "GEX";
+  const nm = calEmp.name?.toUpperCase() ?? "";
+  const combined = `${jt} ${nm}`;
+
+  if (combined.includes("AFOM") || combined.includes("ASSISTANT FOM")) return "AFOM";
+  if (combined.includes("FOM") || combined.includes("FRONT OFFICE MANAGER")) return "FOM";
+  if (combined.includes("NIGHT") || combined.includes("NOCTURNO")) return "NIGHT_SHIFT_AGENT";
+  if (combined.includes("GEX") || combined.includes("GUEST EXPERIENCE")) return "GEX";
+  if (combined.includes("FRONT DESK") || combined.includes("FDA")) return "FRONT_DESK_AGENT";
 
   // Fallback por role del v1
   if (calEmp.role === "manager") return "FOM";

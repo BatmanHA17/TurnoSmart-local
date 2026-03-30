@@ -16,6 +16,7 @@ export interface ShiftBlockDay {
   slotStart: number;
   slotEnd: number;
   isOvernight: boolean;
+  validation_status?: 'pending' | 'validated' | 'invalidated';
 }
 
 interface CalendarShiftRow {

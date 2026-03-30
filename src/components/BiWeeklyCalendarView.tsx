@@ -49,6 +49,7 @@ import { useEmployeeSortOrder } from "@/hooks/useEmployeeSortOrder";
 import { VersionHistoryDialog } from "./calendar/VersionHistoryDialog";
 import { OperationBackupsDialog } from "./calendar/OperationBackupsDialog";
 import { ConfirmationDialog } from "./calendar/ConfirmationDialog";
+import { DuplicateWeekDialog } from "./calendar/DuplicateWeekDialog";
 import { useDataProtection } from "@/hooks/useDataProtection";
 import { useDataPersistence } from "@/hooks/useDataPersistence";
 import { ConnectionStatusBanner } from "./ConnectionStatusBanner";
@@ -60,6 +61,12 @@ import { useBiWeekAudit } from "@/hooks/useShiftAudit";
 import { ShiftForAudit } from "@/utils/shiftAudit";
 import { AuditCellHighlight, EmployeeViolationBadge } from "@/components/audit";
 import { AuditViolationTooltip } from "@/components/audit/AuditViolationTooltip";
+import { DailyNotesRow } from "./calendar/DailyNotesRow";
+import { useDailyNotes } from "@/hooks/useDailyNotes";
+import { UnassignedShiftsRow } from "./calendar/UnassignedShiftsRow";
+import { useUnassignedShifts } from "@/hooks/useUnassignedShifts";
+import { ICalExportButton } from "./calendar/ICalExportButton";
+import { useCalendarDragDrop } from "@/hooks/useCalendarDragDrop";
 
 import {
   DropdownMenu,
@@ -94,6 +101,7 @@ interface ShiftBlock {
   breakType?: string;
   breakDuration?: string;
   notes?: string;
+  validation_status?: 'pending' | 'validated' | 'invalidated';
 }
 
 interface BiWeeklyCalendarViewProps {
@@ -166,7 +174,7 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
   const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
   const [showEmployeeSortingSheet, setShowEmployeeSortingSheet] = useState(false);
   const [showAddShiftPopup, setShowAddShiftPopup] = useState<{employeeId: string, date: Date} | null>(null);
-  const [showAdvancedOptions, setShowAdvancedOptions] = useState<{employeeId: string, date: Date} | null>(null);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState<{employeeId: string, date: Date, multiDate?: boolean} | null>(null);
   const [editingShift, setEditingShift] = useState<ShiftBlock | null>(null);
   const [showShiftConfiguration, setShowShiftConfiguration] = useState(false);
   const [showAddEmployeesDialog, setShowAddEmployeesDialog] = useState(false);
@@ -182,6 +190,9 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
   const [isDragging, setIsDragging] = useState(false);
   const [deleteZoneDragOver, setDeleteZoneDragOver] = useState(false);
   const [currentDropAction, setCurrentDropAction] = useState<'move' | 'duplicate' | null>(null);
+
+  // Sprint 4.4 — cell-to-cell drag: tracks Alt/Ctrl copy-mode during drag
+  const { isDragCopyMode, updateCopyMode, resetCopyMode } = useCalendarDragDrop();
   const [showTimeSlots, setShowTimeSlots] = useState<boolean>(false);
   const [hoveredZone, setHoveredZone] = useState<'move' | 'duplicate' | null>(null);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
@@ -190,14 +201,31 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
   const [draggedFavorite, setDraggedFavorite] = useState<any>(null);
   const [confirmRestoreVersion, setConfirmRestoreVersion] = useState<string | null>(null);
   const [showCleanDialog, setShowCleanDialog] = useState(false);
+  const [showDuplicateWeekDialog, setShowDuplicateWeekDialog] = useState(false);
 
   // BI-WEEKLY: Generar 14 días en lugar de 7
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
   const biWeekDays = Array.from({ length: 14 }, (_, i) => addDays(weekStart, i));
-  
+
   // Calcular números de semana para el header
   const week1Number = getWeek(weekStart, { weekStartsOn: 1 });
   const week2Number = getWeek(addDays(weekStart, 7), { weekStartsOn: 1 });
+
+  // Daily notes for the biweekly period
+  const dailyNotesDateRange = useMemo(() => ({
+    start: format(biWeekDays[0], "yyyy-MM-dd"),
+    end: format(biWeekDays[13], "yyyy-MM-dd"),
+  }), [biWeekDays[0].getTime()]);
+  const { notes: dailyNotes, updateNote: updateDailyNote } = useDailyNotes(
+    currentOrg?.id ?? "",
+    dailyNotesDateRange
+  );
+
+  // Unassigned shifts (turnos sin asignar) for the biweekly period
+  const { shifts: unassignedShifts, removeUnassignedShift } = useUnassignedShifts(
+    currentOrg?.id ?? "",
+    dailyNotesDateRange
+  );
 
   // Publishing state
   const { 
@@ -214,6 +242,12 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
   const [colaboradores, setColaboradores] = useState<any[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
+
+  // iCal: resolve the current logged-in user's colaborador ID by email match
+  const currentEmployeeId = useMemo(
+    () => colaboradores.find((c: any) => c.email === user?.email)?.id as string | undefined,
+    [colaboradores, user?.email]
+  );
 
   // 🆕 Hook para sincronizar filtro de empleados eliminados entre vistas
   const { filteredEmployees } = useCalendarEmployeeFilter(employees, currentOrg?.org_id || null);
@@ -265,6 +299,45 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
       return newBlocks;
     });
   }, [saveUndoState]);
+
+  // BI-WEEKLY: Duplicate week handler
+  const handleDuplicateWeek = useCallback(
+    (source: "week1" | "week2", target: "week1" | "week2") => {
+      const ws = startOfWeek(currentWeek, { weekStartsOn: 1 });
+      const week1Days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
+      const week2Days = Array.from({ length: 7 }, (_, i) => addDays(ws, i + 7));
+
+      const sourceDays = source === "week1" ? week1Days : week2Days;
+      const targetDays = target === "week1" ? week1Days : week2Days;
+
+      setShiftBlocksWithHistory((prev) => {
+        const withoutTarget = prev.filter(
+          (s) => !targetDays.some((d) => isSameDay(s.date, d))
+        );
+        const sourceShifts = prev.filter((s) =>
+          sourceDays.some((d) => isSameDay(s.date, d))
+        );
+        const copied = sourceShifts.map((shift, idx) => {
+          const srcDayIdx = sourceDays.findIndex((d) => isSameDay(shift.date, d));
+          return {
+            ...shift,
+            id: `${shift.id}-dup-${Date.now()}-${idx}`,
+            date: targetDays[srcDayIdx],
+          };
+        });
+        return [...withoutTarget, ...copied];
+      });
+
+      toast({
+        title: "Semana duplicada",
+        description: `Semana ${source === "week1" ? "1" : "2"} copiada a semana ${
+          target === "week1" ? "1" : "2"
+        }`,
+      });
+      setShowDuplicateWeekDialog(false);
+    },
+    [currentWeek, setShiftBlocksWithHistory]
+  );
 
   // Handler functions
   const handlePrint = () => {
@@ -461,6 +534,7 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
             organization_id: shift.org_id,
             hasBreak: savedShift?.hasBreak || !!shift.break_duration || false,
             breakDuration: savedShift?.breakDuration || shift.break_duration || undefined,
+            validation_status: (shift.validation_status as 'pending' | 'validated' | 'invalidated') || 'pending',
           };
         });
 
@@ -540,6 +614,23 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
     
     return totalAbsenceHours;
   };
+
+  // Handler para cambiar el estado de validación de un turno (Sprint 2.3)
+  const handleValidationChange = useCallback(async (shiftId: string, newStatus: 'pending' | 'validated' | 'invalidated') => {
+    // Actualización optimista en estado local
+    setShiftBlocks(prev => prev.map(s =>
+      s.id === shiftId ? { ...s, validation_status: newStatus } : s
+    ));
+
+    const { error } = await supabase
+      .from('calendar_shifts')
+      .update({ validation_status: newStatus })
+      .eq('id', shiftId);
+
+    if (error) {
+      toast({ title: "Error", description: "No se pudo actualizar el estado de validación", variant: "destructive" });
+    }
+  }, []);
 
   // Obtener turnos para empleado y fecha
   const getShiftsForEmployeeAndDate = (employeeId: string, date: Date): ShiftBlock[] => {
@@ -750,13 +841,14 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
     e.preventDefault();
     const target = e.target as HTMLElement;
     const dropAction = target.closest('[data-drop-action]')?.getAttribute('data-drop-action');
-    
+
     if (dropAction === 'move' || dropAction === 'duplicate') {
       e.dataTransfer.dropEffect = dropAction === 'move' ? 'move' : 'copy';
       setCurrentDropAction(dropAction as 'move' | 'duplicate');
     } else {
-      e.dataTransfer.dropEffect = 'move';
-      setCurrentDropAction('move');
+      // Sprint 4.4: Alt/Ctrl held → copy mode; otherwise move
+      updateCopyMode(e);
+      setCurrentDropAction(e.altKey || e.ctrlKey ? 'duplicate' : 'move');
     }
   };
 
@@ -853,8 +945,10 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
       if (!dropAction) {
         dropAction = target.closest('[data-drop-action]')?.getAttribute('data-drop-action');
       }
-      const action = dropAction || currentDropAction || 'move';
-      
+      // Sprint 4.4: Alt/Ctrl at drop time overrides zone/state action
+      const keyboardCopy = e.altKey || e.ctrlKey;
+      const action = keyboardCopy ? 'duplicate' : (dropAction || currentDropAction || 'move');
+
       if (action === 'duplicate') {
         const adaptedTimes = adaptShiftBlockToContract(shift, sourceEmployeeId, targetEmployeeId);
         const newId = crypto.randomUUID();
@@ -874,10 +968,12 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
           return [...filtered, newShift];
         });
         persistShiftToSupabase(newShift);
+        // Sprint 4.4: feedback toast
+        toast({ title: "Turno duplicado", description: "Copia creada en la nueva celda." });
       } else {
         const adaptedTimes = adaptShiftBlockToContract(shift, sourceEmployeeId, targetEmployeeId);
         const newId = crypto.randomUUID();
-        
+
         setShiftBlocksWithHistory(currentShifts => {
           const filteredShifts = currentShifts.filter(s => s.id !== shift.id);
           const newShift: ShiftBlock = {
@@ -888,15 +984,18 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
             startTime: adaptedTimes.startTime,
             endTime: adaptedTimes.endTime
           };
-          
+
           deleteShiftFromSupabase(shift.id);
           persistShiftToSupabase(newShift);
-          
+
           return [...filteredShifts, newShift];
         });
+        // Sprint 4.4: feedback toast
+        toast({ title: "Turno movido", description: "El turno fue trasladado a la nueva celda." });
       }
-      
+
       setCurrentDropAction(null);
+      resetCopyMode();
     } catch (error) {
       console.error('Error al procesar drop:', error);
     }
@@ -1042,6 +1141,7 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
       setCurrentDropAction(null);
       setDraggedFavorite(null);
       setHoveredZone(null);
+      resetCopyMode(); // Sprint 4.4
     };
 
     document.addEventListener('dragstart', handleGlobalDragStart);
@@ -1152,9 +1252,32 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
           isAuditing={isAuditing}
           onRefreshAudit={runAudit}
           onClean={() => setShowCleanDialog(true)}
+          onDuplicateWeek={canEdit ? () => setShowDuplicateWeekDialog(true) : undefined}
           employeeCount={sortedEmployees.length}
           dayCount={14}
+          exportButton={
+            <ICalExportButton
+              shiftBlocks={shiftBlocks}
+              employees={employees}
+              biWeekDays={biWeekDays}
+              canExportAll={!isEmployee}
+              currentEmployeeId={currentEmployeeId}
+            />
+          }
         />
+
+        {/* Mobile hint banner — only visible on small screens */}
+        <div className="md:hidden mx-1 px-3 py-2.5 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-between gap-2">
+          <span className="text-xs text-primary/80 leading-snug">
+            Para mejor experiencia, usa la Vista Semanal en móvil
+          </span>
+          <a
+            href="/turnosmart/week"
+            className="text-xs font-semibold text-primary whitespace-nowrap underline underline-offset-2 flex-shrink-0"
+          >
+            Ver semana
+          </a>
+        </div>
 
         {/* Área de Favoritos */}
         <FavoritesArea
@@ -1331,6 +1454,20 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
                 </thead>
                 
                 <tbody className="h-full">
+                  {/* Fila Notas del Día */}
+                  <DailyNotesRow
+                    days={biWeekDays}
+                    notes={dailyNotes}
+                    onUpdateNote={updateDailyNote}
+                    canEdit={canEdit}
+                  />
+                  {/* Fila Turnos Sin Asignar */}
+                  <UnassignedShiftsRow
+                    days={biWeekDays}
+                    shifts={unassignedShifts}
+                    onRemoveShift={removeUnassignedShift}
+                    canEdit={canEdit}
+                  />
                   {sortedEmployees.map((employee) => {
                     const contractHours = getWeeklyHoursFromColaborador(employee.name) || 40;
                     const biWeeklyContractHours = contractHours * 2; // 2 semanas
@@ -1380,14 +1517,20 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
                           const cellViolations = getViolationsForCell(employee.id, dayKey);
                           const cellSeverity = getMaxSeverityForCell(employee.id, dayKey);
                           
+                          // Sprint 4.4: is this cell the current drag target?
+                          const isCellDragTarget = isDragging && dragOverCell === `${employee.id}-${dayKey}`;
+
                           return (
                             <td
                               key={dayKey}
                               className={cn(
                                 `p-0.5 text-center cursor-pointer hover:bg-muted/30 relative w-[90px] min-w-[90px] ${rowMinHeight}`,
-                                isToday && "bg-primary/5",
+                                isToday && !isCellDragTarget && "bg-primary/5",
                                 index === 6 && "border-r-2 border-primary/30",
-                                dragOverCell === `${employee.id}-${dayKey}` && 'bg-blue-100'
+                                // Sprint 4.4: improved drag-target highlight
+                                isCellDragTarget && "ring-2 ring-inset ring-primary/50 bg-primary/5",
+                                isCellDragTarget && isDragCopyMode && "cursor-copy",
+                                isCellDragTarget && !isDragCopyMode && "cursor-move"
                               )}
                               onClick={(e) => {
                                 const target = e.target as HTMLElement;
@@ -1400,8 +1543,23 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
                               onDragLeave={handleDragLeave}
                             >
                               <AuditCellHighlight severity={cellSeverity} className="h-full w-full">
+                                {/* Sprint 4.4: Alt+soltar = duplicar hint */}
+                                {isCellDragTarget && !isDragCopyMode && (
+                                  <div className="absolute top-0 left-0 right-0 z-20 flex justify-center pointer-events-none">
+                                    <span className="text-[7px] bg-primary/80 text-primary-foreground px-1 py-px rounded-b leading-none select-none">
+                                      Alt = duplicar
+                                    </span>
+                                  </div>
+                                )}
+                                {isCellDragTarget && isDragCopyMode && (
+                                  <div className="absolute top-0 left-0 right-0 z-20 flex justify-center pointer-events-none">
+                                    <span className="text-[7px] bg-emerald-600/80 text-white px-1 py-px rounded-b leading-none select-none">
+                                      Duplicar
+                                    </span>
+                                  </div>
+                                )}
                                 {/* DragDropZones - aparecen cuando hay dragging activo */}
-                                {canEdit && isDragging && dragOverCell === `${employee.id}-${dayKey}` && (
+                                {canEdit && isCellDragTarget && (
                                   <DragDropZones
                                     isActive={true}
                                     hoveredZone={hoveredZone}
@@ -1444,6 +1602,7 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
                                           }}
                                           onAddShift={canEdit ? handleAddShift : undefined}
                                           readOnly={!canEdit || isPublished}
+                                          onValidationChange={canEdit && !isPublished ? handleValidationChange : undefined}
                                         />
                                       ))}
                                       {/* Indicador de violación */}
@@ -1519,6 +1678,14 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
               });
               setShowShiftSelector(null);
             }}
+            onAdvancedMultiDate={() => {
+              setShowAdvancedOptions({
+                employeeId: showShiftSelector.employeeId,
+                date: showShiftSelector.date,
+                multiDate: true
+              });
+              setShowShiftSelector(null);
+            }}
             position={showShiftSelector.position}
           />
         )}
@@ -1533,6 +1700,9 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
           employee={showAdvancedOptions ? employees.find(e => e.id === showAdvancedOptions.employeeId) : undefined}
           date={showAdvancedOptions?.date || new Date()}
           editingShift={editingShift || undefined}
+          biWeekDays={biWeekDays}
+          shiftBlocks={shiftBlocks}
+          defaultMultiDate={showAdvancedOptions?.multiDate ?? false}
           onShiftAssigned={async (shiftData) => {
             if (showAdvancedOptions) {
               if (editingShift) {
@@ -1685,6 +1855,15 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
           onSuccess={() => {
             loadShiftsFromSupabase(employees.map(e => e.id));
           }}
+        />
+
+        {/* Duplicate Week Dialog */}
+        <DuplicateWeekDialog
+          open={showDuplicateWeekDialog}
+          onClose={() => setShowDuplicateWeekDialog(false)}
+          onConfirm={handleDuplicateWeek}
+          week1Label={`Semana ${week1Number} (${format(weekStart, "d MMM", { locale: es })} – ${format(addDays(weekStart, 6), "d MMM", { locale: es })})`}
+          week2Label={`Semana ${week2Number} (${format(addDays(weekStart, 7), "d MMM", { locale: es })} – ${format(addDays(weekStart, 13), "d MMM", { locale: es })})`}
         />
       </div>
     </TooltipProvider>

@@ -1,7 +1,7 @@
 import { NotionCard } from "@/components/ui/notion-components";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { ChevronUp, ChevronDown, Edit, FileText, Settings } from "lucide-react";
+import { ChevronUp, ChevronDown, Edit, FileText, Settings, CalendarArrowDown } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useColaboradorById } from "@/hooks/useColaboradorFull";
 import { useTeamAssignments } from "@/hooks/useTeamAssignments";
@@ -13,6 +13,8 @@ import { AccessManagementDialog } from "@/components/AccessManagementDialog";
 import { EmployeePlanningConfig } from "@/components/EmployeePlanningConfig";
 import { AvailabilitySheet } from "@/components/AvailabilitySheet";
 import { useEmployeeViewPermissions } from "@/hooks/useEmployeeViewPermissions";
+import { generateICalContent, downloadICalFile } from "@/utils/icalExport";
+import { startOfWeek, addDays, format } from "date-fns";
 
 export default function PlanningTab() {
   const { id } = useParams<{ id: string }>();
@@ -30,8 +32,66 @@ export default function PlanningTab() {
   const [isAccessManagementOpen, setIsAccessManagementOpen] = useState(false);
   const [isPlanningConfigOpen, setIsPlanningConfigOpen] = useState(false);
   const [isAvailabilityOpen, setIsAvailabilityOpen] = useState(false);
+  const [isExportingICal, setIsExportingICal] = useState(false);
 
   const isInactive = colaborador?.status === 'inactivo';
+
+  const handleExportICal = async () => {
+    if (!colaborador?.id) return;
+    setIsExportingICal(true);
+    try {
+      // Export the next 4 weeks of shifts for this employee
+      const today = startOfWeek(new Date(), { weekStartsOn: 1 });
+      const rangeStart = format(today, "yyyy-MM-dd");
+      const rangeEnd = format(addDays(today, 27), "yyyy-MM-dd");
+
+      const { data: shifts, error } = await supabase
+        .from("calendar_shifts")
+        .select("id, date, start_time, end_time, shift_type, shift_name")
+        .eq("employee_id", colaborador.id)
+        .gte("date", rangeStart)
+        .lte("date", rangeEnd)
+        .order("date", { ascending: true });
+
+      if (error) throw error;
+
+      if (!shifts || shifts.length === 0) {
+        toast("Sin turnos", {
+          description: "No hay turnos publicados en las próximas 4 semanas.",
+        });
+        return;
+      }
+
+      const employeeName = `${colaborador.nombre} ${colaborador.apellidos}`;
+
+      const icalShifts = shifts.map((s: any) => ({
+        id: s.id,
+        employeeName,
+        date: new Date(s.date),
+        startTime: s.start_time ?? undefined,
+        endTime: s.end_time ?? undefined,
+        shiftName: s.shift_name ?? undefined,
+        type: s.shift_type ?? "shift",
+      }));
+
+      const content = generateICalContent(
+        icalShifts,
+        `TurnoSmart — ${employeeName}`
+      );
+      const safeName = employeeName.replace(/\s+/g, "-").toLowerCase();
+      downloadICalFile(content, `turnosmart-${safeName}-${rangeStart}_${rangeEnd}.ics`);
+      toast("Exportación lista", {
+        description: "El archivo .ics se ha descargado correctamente.",
+      });
+    } catch (err) {
+      console.error("iCal export error:", err);
+      toast("Error al exportar", {
+        description: "No se pudo generar el archivo iCal. Inténtalo de nuevo.",
+      });
+    } finally {
+      setIsExportingICal(false);
+    }
+  };
 
   const handleGeneralizedAccessToggle = async (checked: boolean) => {
     if (!colaborador) return;
@@ -256,15 +316,28 @@ export default function PlanningTab() {
                 </div>
                 <h3 className="text-base font-semibold text-foreground">Horas Trabajadas</h3>
               </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-primary hover:text-primary/80"
-                onClick={() => navigate(`/colaboradores/${colaborador?.id}/tiempo-trabajo`)}
-              >
-                <FileText className="w-4 h-4 mr-1" />
-                Ver Historial
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={handleExportICal}
+                  disabled={isExportingICal || isInactive}
+                  title="Exportar horario a iCal (.ics)"
+                >
+                  <CalendarArrowDown className="w-4 h-4 mr-1" />
+                  {isExportingICal ? "Exportando…" : "iCal"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-primary hover:text-primary/80"
+                  onClick={() => navigate(`/colaboradores/${colaborador?.id}/tiempo-trabajo`)}
+                >
+                  <FileText className="w-4 h-4 mr-1" />
+                  Ver Historial
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-3">

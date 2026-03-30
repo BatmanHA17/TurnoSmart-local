@@ -2,15 +2,18 @@ import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Building, Settings, Users, Calculator, TrendingUp, Shield, HelpCircle, Cog } from "lucide-react";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 const DashboardDirector = () => {
+  const { displayName } = useUserProfile();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       <div className="container mx-auto p-6 space-y-8">
         {/* Header Section */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div className="space-y-2">
-            <h1 className="text-4xl font-bold text-foreground">Hola Director,</h1>
+            <h1 className="text-4xl font-bold text-foreground">Hola {displayName || 'Director'},</h1>
             <p className="text-lg text-muted-foreground">
               Administra un establecimiento desde la configuración hasta la pre-nómina
             </p>

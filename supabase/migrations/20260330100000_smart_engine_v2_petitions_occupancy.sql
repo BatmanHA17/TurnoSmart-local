@@ -70,23 +70,23 @@ ALTER TABLE daily_occupancy ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view own org petitions"
   ON schedule_petitions FOR SELECT
   USING (organization_id IN (
-    SELECT organization_id FROM organization_members WHERE user_id = auth.uid()
+    SELECT m.org_id FROM memberships m WHERE m.user_id = auth.uid()
   ));
 
 CREATE POLICY "Users can manage own org petitions"
   ON schedule_petitions FOR ALL
   USING (organization_id IN (
-    SELECT organization_id FROM organization_members WHERE user_id = auth.uid()
+    SELECT m.org_id FROM memberships m WHERE m.user_id = auth.uid()
   ));
 
 CREATE POLICY "Users can view own org occupancy"
   ON daily_occupancy FOR SELECT
   USING (organization_id IN (
-    SELECT organization_id FROM organization_members WHERE user_id = auth.uid()
+    SELECT m.org_id FROM memberships m WHERE m.user_id = auth.uid()
   ));
 
 CREATE POLICY "Users can manage own org occupancy"
   ON daily_occupancy FOR ALL
   USING (organization_id IN (
-    SELECT organization_id FROM organization_members WHERE user_id = auth.uid()
+    SELECT m.org_id FROM memberships m WHERE m.user_id = auth.uid()
   ));

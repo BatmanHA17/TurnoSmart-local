@@ -1,11 +1,13 @@
-import { Bell, User, Settings, LogOut, Check, Calendar, HelpCircle, FileText, Crown, Activity, RotateCcw, Menu } from "lucide-react";
+import React from "react";
+import { User, Settings, Check, Calendar, HelpCircle, FileText, Crown, Activity, RotateCcw, Menu } from "lucide-react";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { TurnoSmartLogo } from "@/components/TurnoSmartLogo";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useUserRoleCanonical } from "@/hooks/useUserRoleCanonical";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { OrganizationSwitcher } from "@/components/OrganizationSwitcher";
@@ -38,8 +40,10 @@ export function HorizontalNav() {
   const { profile, displayName } = useUserProfile();
   const { user, signOut } = useAuth();
   const { getDefaultDashboard, role, isOwner } = useUserRoleCanonical();
+  const { isSuperAdmin } = useUserRole();
   const { currentOrganization } = useOrganizationsUnified();
   const navigate = useNavigate();
+  const [userMenuOpen, setUserMenuOpen] = React.useState(false);
 
   // Filter navigation items based on role
   const filteredNavItems = mainNavItems.filter(item => {
@@ -174,21 +178,22 @@ export function HorizontalNav() {
             </div>
             
             {/* Bell notification */}
-            <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-white/70 hover:text-white hover:bg-white/5">
-              <Bell className="h-4 w-4" />
-            </Button>
+            <NotificationBell />
 
             {/* Avatar Dropdown */}
-            <DropdownMenu>
+            <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 rounded-full p-0 hover:bg-white/5">
+                <button
+                  className="h-8 w-8 rounded-full p-0 hover:bg-white/5 cursor-pointer outline-none"
+                  onClick={() => setUserMenuOpen(prev => !prev)}
+                >
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={profile?.avatar_url || ""} />
                     <AvatarFallback className="text-xs bg-white text-black font-medium">
                       {displayName?.charAt(0)?.toUpperCase() || "U"}
                     </AvatarFallback>
                   </Avatar>
-                </Button>
+                </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent 
                 className="w-64 border border-gray-200 shadow-xl rounded-xl p-0" 
@@ -229,7 +234,7 @@ export function HorizontalNav() {
                       </DropdownMenuItem>
                       
                       <DropdownMenuItem className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
-                        Suscripción⚠️
+                        Suscripción
                       </DropdownMenuItem>
                     </>
                   )}
@@ -279,18 +284,18 @@ export function HorizontalNav() {
                         Old-Turnosmart.app
                       </DropdownMenuItem>
                       
-                      {/* Admin - Solo para OWNER */}
-                      {isOwner && (
+                      {/* Admin - Solo para Super Admin */}
+                      {isSuperAdmin && (
                         <>
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
                             onClick={() => navigate("/perfil-admin")}
                           >
                             <Crown className="h-4 w-4 mr-2" />
                             Panel de Super Admin
                           </DropdownMenuItem>
-                          
-                          <DropdownMenuItem 
+
+                          <DropdownMenuItem
                             className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
                             onClick={() => navigate("/activity")}
                           >

@@ -47,8 +47,9 @@ export function useCurrentOrganization() {
         }
 
         if (memberships && memberships.length > 0) {
-          const org = memberships[0].organizations as any;
-          setOrg(org);
+          const orgData = memberships[0].organizations as any;
+          // Include org_id for backwards compat with components using org.org_id
+          setOrg({ ...orgData, org_id: orgData.id, org_name: orgData.name });
         } else {
           setError('No organization found for user');
           setOrg(null);
@@ -65,5 +66,13 @@ export function useCurrentOrganization() {
     fetchOrg();
   }, [user?.id]);
 
-  return { org, loading, error };
+  // Build organizations array for OrganizationSwitcher compat
+  const organizations = org ? [{ org_id: org.id, org_name: org.name, org_slug: org.slug, user_role: 'OWNER', is_primary: true }] : [];
+
+  const switchOrganization = async (_orgId: string): Promise<boolean> => {
+    // Single-org setup — no-op for now
+    return false;
+  };
+
+  return { org, currentOrg: org, organizations, loading, error, switchOrganization };
 }

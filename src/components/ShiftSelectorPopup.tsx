@@ -11,6 +11,8 @@ interface ShiftSelectorPopupProps {
   onClose: () => void;
   onShiftSelected: (shift: any) => void;
   onAdvancedOptions: () => void;
+  /** Opens the advanced dialog with multi-date mode pre-enabled */
+  onAdvancedMultiDate?: () => void;
   position: { x: number; y: number };
 }
 
@@ -19,6 +21,7 @@ export function ShiftSelectorPopup({
   onClose,
   onShiftSelected,
   onAdvancedOptions,
+  onAdvancedMultiDate,
   position
 }: ShiftSelectorPopupProps) {
   const [showAbsences, setShowAbsences] = useState(false);
@@ -241,7 +244,7 @@ export function ShiftSelectorPopup({
             )}
           </div>
           
-          <div className="pt-2 border-t border-gray-100">
+          <div className="pt-2 border-t border-gray-100 space-y-0">
             <Button
               variant="ghost"
               size="sm"
@@ -254,6 +257,20 @@ export function ShiftSelectorPopup({
               <span className="text-blue-600 mr-1">+</span>
               Opciones avanzadas
             </Button>
+            {onAdvancedMultiDate && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-xs justify-start h-auto p-2 hover:bg-gray-50"
+                onClick={() => {
+                  onAdvancedMultiDate();
+                  onClose();
+                }}
+              >
+                <span className="text-purple-600 mr-1">⊞</span>
+                Aplicar a más días →
+              </Button>
+            )}
           </div>
         </div>
       </Card>

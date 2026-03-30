@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { CalendarViewMode, CalendarView } from "@/types/calendarViews";
-import { Calendar, CalendarDays, CalendarRange } from "lucide-react";
+import { Calendar, CalendarDays, CalendarRange, Tag, ClipboardCheck } from "lucide-react";
 
 export const CALENDAR_VIEWS: CalendarView[] = [
   {
@@ -30,6 +30,20 @@ export const CALENDAR_VIEWS: CalendarView[] = [
     icon: CalendarDays,
     available: true,
     route: "/turnosmart/month"
+  },
+  {
+    id: "tags",
+    label: "Vista etiquetas",
+    icon: Tag,
+    available: true,
+    route: "/turnosmart/tags"
+  },
+  {
+    id: "attendance",
+    label: "Vista asistencia",
+    icon: ClipboardCheck,
+    available: true,
+    route: "/turnosmart/attendance"
   }
 ];
 
@@ -39,12 +53,14 @@ export function useCalendarViewMode() {
 
   const getCurrentView = (): CalendarViewMode => {
     const path = location.pathname;
-    
+
     if (path.includes("/turnosmart/day")) return "day";
+    if (path.includes("/turnosmart/tags")) return "tags";
+    if (path.includes("/turnosmart/attendance")) return "attendance";
     if (path.includes("/turnosmart/biweek")) return "biweek";
     if (path.includes("/turnosmart/month")) return "month";
     if (path.includes("/turnosmart/week") || path === "/turnosmart") return "week";
-    
+
     return "week";
   };
 
@@ -52,7 +68,7 @@ export function useCalendarViewMode() {
 
   const changeView = (view: CalendarView) => {
     if (!view.available) return;
-    
+
     const searchParams = new URLSearchParams(location.search);
     navigate(`${view.route}?${searchParams.toString()}`);
   };

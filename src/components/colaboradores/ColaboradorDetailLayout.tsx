@@ -106,20 +106,77 @@ export default function ColaboradorDetailLayout() {
 
   return (
     <MainLayout>
-      <div className="max-w-6xl mx-auto p-6 space-y-6">
-        {/* Back to list navigation */}
-        <div className="mb-4">
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/colaboradores')}
-            className="text-muted-foreground hover:text-foreground p-0 h-auto font-normal"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver a la lista de colaboradores
-          </Button>
-        </div>
+      {/* Sticky header — back button + avatar + tabs always visible while scrolling */}
+      <div className="sticky top-0 z-20 bg-background border-b border-border/40">
+        <div className="max-w-6xl mx-auto px-6 pt-3 pb-0">
+          {/* Back button */}
+          <div className="mb-3">
+            <Button
+              variant="ghost"
+              onClick={() => navigate('/colaboradores')}
+              className="text-muted-foreground hover:text-foreground p-0 h-auto font-normal"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver a la lista de colaboradores
+            </Button>
+          </div>
 
-        {/* Header with Avatar and Name - Black Notion Style */}
+          {/* Compact identity row */}
+          <div className="flex items-center gap-4 mb-3">
+            <Avatar className="h-9 w-9 bg-gray-900 shrink-0">
+              <AvatarImage src={displayColaborador.avatar_url} />
+              <AvatarFallback className="text-xs bg-gray-900 text-white font-semibold">
+                {getInitials(displayColaborador.nombre, displayColaborador.apellidos)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="font-semibold text-foreground truncate">
+                {(displayColaborador.apellidos_uso || `${displayColaborador.nombre} ${displayColaborador.apellidos}`).toUpperCase()}
+              </span>
+              {displayColaborador.tipo_contrato && (
+                <span className="text-xs text-muted-foreground shrink-0 hidden sm:inline">
+                  {displayColaborador.tipo_contrato}
+                </span>
+              )}
+              {isInactive && (
+                <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded-full shrink-0">
+                  Inactivo
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className={`flex gap-1 overflow-x-auto scrollbar-none -mx-1 px-1 ${isInactive ? 'opacity-50' : ''}`}>
+            {[
+              { to: 'profile', label: 'Datos personales' },
+              { to: 'contract', label: 'Contratos' },
+              { to: 'planning', label: 'Tiempo y planificación' },
+              { to: 'absences', label: 'Vacaciones y Ausencias' },
+              { to: 'permissions', label: 'Rol y Permisos' },
+              { to: 'nominas', label: 'Nóminas' },
+              ...(isAdmin ? [{ to: 'system', label: 'Sistema & Usuarios' }] : []),
+            ].map(tab => (
+              <NavLink
+                key={tab.to}
+                to={`/colaboradores/${id}/${tab.to}`}
+                className={({ isActive }) =>
+                  `shrink-0 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                    isActive
+                      ? 'border-foreground text-foreground'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  } ${isInactive ? 'pointer-events-none' : ''}`
+                }
+              >
+                {tab.label}
+              </NavLink>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto p-6 space-y-6">
+        {/* Header with Avatar and Name - Black Notion Style — full detail card */}
         <div className="bg-gray-900 rounded-xl p-6 text-white relative overflow-hidden">
           {/* Top section with avatar and name */}
           <div className="flex items-center gap-6 mb-6">
@@ -204,77 +261,6 @@ export default function ColaboradorDetailLayout() {
               </p>
             </div>
           </div>
-        </div>
-
-        {/* Tabs Navigation with NavLink */}
-        <div className={`inline-flex h-auto gap-2 p-1 bg-muted/30 rounded-full ${isInactive ? 'opacity-50' : ''}`}>
-          <NavLink
-            to={`/colaboradores/${id}/profile`}
-            className={({ isActive }) =>
-              `rounded-full px-6 py-2.5 text-sm font-medium transition-all hover:bg-muted/50 ${
-                isActive ? 'bg-black text-white shadow-sm' : ''
-              } ${isInactive ? 'pointer-events-none' : ''}`
-            }
-          >
-            Datos personales
-          </NavLink>
-          
-          <NavLink
-            to={`/colaboradores/${id}/contract`}
-            className={({ isActive }) =>
-              `rounded-full px-6 py-2.5 text-sm font-medium transition-all hover:bg-muted/50 ${
-                isActive ? 'bg-black text-white shadow-sm' : ''
-              } ${isInactive ? 'pointer-events-none' : ''}`
-            }
-          >
-            Contratos
-          </NavLink>
-          
-          <NavLink
-            to={`/colaboradores/${id}/planning`}
-            className={({ isActive }) =>
-              `rounded-full px-6 py-2.5 text-sm font-medium transition-all hover:bg-muted/50 ${
-                isActive ? 'bg-black text-white shadow-sm' : ''
-              } ${isInactive ? 'pointer-events-none' : ''}`
-            }
-          >
-            Tiempo y planificación
-          </NavLink>
-          
-          <NavLink
-            to={`/colaboradores/${id}/absences`}
-            className={({ isActive }) =>
-              `rounded-full px-6 py-2.5 text-sm font-medium transition-all hover:bg-muted/50 ${
-                isActive ? 'bg-black text-white shadow-sm' : ''
-              } ${isInactive ? 'pointer-events-none' : ''}`
-            }
-          >
-            Vacaciones y Ausencias
-          </NavLink>
-          
-          <NavLink
-            to={`/colaboradores/${id}/permissions`}
-            className={({ isActive }) =>
-              `rounded-full px-6 py-2.5 text-sm font-medium transition-all hover:bg-muted/50 ${
-                isActive ? 'bg-black text-white shadow-sm' : ''
-              } ${isInactive ? 'pointer-events-none' : ''}`
-            }
-          >
-            Rol y Permisos
-          </NavLink>
-
-          {isAdmin && (
-            <NavLink
-              to={`/colaboradores/${id}/system`}
-              className={({ isActive }) =>
-                `rounded-full px-6 py-2.5 text-sm font-medium transition-all hover:bg-muted/50 ${
-                  isActive ? 'bg-black text-white shadow-sm' : ''
-                } ${isInactive ? 'pointer-events-none' : ''}`
-              }
-            >
-              Sistema & Usuarios
-            </NavLink>
-          )}
         </div>
 
         {/* Tab content via Outlet */}
