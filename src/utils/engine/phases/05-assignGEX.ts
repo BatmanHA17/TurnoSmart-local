@@ -38,13 +38,10 @@ export function assignGEX(ctx: PipelineContext): PipelineContext {
       if (isRestOrAbsence(grid[gex.id][d]?.code) && grid[gex.id][d]?.source !== "engine") continue;
       if (gex.isNewHire && gex.startDay && d < gex.startDay) continue;
 
-      // Es día libre asignado por Phase 04 → respetar
-      if (grid[gex.id][d]?.code === "D" && grid[gex.id][d]?.source === "engine") {
-        // Verificar si Phase 04 asignó este como descanso real
-        // Si el grid viene de initGrid (default D) y no fue tocado por Phase 04,
-        // lo consideramos disponible para asignar.
-        // Heurística: si es D con source=engine, Phase 04 lo puso → respetar
-        continue;
+      // Es día libre asignado por Phase 04 (locked) → respetar
+      // Placeholder D de initGrid tiene locked=false → disponible para asignar
+      if (grid[gex.id][d]?.code === "D" && grid[gex.id][d]?.locked) {
+        continue; // Descanso real asignado por Phase 04
       }
 
       // Determinar turno según ocupación

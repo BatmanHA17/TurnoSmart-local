@@ -134,8 +134,8 @@ export function audit(ctx: PipelineContext): PipelineContext {
       }
     }
 
-    // CK-06: N → siguiente día libre
-    if (SPAIN_LABOR_LAW.nightShiftNextDayFree) {
+    // CK-06: N → siguiente día libre (solo para ROTA_COMPLETO, no Night Agent fijo)
+    if (SPAIN_LABOR_LAW.nightShiftNextDayFree && emp.rotationType === "ROTA_COMPLETO") {
       for (let d = 1; d < totalDays; d++) {
         if (schedule[d]?.code === "N" && schedule[d + 1] && !isRestOrAbsence(schedule[d + 1].code)) {
           violations.push({
@@ -151,17 +151,16 @@ export function audit(ctx: PipelineContext): PipelineContext {
       }
     }
 
-    // CK-07: Rotación ergonómica (M→T→N, no inversa)
-    if (constraints.ergonomicRotation) {
+    // CK-07: Rotación ergonómica — solo para ROTA_COMPLETO (FOM/AFOM/Night son fijos por diseño)
+    if (constraints.ergonomicRotation && emp.rotationType === "ROTA_COMPLETO") {
       for (let d = 1; d < totalDays; d++) {
         const today = schedule[d]?.code;
         const tomorrow = schedule[d + 1]?.code;
         if (!today || !tomorrow) continue;
+        if (!isWorkingShift(today) || !isWorkingShift(tomorrow)) continue; // skip D→M, M→D
         const ti = ERGONOMIC_SEQUENCE.indexOf(today as ShiftCode);
         const ni = ERGONOMIC_SEQUENCE.indexOf(tomorrow as ShiftCode);
         if (ti >= 0 && ni >= 0 && ni < ti) {
-          // Rotación inversa (ej: T→M, N→T)
-          // Excepto si es con transición 11×19
           if (tomorrow !== "11x19") {
             violations.push({
               employeeId: emp.id,

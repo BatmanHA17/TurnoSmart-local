@@ -41,14 +41,14 @@ export function anchorFixed(ctx: PipelineContext): PipelineContext {
     }
   }
 
-  // --- 3. Anclar FOM (turno fijo) ---
+  // --- 3. Anclar FOM (turno fijo) — NO locked para que Phase 04 pueda asignar 2 libres ---
   for (const fom of roleGroups.FIJO_NO_ROTA.filter((e) => e.role === "FOM")) {
     const fixedShift = fom.fixedShift ?? "M";
     for (let d = 1; d <= totalDays; d++) {
       if (grid[fom.id][d].locked) continue; // ausencia/petición A ya anclada
-      // Si es nueva incorporación y aún no empezó, skip
       if (fom.isNewHire && fom.startDay && d < fom.startDay) continue;
       grid[fom.id][d] = makeAssignment(fixedShift, "engine");
+      // NO locked: Phase 04 necesita poder sobreescribir 2 días con D locked
     }
   }
 
@@ -61,8 +61,7 @@ export function anchorFixed(ctx: PipelineContext): PipelineContext {
       if (grid[afom.id][d].locked) continue;
       if (afom.isNewHire && afom.startDay && d < afom.startDay) continue;
 
-      // Buscar qué hace el FOM este día
-      let mirrorCode: ShiftCode = "M"; // default si no hay FOM
+      let mirrorCode: ShiftCode = "M";
       for (const fom of fomEmployees) {
         const fomCode = grid[fom.id][d]?.code;
         if (fomCode && FOM_AFOM_MIRROR[fomCode]) {
@@ -82,6 +81,12 @@ export function anchorFixed(ctx: PipelineContext): PipelineContext {
       grid[nightAgent.id][d] = makeAssignment("N", "engine");
     }
   }
+
+  // --- 6. POST-Phase04: marcar turnos fijos como locked ---
+  // Esto se hace DESPUÉS de Phase 04 en el pipeline.
+  // Phase 04 sobreescribe 2 días/semana con D locked.
+  // Los días NO sobreescritos mantienen su turno fijo (M/T/N) sin locked.
+  // Aquí NO lockeamos — Phase 04 necesita libertad para elegir qué 2 días librar.
 
   return { ...ctx, grid };
 }

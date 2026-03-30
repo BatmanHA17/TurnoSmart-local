@@ -26,6 +26,31 @@ import { audit } from "./phases/09-audit";
 import { score } from "./phases/10-score";
 
 /**
+ * Después de Phase 04, los turnos fijos de FOM/AFOM/Night que sobrevivieron
+ * (no fueron convertidos a D por Phase 04) se lockean para que Phase 05/06
+ * no los sobreescriban. Phase 04 ya eligió qué 2 días por semana librar.
+ */
+function lockSurvivingFixedShifts(ctx: PipelineContext): void {
+  const { grid, roleGroups } = ctx;
+  const fixedGroups = [
+    ...roleGroups.FIJO_NO_ROTA,  // FOM + Night Agent
+    ...roleGroups.COBERTURA,      // AFOM
+  ];
+  for (const emp of fixedGroups) {
+    const schedule = grid[emp.id];
+    if (!schedule) continue;
+    for (const dayStr of Object.keys(schedule)) {
+      const day = Number(dayStr);
+      const cell = schedule[day];
+      // Si tiene turno de trabajo (M/T/N/G/GT) y NO está locked → lockear
+      if (cell && cell.code !== "D" && !cell.locked) {
+        cell.locked = true;
+      }
+    }
+  }
+}
+
+/**
  * Ejecuta el pipeline completo del motor SMART v2.0.
  * Input → 10 fases → Output con schedules, violations, score.
  */
@@ -53,7 +78,12 @@ export function runPipeline(input: EngineInput): EngineOutput {
   ctx = loadContinuity(ctx);    // 02
   ctx = anchorFixed(ctx);       // 03
   ctx = assignRestDays(ctx);    // 04
-  ctx = assignGEX(ctx);         // 05 (no-op MVP)
+
+  // Post-Phase04: lockear turnos fijos de FOM/AFOM/Night que Phase 04 NO convirtió a D
+  // Esto previene que Phase 05/06 sobreescriban turnos fijos
+  lockSurvivingFixedShifts(ctx);
+
+  ctx = assignGEX(ctx);         // 05
   ctx = assignRotating(ctx);    // 06
   ctx = ensureCoverage(ctx);    // 07
   ctx = applyPetitions(ctx);    // 08 (no-op MVP)

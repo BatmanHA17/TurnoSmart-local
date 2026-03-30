@@ -290,8 +290,12 @@ function engineOutputToBlocks(
       const assignment = empSchedule[day];
       if (!assignment) continue;
 
-      const date = setDate(monthStart, day);
       const code = assignment.code;
+
+      // Skip rest/absence days — solo generar bloques para turnos de trabajo
+      if (code === "D" || assignment.hours === 0) continue;
+
+      const date = setDate(monthStart, day);
       const type = SHIFT_TYPE_MAP[code] ?? (code.match(/^\d/) ? "morning" : "absence");
       const color = SHIFT_COLORS[code] ?? "#6b7280";
 
