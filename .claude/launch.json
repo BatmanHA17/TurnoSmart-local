@@ -3,9 +3,9 @@
   "configurations": [
     {
       "name": "Frontend (Vite Dev Server)",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 8080
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--prefix", "/Users/josegalvan/desarrollo/TurnoSmart-local", "vite", "--port", "8085"],
+      "port": 8085
     },
     {
       "name": "Supabase Local (DB + Auth + API + Studio)",
