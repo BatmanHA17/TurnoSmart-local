@@ -67,7 +67,11 @@ import { ShiftForAudit } from "@/utils/shiftAudit";
 import { AuditCellHighlight, EmployeeViolationBadge } from "@/components/audit";
 import { AuditViolationTooltip } from "@/components/audit/AuditViolationTooltip";
 import { useSmartGenerate } from "@/hooks/useSmartGenerate";
+import { useSmartGenerateV2 } from "@/hooks/useSmartGenerateV2";
 import { GenerateScheduleSheet, GenerateConfig } from "@/components/calendar/GenerateScheduleSheet";
+import { AlternativesResultSheet } from "@/components/calendar/AlternativesResultSheet";
+import { GenerateScheduleWizard } from "@/components/calendar/GenerateScheduleWizard";
+import type { WizardConfig } from "@/components/calendar/GenerateScheduleWizard";
 import {
   ShiftBlock,
   absenceTypes,
@@ -1318,7 +1322,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           organization: shift.organization_id || 'default',
           break_duration: shift.breakDuration || null,
           org_id: org?.id || null
-        })
+        }, { onConflict: 'employee_id,date,shift_name', ignoreDuplicates: false })
         .select()
         .single();
 
@@ -1704,23 +1708,22 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   // Function to check if employee exceeds weekly hours
   const checkEmployeeHoursCompliance = (employeeId: string): { isExceeded: boolean, plannedHours: number, contractHours: number } => {
     const plannedHours = calculateEmployeeHours(employeeId);
-    const employee = mockEmployees.find(emp => emp.id === employeeId);
-    if (!employee) return { isExceeded: false, plannedHours: 0, contractHours: 0 };
-    
-    const contractHours = employee.contractHours;
+    const colaborador = colaboradores.find(c => c.id === employeeId);
+    if (!colaborador) return { isExceeded: false, plannedHours: 0, contractHours: 0 };
+
+    const contractHours = colaborador.tiempo_trabajo_semanal || 40;
     const isExceeded = plannedHours > contractHours;
-    
+
     return { isExceeded, plannedHours, contractHours };
   };
 
   // Calculate planned hours, hours to plan, and hour bank for each employee
   const getEmployeeStats = (employeeId: string) => {
-    const employee = mockEmployees.find(emp => emp.id === employeeId);
-    if (!employee) return { plannedHours: 0, hoursToPlanned: 0, hourBank: 0, contractMonths: 0 };
-    
-    
+    const colaborador = colaboradores.find(c => c.id === employeeId);
+    if (!colaborador) return { plannedHours: 0, hoursToPlanned: 0, hourBank: 0, contractMonths: 0 };
+
     const plannedHours = calculateEmployeeHours(employeeId);
-    const contractHours = employee.contractHours;
+    const contractHours = colaborador.tiempo_trabajo_semanal || 40;
     
     // Si no tiene horarios asignados, devolver 0h
     const shiftsForEmployee = shiftBlocks.filter(shift => shift.employeeId === employeeId);
@@ -2652,14 +2655,13 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   // Esto garantiza que si cambias de Week a Month a Day, el orden sea IDÉNTICO
   const { sortedEmployees, sortBy, setSortBy } = useEmployeeSortOrder(activeEmployees);
 
-  // SMART Schedule Generator
+  // SMART Schedule Generator (v1 — legacy)
   const [showGenerateSheet, setShowGenerateSheet] = useState(false);
   const { generate: runSmartGenerate, isGenerating } = useSmartGenerate({
     employees,
     currentWeek,
     orgId: org?.id,
     onResult: (newBlocks) => {
-      // Reemplaza los turnos del mes generado manteniendo los de otros meses
       const monthStart = new Date(newBlocks[0]?.date ?? currentWeek);
       monthStart.setDate(1);
       const year = monthStart.getFullYear();
@@ -2671,11 +2673,57 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         });
         return [...otherMonths, ...newBlocks];
       });
-      setShowGenerateSheet(false); // Cerrar panel tras generar
+      setShowGenerateSheet(false);
     },
   });
-  const handleOpenGenerateSheet = () => setShowGenerateSheet(true);
-  const handleGenerate = (config: GenerateConfig) => runSmartGenerate(config);
+
+  // SMART Schedule Generator v2 — 3 alternativas con score
+  const [showAlternativesSheet, setShowAlternativesSheet] = useState(false);
+  const {
+    generation: smartGeneration,
+    isGenerating: isGeneratingV2,
+    generate: runSmartGenerateV2,
+    applyAlternative,
+  } = useSmartGenerateV2({
+    employees,
+    currentWeek,
+    orgId: org?.id,
+    onResult: (newBlocks) => {
+      const monthStart = new Date(newBlocks[0]?.date ?? currentWeek);
+      monthStart.setDate(1);
+      const year = monthStart.getFullYear();
+      const month = monthStart.getMonth();
+      setShiftBlocksWithHistory((prev) => {
+        const otherMonths = prev.filter((b) => {
+          const d = new Date(b.date);
+          return !(d.getFullYear() === year && d.getMonth() === month);
+        });
+        return [...otherMonths, ...newBlocks];
+      });
+      setShowAlternativesSheet(false);
+    },
+  });
+
+  // Wizard SMART v2 (9 pasos)
+  const [showWizard, setShowWizard] = useState(false);
+  const hasExistingShifts = shiftBlocks.length > 0;
+
+  const handleOpenGenerateSheet = () => setShowWizard(true);
+  const handleGenerate = (config: GenerateConfig) => {
+    // Legacy: redirigir al wizard
+    runSmartGenerateV2();
+    setShowGenerateSheet(false);
+    setShowAlternativesSheet(true);
+  };
+  const handleWizardGenerate = (config: WizardConfig) => {
+    runSmartGenerateV2(config.weeks);
+  };
+
+  const handleApplyAlternative = (index: number) => {
+    applyAlternative(index);
+    setShowWizard(false);
+    setShowAlternativesSheet(false);
+  };
 
   // Transformar shiftBlocks a formato de auditoría
   const shiftsForAudit: ShiftForAudit[] = useMemo(() => {
@@ -3584,6 +3632,28 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         currentWeek={currentWeek}
         isGenerating={isGenerating}
         onGenerate={handleGenerate}
+      />
+
+      {/* SMART v2 Alternatives Result Sheet */}
+      <AlternativesResultSheet
+        open={showAlternativesSheet}
+        onOpenChange={setShowAlternativesSheet}
+        generation={smartGeneration}
+        onApplyAlternative={handleApplyAlternative}
+      />
+
+      {/* SMART v2 Wizard (9 pasos) */}
+      <GenerateScheduleWizard
+        open={showWizard}
+        onOpenChange={setShowWizard}
+        currentWeek={currentWeek}
+        hasExistingShifts={hasExistingShifts}
+        pendingPetitionsCount={0}
+        hasOccupancyData={false}
+        onGenerate={handleWizardGenerate}
+        generation={smartGeneration}
+        isGenerating={isGeneratingV2}
+        onApplyAlternative={handleApplyAlternative}
       />
 
       {/* Shift Configuration Dialog */}
