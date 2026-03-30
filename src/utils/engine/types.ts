@@ -385,6 +385,8 @@ export interface EngineInput {
   continuity?: ContinuityHistory;
   /** Weight profile para esta ejecución */
   weights: WeightProfile;
+  /** Días del período (1-based) donde FOM tiene Guardia (G/GT) — solo S/D */
+  fomGuardiaDays?: number[];
 }
 
 /** Output de una ejecución del motor */

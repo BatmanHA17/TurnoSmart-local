@@ -33,6 +33,7 @@ import { Separator } from "@/components/ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Calendar,
   ChevronLeft,
@@ -43,6 +44,7 @@ import {
   CheckCircle2,
   FileWarning,
   Sparkles,
+  Shield,
 } from "lucide-react";
 import { ScoreDisplay } from "./ScoreDisplay";
 import type { GenerationResult, ExistingShiftsPolicy } from "@/utils/engine";
@@ -74,6 +76,8 @@ interface WizardProps {
 export interface WizardConfig {
   weeks: 1 | 2 | 3 | 4;
   existingShiftsPolicy: ExistingShiftsPolicy;
+  /** Días del período (1-based) donde FOM tiene Guardia (G/GT) */
+  fomGuardiaDays: number[];
 }
 
 // ---------------------------------------------------------------------------
@@ -83,10 +87,11 @@ export interface WizardConfig {
 const STEPS = [
   { id: 1, label: "Posicionar", icon: Calendar },
   { id: 2, label: "Semanas", icon: Calendar },
-  { id: 3, label: "Conflictos", icon: FileWarning },
-  { id: 4, label: "Resumen", icon: CheckCircle2 },
-  { id: 5, label: "Generar", icon: Sparkles },
-  { id: 6, label: "Elegir", icon: Wand2 },
+  { id: 3, label: "Guardias FOM", icon: Shield },
+  { id: 4, label: "Conflictos", icon: FileWarning },
+  { id: 5, label: "Resumen", icon: CheckCircle2 },
+  { id: 6, label: "Generar", icon: Sparkles },
+  { id: 7, label: "Elegir", icon: Wand2 },
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -108,32 +113,34 @@ export function GenerateScheduleWizard({
   const [step, setStep] = useState(1);
   const [weeks, setWeeks] = useState<1 | 2 | 3 | 4>(4);
   const [existingPolicy, setExistingPolicy] = useState<ExistingShiftsPolicy>("overwrite");
+  const [fomGuardiaDays, setFomGuardiaDays] = useState<number[]>([]);
 
   const monthLabel = format(startOfMonth(currentWeek), "MMMM yyyy", { locale: es });
 
   const canNext = useMemo(() => {
     switch (step) {
-      case 1: return true; // posicionar siempre OK
-      case 2: return true; // semanas siempre tiene valor
-      case 3: return true; // conflictos siempre tiene valor
-      case 4: return true; // resumen siempre OK
-      case 5: return !isGenerating && generation !== null; // esperando generación
-      case 6: return false; // último paso
+      case 1: return true;
+      case 2: return true;
+      case 3: return true; // guardias (puede ser vacío = sin guardias)
+      case 4: return true; // conflictos
+      case 5: return true; // resumen
+      case 6: return !isGenerating && generation !== null;
+      case 7: return false; // último paso
       default: return false;
     }
   }, [step, isGenerating, generation]);
 
   const handleNext = () => {
-    if (step === 4) {
-      // Paso 4 → 5: lanzar generación
-      onGenerate({ weeks, existingShiftsPolicy: existingPolicy });
-      setStep(5);
-    } else if (step === 5 && generation) {
+    if (step === 5) {
+      // Paso 5 → 6: lanzar generación
+      onGenerate({ weeks, existingShiftsPolicy: existingPolicy, fomGuardiaDays });
       setStep(6);
-    } else if (step < 6) {
-      // Skip step 3 si no hay turnos existentes
-      if (step === 2 && !hasExistingShifts) {
-        setStep(4);
+    } else if (step === 6 && generation) {
+      setStep(7);
+    } else if (step < 7) {
+      // Skip step 4 (conflictos) si no hay turnos existentes
+      if (step === 3 && !hasExistingShifts) {
+        setStep(5);
       } else {
         setStep(step + 1);
       }
@@ -142,8 +149,8 @@ export function GenerateScheduleWizard({
 
   const handleBack = () => {
     if (step > 1) {
-      if (step === 4 && !hasExistingShifts) {
-        setStep(2);
+      if (step === 5 && !hasExistingShifts) {
+        setStep(3);
       } else {
         setStep(step - 1);
       }
@@ -178,18 +185,27 @@ export function GenerateScheduleWizard({
         <div className="min-h-[300px]">
           {step === 1 && <Step1Position monthLabel={monthLabel} />}
           {step === 2 && <Step2Weeks weeks={weeks} onWeeksChange={setWeeks} />}
-          {step === 3 && <Step3Conflicts policy={existingPolicy} onPolicyChange={setExistingPolicy} />}
-          {step === 4 && (
-            <Step4Summary
+          {step === 3 && (
+            <Step3Guardias
+              currentWeek={currentWeek}
+              weeks={weeks}
+              guardiaDays={fomGuardiaDays}
+              onGuardiaDaysChange={setFomGuardiaDays}
+            />
+          )}
+          {step === 4 && <Step4Conflicts policy={existingPolicy} onPolicyChange={setExistingPolicy} />}
+          {step === 5 && (
+            <Step5Summary
               weeks={weeks}
               policy={existingPolicy}
               pendingPetitions={pendingPetitionsCount}
               hasOccupancy={hasOccupancyData}
+              guardiaDays={fomGuardiaDays}
             />
           )}
-          {step === 5 && <Step5Generate isGenerating={isGenerating} generation={generation} />}
-          {step === 6 && generation && (
-            <Step6Choose generation={generation} onApply={handleApply} />
+          {step === 6 && <Step6Generate isGenerating={isGenerating} generation={generation} />}
+          {step === 7 && generation && (
+            <Step7Choose generation={generation} onApply={handleApply} />
           )}
         </div>
 
@@ -200,19 +216,19 @@ export function GenerateScheduleWizard({
             variant="ghost"
             size="sm"
             onClick={handleBack}
-            disabled={step === 1 || step === 5}
+            disabled={step === 1 || step === 6}
           >
             <ChevronLeft className="h-4 w-4 mr-1" />
             Atrás
           </Button>
-          {step < 6 && (
+          {step < 7 && (
             <Button
               size="sm"
               onClick={handleNext}
               disabled={!canNext}
               className="gap-1.5 bg-violet-600 hover:bg-violet-700"
             >
-              {step === 4 ? (
+              {step === 5 ? (
                 <>
                   <Wand2 className="h-3.5 w-3.5" />
                   Generar
@@ -295,10 +311,135 @@ function Step2Weeks({
 }
 
 // ---------------------------------------------------------------------------
-// STEP 3 — Conflictos (turnos existentes)
+// STEP 3 — Guardias FOM (¿Qué fines de semana tiene guardia?)
 // ---------------------------------------------------------------------------
 
-function Step3Conflicts({
+function Step3Guardias({
+  currentWeek,
+  weeks,
+  guardiaDays,
+  onGuardiaDaysChange,
+}: {
+  currentWeek: Date;
+  weeks: 1 | 2 | 3 | 4;
+  guardiaDays: number[];
+  onGuardiaDaysChange: (days: number[]) => void;
+}) {
+  // Calcular los fines de semana del período
+  const monthStart = startOfMonth(currentWeek);
+  const year = monthStart.getFullYear();
+  const month = monthStart.getMonth() + 1; // 1-indexed
+  const totalDays = weeks * 7;
+
+  // Encontrar S+D agrupados por fin de semana
+  const weekends: Array<{ weekNum: number; satDay: number | null; sunDay: number | null; satDate: string; sunDate: string }> = [];
+
+  for (let wi = 0; wi < weeks; wi++) {
+    const weekDays = Array.from({ length: 7 }, (_, i) => wi * 7 + i + 1);
+    let satDay: number | null = null;
+    let sunDay: number | null = null;
+
+    for (const d of weekDays) {
+      if (d > totalDays) break;
+      const date = new Date(year, month - 1, d);
+      const dow = date.getDay(); // 0=dom, 6=sáb
+      if (dow === 6) satDay = d;
+      if (dow === 0) sunDay = d;
+    }
+
+    if (satDay || sunDay) {
+      weekends.push({
+        weekNum: wi + 1,
+        satDay,
+        sunDay,
+        satDate: satDay ? format(new Date(year, month - 1, satDay), "d MMM", { locale: es }) : "",
+        sunDate: sunDay ? format(new Date(year, month - 1, sunDay), "d MMM", { locale: es }) : "",
+      });
+    }
+  }
+
+  const toggleDay = (day: number) => {
+    if (guardiaDays.includes(day)) {
+      onGuardiaDaysChange(guardiaDays.filter(d => d !== day));
+    } else {
+      onGuardiaDaysChange([...guardiaDays, day]);
+    }
+  };
+
+  // Contar fines de semana con guardia (al menos 1 día del fds seleccionado)
+  const weekendsWithGuardia = weekends.filter(w =>
+    (w.satDay && guardiaDays.includes(w.satDay)) ||
+    (w.sunDay && guardiaDays.includes(w.sunDay))
+  ).length;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-2">
+        <Shield className="h-4 w-4 text-violet-600" />
+        <Label className="text-sm font-medium">Guardias del FOM</Label>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        ¿En qué fines de semana tiene Guardia (G/GT) el FOM este período?
+        <br />
+        <span className="text-[10px]">
+          Las semanas con guardia, el FOM librará 2 días entre semana. Máximo 2 fines de semana con guardia.
+        </span>
+      </p>
+
+      <div className="space-y-2">
+        {weekends.map((w) => (
+          <Card key={w.weekNum} className="overflow-hidden">
+            <CardContent className="p-3 space-y-2">
+              <span className="text-xs font-medium text-muted-foreground">Semana {w.weekNum}</span>
+              <div className="flex gap-3">
+                {w.satDay && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={guardiaDays.includes(w.satDay)}
+                      onCheckedChange={() => toggleDay(w.satDay!)}
+                      disabled={weekendsWithGuardia >= 2 && !guardiaDays.includes(w.satDay)}
+                    />
+                    <span className="text-sm">Sáb {w.satDate}</span>
+                    <Badge variant="outline" className="text-[9px]">G</Badge>
+                  </label>
+                )}
+                {w.sunDay && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={guardiaDays.includes(w.sunDay)}
+                      onCheckedChange={() => toggleDay(w.sunDay!)}
+                      disabled={weekendsWithGuardia >= 2 && !guardiaDays.includes(w.sunDay)}
+                    />
+                    <span className="text-sm">Dom {w.sunDate}</span>
+                    <Badge variant="outline" className="text-[9px]">GT</Badge>
+                  </label>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {guardiaDays.length === 0 && (
+        <p className="text-xs text-center text-muted-foreground italic">
+          Sin guardias — el FOM librará todos los fines de semana.
+        </p>
+      )}
+      {guardiaDays.length > 0 && (
+        <p className="text-xs text-center text-violet-600 font-medium">
+          {guardiaDays.length} día{guardiaDays.length > 1 ? "s" : ""} de guardia seleccionado{guardiaDays.length > 1 ? "s" : ""}.
+          El FOM librará entre semana en esas semanas.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// STEP 4 — Conflictos (turnos existentes)
+// ---------------------------------------------------------------------------
+
+function Step4Conflicts({
   policy,
   onPolicyChange,
 }: {
@@ -352,19 +493,21 @@ function Step3Conflicts({
 }
 
 // ---------------------------------------------------------------------------
-// STEP 4 — Resumen pre-generación
+// STEP 5 — Resumen pre-generación
 // ---------------------------------------------------------------------------
 
-function Step4Summary({
+function Step5Summary({
   weeks,
   policy,
   pendingPetitions,
   hasOccupancy,
+  guardiaDays,
 }: {
   weeks: number;
   policy: ExistingShiftsPolicy;
   pendingPetitions: number;
   hasOccupancy: boolean;
+  guardiaDays: number[];
 }) {
   const policyLabels: Record<ExistingShiftsPolicy, string> = {
     overwrite: "Sobreescribir todo",
@@ -406,6 +549,16 @@ function Step4Summary({
               )}
             </span>
           </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Guardias FOM</span>
+            <span className="font-medium">
+              {guardiaDays.length > 0 ? (
+                <Badge variant="info" className="text-[10px]">{guardiaDays.length} día{guardiaDays.length > 1 ? "s" : ""}</Badge>
+              ) : (
+                "Sin guardias"
+              )}
+            </span>
+          </div>
         </CardContent>
       </Card>
 
@@ -418,10 +571,10 @@ function Step4Summary({
 }
 
 // ---------------------------------------------------------------------------
-// STEP 5 — Generando
+// STEP 6 — Generando
 // ---------------------------------------------------------------------------
 
-function Step5Generate({
+function Step6Generate({
   isGenerating,
   generation,
 }: {
@@ -465,10 +618,10 @@ function Step5Generate({
 }
 
 // ---------------------------------------------------------------------------
-// STEP 6 — Elegir alternativa
+// STEP 7 — Elegir alternativa
 // ---------------------------------------------------------------------------
 
-function Step6Choose({
+function Step7Choose({
   generation,
   onApply,
 }: {

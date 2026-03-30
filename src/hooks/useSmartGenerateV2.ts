@@ -150,7 +150,7 @@ export function useSmartGenerateV2({
 
   // Genera 3 alternativas sin aplicar ninguna automáticamente
   const generate = useCallback(
-    (weeks: 1 | 2 | 3 | 4 = 4) => {
+    (weeks: 1 | 2 | 3 | 4 = 4, fomGuardiaDays: number[] = []) => {
       setIsGenerating(true);
       setError(null);
 
@@ -206,6 +206,7 @@ export function useSmartGenerateV2({
           employees: engineEmployees,
           constraints,
           occupancy: [],
+          fomGuardiaDays,
         });
 
         setGeneration(result);

@@ -2716,7 +2716,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     setShowAlternativesSheet(true);
   };
   const handleWizardGenerate = (config: WizardConfig) => {
-    runSmartGenerateV2(config.weeks);
+    runSmartGenerateV2(config.weeks, config.fomGuardiaDays ?? []);
   };
 
   const handleApplyAlternative = (index: number) => {
