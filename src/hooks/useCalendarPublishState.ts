@@ -167,6 +167,12 @@ export const useCalendarPublishState = (currentWeek: Date) => {
         .maybeSingle();
 
       if (error) {
+        // turnos_publicos es tabla legacy que aún no existe — silenciar el error
+        if (error.message?.includes('turnos_publicos') || error.code === '42P01') {
+          setPublishState({ status: 'draft', isPublishing: false });
+          setIsLoading(false);
+          return;
+        }
         console.error('Error loading publish state:', error);
         setError(error.message);
         return;
@@ -311,6 +317,11 @@ export const useCalendarPublishState = (currentWeek: Date) => {
       }
 
       if (result.error) {
+        // turnos_publicos es tabla legacy que aún no existe
+        if (result.error.message?.includes('turnos_publicos') || result.error.code === '42P01') {
+          setError('La función de publicación aún no está disponible. Se implementará próximamente.');
+          return false;
+        }
         throw result.error;
       }
 
@@ -373,6 +384,27 @@ export const useCalendarPublishState = (currentWeek: Date) => {
         // No bloqueamos la publicación si falla el envío de emails
       }
 
+      // Notificaciones in-app para empleados afectados
+      try {
+        const uniqueEmployeeIds = [...new Set(shiftBlocks.map(s => s.employeeId).filter(Boolean))];
+        if (uniqueEmployeeIds.length > 0) {
+          const monthName = format(weekStart, 'MMMM yyyy', { locale: es });
+          const notifRows = uniqueEmployeeIds
+            .filter((empId): empId is string => !!empId)
+            .map(empId => ({
+              user_id: empId,
+              org_id: currentOrg.org_id,
+              type: isModification ? 'shift_changed' : 'shift_published',
+              title: isModification ? 'Cuadrante actualizado' : 'Nuevo cuadrante publicado',
+              body: `${isModification ? 'Se ha actualizado' : 'Se ha publicado'} el cuadrante de ${monthName}. Revisa tu horario.`,
+              data: { version: newVersion, week_start: format(weekStart, 'yyyy-MM-dd'), week_end: format(weekEnd, 'yyyy-MM-dd') },
+            }));
+          await supabase.from('notifications').insert(notifRows);
+        }
+      } catch (inAppError) {
+        console.error('Error creating in-app notifications:', inAppError);
+      }
+
       return true;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al publicar calendario';
@@ -404,6 +436,11 @@ export const useCalendarPublishState = (currentWeek: Date) => {
         .eq('id', publishState.id);
 
       if (error) {
+        // turnos_publicos es tabla legacy que aún no existe
+        if (error.message?.includes('turnos_publicos') || error.code === '42P01') {
+          setError('La función de publicación aún no está disponible.');
+          return false;
+        }
         throw error;
       }
 

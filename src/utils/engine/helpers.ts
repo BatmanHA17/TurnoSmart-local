@@ -12,6 +12,45 @@ import { SHIFT_TIMES, WORKING_SHIFTS, ABSENCE_CODES } from "./constants";
 // FECHAS
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// PERIOD-DAY DATE HELPERS
+// Period day indices (d=1,2,3...) are offsets from startDate, NOT month day numbers.
+// Always use these functions when converting period days to calendar dates.
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the actual calendar Date for a period day index (1-based).
+ * d=1 → startDate, d=2 → startDate+1, etc.
+ */
+export function periodDayDate(startDate: string, d: number): Date {
+  const base = new Date(startDate + "T00:00:00");
+  base.setDate(base.getDate() + d - 1);
+  return base;
+}
+
+/** ISO day of week (0=Mon…6=Sun) for a period day index */
+export function periodDayOfWeekISO(startDate: string, d: number): number {
+  const date = periodDayDate(startDate, d);
+  return date.getDay() === 0 ? 6 : date.getDay() - 1;
+}
+
+export function isPeriodWeekend(startDate: string, d: number): boolean {
+  const dow = periodDayOfWeekISO(startDate, d);
+  return dow === 5 || dow === 6;
+}
+
+export function isPeriodSaturday(startDate: string, d: number): boolean {
+  return periodDayOfWeekISO(startDate, d) === 5;
+}
+
+export function isPeriodSunday(startDate: string, d: number): boolean {
+  return periodDayOfWeekISO(startDate, d) === 6;
+}
+
+export function isPeriodMonday(startDate: string, d: number): boolean {
+  return periodDayOfWeekISO(startDate, d) === 0;
+}
+
 /** Obtiene el número de días en un mes (1-indexed) */
 export function daysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
@@ -51,30 +90,79 @@ export function toISO(year: number, month: number, day: number): string {
   return `${year}-${m}-${d}`;
 }
 
-/** Construye un GenerationPeriod para N semanas completas (L-D) a partir de un mes */
+/**
+ * Construye un GenerationPeriod de semanas completas L-D que cubra todo el mes.
+ *
+ * Regla: el período empieza en el primer lunes >= día 1 del mes.
+ * Si el día 1 no es lunes, los días previos pertenecen a la generación
+ * del mes anterior (su última semana se extiende al domingo siguiente).
+ *
+ * El período termina en el domingo >= último día del mes, para no dejar
+ * días sueltos al final.
+ *
+ * Ejemplo marzo 2026 (1 = domingo):
+ *   start = lunes 2 mar, end = domingo 5 abr → 5 semanas (35 días)
+ * Ejemplo abril 2026 (1 = miércoles):
+ *   start = lunes 6 abr, end = domingo 3 may → 4 semanas (28 días)
+ *
+ * @param weeks — si se pasa, se usa ese número fijo; si no, se auto-calcula.
+ */
 export function buildGenerationPeriod(
   year: number,
   month: number,
-  weeks: 1 | 2 | 3 | 4
+  weeks?: number
 ): GenerationPeriod {
-  // Primer día del mes
   const firstDay = new Date(year, month - 1, 1);
-  // Retroceder al lunes de esa semana
-  const dow = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
-  const startDate = new Date(firstDay);
-  startDate.setDate(startDate.getDate() - dow);
+  const lastDay = new Date(year, month, 0); // último día del mes
 
-  // Sumar N semanas (cada semana = 7 días, acabamos en domingo)
-  const endDate = new Date(startDate);
-  endDate.setDate(endDate.getDate() + weeks * 7 - 1);
+  // Start: primer lunes >= día 1 del mes
+  const firstDow = firstDay.getDay(); // 0=dom, 1=lun, ..., 6=sáb
+  let startDate: Date;
+  if (firstDow === 1) {
+    // Ya es lunes
+    startDate = new Date(firstDay);
+  } else {
+    // Avanzar al próximo lunes
+    const daysUntilMonday = firstDow === 0 ? 1 : 8 - firstDow;
+    startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() + daysUntilMonday);
+  }
 
-  const totalDays = weeks * 7;
+  if (weeks) {
+    // Semanas fijas: endDate = startDate + weeks*7 - 1
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + weeks * 7 - 1);
+    return {
+      startDate: formatDate(startDate),
+      endDate: formatDate(endDate),
+      totalDays: weeks * 7,
+      totalWeeks: weeks,
+      year,
+      month,
+    };
+  }
+
+  // Auto-calcular: End = domingo >= último día del mes
+  const lastDow = lastDay.getDay(); // 0=dom
+  let endDate: Date;
+  if (lastDow === 0) {
+    // Ya es domingo
+    endDate = new Date(lastDay);
+  } else {
+    const daysToSunday = 7 - lastDow;
+    endDate = new Date(lastDay);
+    endDate.setDate(endDate.getDate() + daysToSunday);
+  }
+
+  const diffMs = endDate.getTime() - startDate.getTime();
+  const totalDays = Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
+  const totalWeeks = totalDays / 7;
 
   return {
     startDate: formatDate(startDate),
     endDate: formatDate(endDate),
     totalDays,
-    totalWeeks: weeks,
+    totalWeeks,
     year,
     month,
   };
@@ -333,6 +421,21 @@ export function countShiftOnDay(
 ): number {
   let count = 0;
   for (const empId of Object.keys(grid)) {
+    if (grid[empId][day]?.code === shiftCode) count++;
+  }
+  return count;
+}
+
+/** Cuenta turnos en un día excluyendo ciertos empleados (ej: FOM no cuenta para cobertura) */
+export function countShiftOnDayExcluding(
+  grid: Record<string, Record<number, DayAssignmentV2>>,
+  day: number,
+  shiftCode: string,
+  excludeIds: Set<string>
+): number {
+  let count = 0;
+  for (const empId of Object.keys(grid)) {
+    if (excludeIds.has(empId)) continue;
     if (grid[empId][day]?.code === shiftCode) count++;
   }
   return count;

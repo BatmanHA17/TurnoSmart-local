@@ -7,8 +7,9 @@
  * Fase 2: Genera 3 alternativas, el FOM elige cuál aplicar.
  */
 import { useState, useCallback } from "react";
-import { startOfMonth, setDate, addDays } from "date-fns";
+import { startOfMonth, addDays, endOfMonth, format } from "date-fns";
 import type { ShiftBlock } from "@/utils/calendarShiftUtils";
+import { supabase } from "@/integrations/supabase/client";
 import {
   generateAlternatives,
   buildGenerationPeriod,
@@ -24,6 +25,11 @@ import type {
   DayAssignmentV2,
   EmployeeRoleV2,
   ScoreBreakdown,
+  Petition,
+  DailyOccupancy,
+  ContinuityHistory,
+  EquityBalance,
+  OptionalCriteria,
 } from "@/utils/engine";
 import { useToast } from "@/hooks/use-toast";
 
@@ -55,7 +61,7 @@ interface GenerateV2Result {
   isGenerating: boolean;
   error: string | null;
   /** Genera 3 alternativas (no aplica ninguna automáticamente) */
-  generate: (weeks?: 1 | 2 | 3 | 4) => void;
+  generate: (weeks?: number, fomGuardiaDays?: number[]) => Promise<void>;
   /** Aplica una alternativa al calendario por índice */
   applyAlternative: (index: number) => void;
 }
@@ -112,7 +118,6 @@ function mapRole(calEmp: CalendarEmployee): EmployeeRoleV2 {
   const nm = calEmp.name?.toUpperCase() ?? "";
   const combined = `${jt} ${nm}`;
 
-  if (combined.includes("AFOM") || combined.includes("ASSISTANT FOM")) return "AFOM";
   if (combined.includes("FOM") || combined.includes("FRONT OFFICE MANAGER")) return "FOM";
   if (combined.includes("NIGHT") || combined.includes("NOCTURNO")) return "NIGHT_SHIFT_AGENT";
   if (combined.includes("GEX") || combined.includes("GUEST EXPERIENCE")) return "GEX";
@@ -150,7 +155,7 @@ export function useSmartGenerateV2({
 
   // Genera 3 alternativas sin aplicar ninguna automáticamente
   const generate = useCallback(
-    (weeks: 1 | 2 | 3 | 4 = 4, fomGuardiaDays: number[] = []) => {
+    async (weeks?: number, fomGuardiaDays: number[] = []) => {
       setIsGenerating(true);
       setError(null);
 
@@ -159,12 +164,132 @@ export function useSmartGenerateV2({
         const year = refDate.getFullYear();
         const month = refDate.getMonth() + 1;
 
-        const period = buildGenerationPeriod(year, month, weeks);
+        // Auto-calcula semanas completas L-D para cubrir todo el mes
+        const period = weeks
+          ? buildGenerationPeriod(year, month, weeks)
+          : buildGenerationPeriod(year, month);
+        const periodStart = period.startDate;
+        const periodEnd = period.endDate;
+
+        // --- Cargar peticiones desde DB ---
+        const petitionsByEmployee = new Map<string, Petition[]>();
+        if (orgId) {
+          const { data: dbPetitions } = await supabase
+            .from("schedule_petitions")
+            .select("*")
+            .eq("organization_id", orgId)
+            .lte("period_start", periodEnd)
+            .gte("period_end", periodStart);
+
+          for (const row of dbPetitions ?? []) {
+            const p: Petition = {
+              id: row.id,
+              employeeId: row.employee_id,
+              type: row.type as Petition["type"],
+              days: row.days ?? [],
+              requestedShift: row.requested_shift ?? undefined,
+              avoidShift: (row.avoid_shift as Petition["avoidShift"]) ?? undefined,
+              exchangeWithEmployeeId: row.exchange_with_employee_id ?? undefined,
+              exchangeDay: row.exchange_day ?? undefined,
+              status: row.status as Petition["status"],
+              priority: row.priority ?? 3,
+              reason: row.reason ?? undefined,
+            };
+            const list = petitionsByEmployee.get(row.employee_id) ?? [];
+            list.push(p);
+            petitionsByEmployee.set(row.employee_id, list);
+          }
+        }
+
+        // --- Cargar ocupación desde DB ---
+        let occupancy: DailyOccupancy[] = [];
+        if (orgId) {
+          const { data: dbOccupancy } = await supabase
+            .from("daily_occupancy")
+            .select("date, check_ins, check_outs")
+            .eq("organization_id", orgId)
+            .gte("date", periodStart)
+            .lte("date", periodEnd)
+            .order("date");
+
+          occupancy = (dbOccupancy ?? []).map((row) => {
+            const dayNum = parseInt(row.date.split("-")[2], 10);
+            const total = (row.check_ins ?? 0) + (row.check_outs ?? 0);
+            return {
+              day: dayNum,
+              checkIns: row.check_ins ?? 0,
+              checkOuts: row.check_outs ?? 0,
+              totalMovements: total,
+              needsReinforcement: total >= DEFAULT_REINFORCEMENT_THRESHOLD,
+            };
+          });
+        }
+
+        // --- Cargar equity del período anterior desde DB ---
+        const equityByEmployee = new Map<string, EquityBalance>();
+        if (orgId) {
+          const { data: dbEquity } = await supabase
+            .from("employee_equity")
+            .select("*")
+            .eq("organization_id", orgId)
+            .lt("period_end", periodStart)
+            .order("period_end", { ascending: false });
+
+          // Tomar solo la más reciente por empleado
+          for (const row of dbEquity ?? []) {
+            if (!equityByEmployee.has(row.employee_id)) {
+              equityByEmployee.set(row.employee_id, {
+                morningCount: row.morning_count ?? 0,
+                afternoonCount: row.afternoon_count ?? 0,
+                nightCount: row.night_count ?? 0,
+                weekendWorkedCount: row.weekend_worked_count ?? 0,
+                longWeekendCount: row.long_weekend_count ?? 0,
+                holidayWorkedCount: 0,
+                petitionSatisfactionRatio: 0,
+                nightCoverageCount: 0,
+              });
+            }
+          }
+        }
+
+        // --- Cargar criterios BOOST desde DB ---
+        let optionalCriteria: OptionalCriteria[] = [];
+        if (orgId) {
+          const { data: dbCriteria } = await supabase
+            .from("schedule_criteria")
+            .select("*")
+            .eq("organization_id", orgId);
+
+          optionalCriteria = (dbCriteria ?? [])
+            .filter((c: any) => c.category === "optional" && c.enabled)
+            .map((c: any) => ({
+              id: c.criteria_key,
+              name: c.criteria_name ?? c.criteria_key,
+              description: c.description ?? "",
+              enabled: c.enabled,
+              boost: c.boost ?? 1,
+              boostNote: c.boost_note ?? undefined,
+            }));
+        }
+
+        // --- Construir continuity desde equity (si hay datos) ---
+        let continuity: ContinuityHistory | undefined;
+        if (equityByEmployee.size > 0) {
+          const equitySnapshot: Record<string, EquityBalance> = {};
+          equityByEmployee.forEach((eq, empId) => {
+            equitySnapshot[empId] = eq;
+          });
+          continuity = {
+            lastWeek: {}, // TODO: cargar últimos 3 días de la generación anterior
+            equitySnapshot,
+          };
+        }
 
         const engineEmployees: EngineEmployee[] = calEmployees.map((ce) => {
           const role = mapRole(ce);
           const config = ROLE_CONFIGS[role];
           const wh = parseWeeklyHours(ce.workingHours);
+          const prevEquity = equityByEmployee.get(ce.id);
           return {
             id: ce.id,
             name: ce.name,
@@ -174,8 +299,8 @@ export function useSmartGenerateV2({
             weeklyHours: wh,
             contractUnits: wh / 8,
             absences: [],
-            petitions: [],
-            equityBalance: {
+            petitions: petitionsByEmployee.get(ce.id) ?? [],
+            equityBalance: prevEquity ?? {
               morningCount: 0,
               afternoonCount: 0,
               nightCount: 0,
@@ -192,11 +317,11 @@ export function useSmartGenerateV2({
           law: { ...SPAIN_LABOR_LAW },
           ergonomicRotation: true,
           fairWeekendDistribution: true,
-          occupancyBasedStaffing: false,
+          occupancyBasedStaffing: occupancy.length > 0,
           minCoveragePerShift: DEFAULT_MIN_COVERAGE,
           reinforcementThreshold: DEFAULT_REINFORCEMENT_THRESHOLD,
           fomAfomMirror: true,
-          optionalCriteria: [],
+          optionalCriteria,
           allowForceMajeureOverride: false,
           existingShiftsPolicy: "overwrite",
         };
@@ -205,7 +330,8 @@ export function useSmartGenerateV2({
           period,
           employees: engineEmployees,
           constraints,
-          occupancy: [],
+          occupancy,
+          continuity,
           fomGuardiaDays,
         });
 
@@ -215,9 +341,10 @@ export function useSmartGenerateV2({
         const best = result.alternatives[result.recommendedIndex];
         setScoreResult(best.output.score);
 
+        const petitionCount = [...petitionsByEmployee.values()].flat().length;
         toast({
           title: "3 alternativas SMART generadas",
-          description: `Mejor score: ${best.output.score.overall}/100 — elige cuál aplicar`,
+          description: `Score: ${best.output.score.overall}/100 · ${petitionCount} petición(es) · ${occupancy.length} días ocupación`,
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Error desconocido";
@@ -227,7 +354,7 @@ export function useSmartGenerateV2({
         setIsGenerating(false);
       }
     },
-    [calEmployees, currentWeek, toast]
+    [calEmployees, currentWeek, orgId, toast]
   );
 
   // Aplica una alternativa elegida al calendario
@@ -237,13 +364,14 @@ export function useSmartGenerateV2({
       const alt = generation.alternatives[index];
       if (!alt) return;
 
-      const refDate = startOfMonth(currentWeek);
+      // Usar el startDate real del período (primer lunes >= día 1 del mes)
+      const periodStartDate = new Date(alt.output.meta.period.startDate + "T00:00:00");
       const totalDays = alt.output.meta.totalDays;
 
       const blocks = engineOutputToBlocks(
         alt.output.schedules,
         calEmployees,
-        refDate,
+        periodStartDate,
         totalDays,
         orgId
       );
@@ -277,7 +405,7 @@ export function useSmartGenerateV2({
 function engineOutputToBlocks(
   schedules: Record<string, Record<number, DayAssignmentV2>>,
   calEmployees: CalendarEmployee[],
-  monthStart: Date,
+  periodStartDate: Date,
   totalDays: number,
   orgId: string | undefined
 ): ShiftBlock[] {
@@ -296,7 +424,8 @@ function engineOutputToBlocks(
       // Skip rest/absence days — solo generar bloques para turnos de trabajo
       if (code === "D" || assignment.hours === 0) continue;
 
-      const date = setDate(monthStart, day);
+      // day es 1-based dentro del período → fecha real = periodStart + (day - 1)
+      const date = addDays(periodStartDate, day - 1);
       const type = SHIFT_TYPE_MAP[code] ?? (code.match(/^\d/) ? "morning" : "absence");
       const color = SHIFT_COLORS[code] ?? "#6b7280";
 

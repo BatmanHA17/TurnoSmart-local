@@ -6,6 +6,7 @@ import { TurnoSmartLogo } from "@/components/TurnoSmartLogo";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useUserRoleCanonical } from "@/hooks/useUserRoleCanonical";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useTurnoSmartRole } from "@/hooks/useTurnoSmartRole";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,15 +42,18 @@ export function HorizontalNav() {
   const { user, signOut } = useAuth();
   const { getDefaultDashboard, role, isOwner } = useUserRoleCanonical();
   const { isSuperAdmin } = useUserRole();
+  const { canManage, isEmpleado, loading: tsRoleLoading } = useTurnoSmartRole();
   const { currentOrganization } = useOrganizationsUnified();
   const navigate = useNavigate();
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
 
-  // Filter navigation items based on role
+  // Filter navigation items based on TurnoSmart role
+  // Mientras carga el rol, mostrar todos para evitar flash de navbar vacío
   const filteredNavItems = mainNavItems.filter(item => {
-    // Hide HR for employees
-    if (item.url === "/hr" && role === "EMPLOYEE") {
-      return false;
+    if (tsRoleLoading) return true; // No filtrar mientras carga
+    // Empleados solo ven "Turnos" (su horario)
+    if (isEmpleado) {
+      return item.url === "/turnosmart";
     }
     return true;
   });
@@ -208,7 +212,7 @@ export function HorizontalNav() {
                 {/* Main menu items */}
                 <div className="py-2">
                   {/* Show all options for admin roles, only "Mis preferencias" for employees */}
-                  {role !== "EMPLOYEE" && (
+                  {(!isEmpleado || tsRoleLoading) && (
                     <DropdownMenuItem 
                       className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
                       onClick={() => navigate("/solicitudes-ausencia")}
@@ -224,7 +228,7 @@ export function HorizontalNav() {
                     Mis preferencias
                   </DropdownMenuItem>
                   
-                  {role !== "EMPLOYEE" && (
+                  {(!isEmpleado || tsRoleLoading) && (
                     <>
                       <DropdownMenuItem 
                         className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
@@ -240,7 +244,7 @@ export function HorizontalNav() {
                   )}
                 </div>
                 
-                {role !== "EMPLOYEE" && (
+                {(!isEmpleado || tsRoleLoading) && (
                   <>
                     <DropdownMenuSeparator className="border-gray-200" />
                     

@@ -1,7 +1,7 @@
 -- =============================================================================
 -- SEED: Datos de prueba para TurnoSmart® — Motor SMART v2.0
 -- Org: Recepción (eb228f04-a473-4d2d-8bf8-99c7f08d8c5c)
--- 7 empleados: 1 FOM + 1 AFOM + 1 Night Agent + 1 GEX + 3 Front Desk Agents
+-- 7 empleados: 1 FOM + 1 Night Agent + 1 GEX + 4 Front Desk Agents
 -- =============================================================================
 
 DO $$
@@ -9,7 +9,7 @@ DECLARE
   v_org_id UUID;
   v_admin_id UUID := '00000000-0000-0000-0000-000000000001';
   v_fom_id UUID := gen_random_uuid();
-  v_afom_id UUID := gen_random_uuid();
+  v_fda4_id UUID := gen_random_uuid();
   v_night_id UUID := gen_random_uuid();
   v_gex_id UUID := gen_random_uuid();
   v_fda1_id UUID := gen_random_uuid();
@@ -79,7 +79,7 @@ ON CONFLICT (user_id, org_id) DO UPDATE SET role = 'OWNER', status = 'active';
 -- ----------------------------------------------------------------
 INSERT INTO colaboradores (id, org_id, nombre, apellidos, email, department, status, tipo_contrato, tiempo_trabajo_semanal, fecha_inicio_contrato) VALUES
   (v_fom_id,   v_org_id, 'FOM',              NULL, 'fom@hotel.com',          'Recepción', 'activo', 'Indefinido', 40, '2023-01-15'),
-  (v_afom_id,  v_org_id, 'AFOM',             NULL, 'afom@hotel.com',         'Recepción', 'activo', 'Indefinido', 40, '2023-03-01'),
+  (v_fda4_id,  v_org_id, 'Front Desk',       '4',  'fda4@hotel.com',         'Recepción', 'activo', 'Indefinido', 40, '2023-03-01'),
   (v_night_id, v_org_id, 'Night Agent',      NULL, 'night@hotel.com',        'Recepción', 'activo', 'Indefinido', 40, '2022-09-01'),
   (v_gex_id,   v_org_id, 'GEX',              NULL, 'gex@hotel.com',          'Recepción', 'activo', 'Parcial',    20, '2024-02-01'),
   (v_fda1_id,  v_org_id, 'Front Desk',       '1',  'fda1@hotel.com',         'Recepción', 'activo', 'Indefinido', 40, '2023-06-15'),
@@ -97,7 +97,7 @@ INSERT INTO employee_equity (
   long_weekend_count, weekend_worked_count
 ) VALUES
   (v_fom_id,   v_org_id, '2026-02-01', '2026-02-28', 18, 0, 0, 1, 8),
-  (v_afom_id,  v_org_id, '2026-02-01', '2026-02-28', 8, 14, 0, 1, 6),
+  (v_fda4_id,  v_org_id, '2026-02-01', '2026-02-28', 9, 9, 4, 1, 5),
   (v_night_id, v_org_id, '2026-02-01', '2026-02-28', 0, 0, 20, 0, 12),
   (v_gex_id,   v_org_id, '2026-02-01', '2026-02-28', 10, 8, 0, 1, 4),
   (v_fda1_id,  v_org_id, '2026-02-01', '2026-02-28', 10, 8, 5, 1, 6),
@@ -163,5 +163,67 @@ SELECT
 FROM generate_series(1, 31) AS d
 ON CONFLICT (organization_id, date) DO NOTHING;
 
-RAISE NOTICE '✅ Seed completado: 7 empleados, equity feb-2026, 3 peticiones, 31 días ocupación';
+-- ----------------------------------------------------------------
+-- 5. RBAC: Crear auth.users para cada empleado y vincular
+-- FOM + Front Desk 4 (AFOM) → ADMIN | Resto → USER
+-- ----------------------------------------------------------------
+DECLARE
+  v_emp RECORD;
+  v_uid UUID;
+  v_emp_role app_role_canonical;
+BEGIN
+  FOR v_emp IN
+    SELECT id, nombre, apellidos, email
+    FROM colaboradores
+    WHERE org_id = v_org_id AND user_id IS NULL AND email IS NOT NULL
+  LOOP
+    v_uid := gen_random_uuid();
+
+    -- FOM y AFOM (Front Desk 4) → ADMIN, resto → USER
+    IF v_emp.nombre = 'FOM' OR (v_emp.nombre = 'Front Desk' AND v_emp.apellidos = '4') THEN
+      v_emp_role := 'ADMIN';
+    ELSE
+      v_emp_role := 'USER';
+    END IF;
+
+    -- auth.user
+    INSERT INTO auth.users (
+      id, instance_id, email, encrypted_password, email_confirmed_at,
+      role, aud, created_at, updated_at,
+      raw_app_meta_data, raw_user_meta_data, is_super_admin,
+      confirmation_token, recovery_token, email_change_token_new, email_change
+    ) VALUES (
+      v_uid, '00000000-0000-0000-0000-000000000000',
+      v_emp.email, crypt('TurnoSmart2026!', gen_salt('bf')), now(),
+      'authenticated', 'authenticated', now(), now(),
+      '{"provider":"email","providers":["email"]}',
+      jsonb_build_object('display_name', v_emp.nombre || COALESCE(' ' || v_emp.apellidos, '')),
+      false, '', '', '', ''
+    ) ON CONFLICT DO NOTHING;
+
+    -- identity
+    INSERT INTO auth.identities (
+      id, user_id, identity_data, provider, provider_id, created_at, updated_at, last_sign_in_at
+    ) VALUES (
+      v_uid, v_uid,
+      jsonb_build_object('sub', v_uid::text, 'email', v_emp.email),
+      'email', v_emp.email, now(), now(), now()
+    ) ON CONFLICT DO NOTHING;
+
+    -- profile
+    INSERT INTO profiles (id, email, display_name, is_active)
+    VALUES (v_uid, v_emp.email, v_emp.nombre || COALESCE(' ' || v_emp.apellidos, ''), true)
+    ON CONFLICT (id) DO NOTHING;
+
+    -- membership
+    INSERT INTO memberships (user_id, org_id, role, status)
+    VALUES (v_uid, v_org_id, v_emp_role, 'active')
+    ON CONFLICT (user_id, org_id) DO UPDATE SET role = v_emp_role, status = 'active';
+
+    -- vincular colaborador ↔ auth.user
+    UPDATE colaboradores SET user_id = v_uid WHERE id = v_emp.id;
+  END LOOP;
+END;
+
+RAISE NOTICE '✅ Seed completado: 7 empleados + RBAC, equity feb-2026, 3 peticiones, 31 días ocupación';
 END $$;

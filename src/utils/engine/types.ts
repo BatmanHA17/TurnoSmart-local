@@ -236,7 +236,7 @@ export interface GenerationPeriod {
   startDate: string;   // ISO "YYYY-MM-DD" (siempre lunes)
   endDate: string;     // ISO "YYYY-MM-DD" (siempre domingo)
   totalDays: number;
-  totalWeeks: number;  // 1, 2, 3 o 4
+  totalWeeks: number;  // típicamente 4 o 5
   year: number;
   month: number;       // mes principal (1-12)
 }
@@ -317,6 +317,7 @@ export interface EngineConstraints {
 export interface WeightProfile {
   name: string;
   label: string;          // nombre para UI: "Equilibrio", "Peticiones", "Cobertura"
+  legal: number;          // peso cumplimiento legal (12h, 40h, T→M)
   equity: number;         // peso equidad M/T/N/FDS
   coverage: number;       // peso cobertura mínima
   petitions: number;      // peso peticiones satisfechas

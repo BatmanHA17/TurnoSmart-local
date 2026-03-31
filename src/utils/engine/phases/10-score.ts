@@ -15,11 +15,38 @@
  *   Semáforo:    ≥80 verde | ≥50 naranja | <50 rojo
  */
 
-import type { PipelineContext, ScoreBreakdown, TrafficLight, AuditViolation } from "../types";
+import type { PipelineContext, ScoreBreakdown, TrafficLight, AuditViolation, OptionalCriteria } from "../types";
+
+/**
+ * Mapeo criterio BOOST → categoría de score afectada.
+ * Los IDs coinciden con criteria_key de schedule_criteria.
+ */
+const BOOST_CATEGORY_MAP: Record<string, keyof typeof CATEGORY_KEYS> = {
+  ERGONOMIC_ROTATION: "ergonomics",
+  CONSECUTIVE_REST: "ergonomics",
+  MIN_COVERAGE: "coverage",
+  OCCUPANCY_UNDERSTAFFING: "coverage",
+  EQUITY_DEVIATION: "equity",
+  WEEKEND_EQUITY: "equity",
+  PETITION_NOT_SATISFIED: "petitions",
+};
+
+const CATEGORY_KEYS = {
+  legal: true,
+  coverage: true,
+  equity: true,
+  petitions: true,
+  ergonomics: true,
+  continuity: true,
+} as const;
 
 export function score(ctx: PipelineContext): PipelineContext {
   const { violations, input } = ctx;
-  const weights = input.weights;
+  const baseWeights = { ...input.weights };
+  const boostCriteria = input.constraints.optionalCriteria ?? [];
+
+  // Aplicar BOOST: cada criterio con boost > 1 amplifica su categoría
+  const adjustedWeights = applyBoost(baseWeights, boostCriteria);
 
   const legal = calcLegal(violations);
   const coverage = calcCoverage(violations, input.period.totalDays, input.constraints.minCoveragePerShift);
@@ -29,17 +56,15 @@ export function score(ctx: PipelineContext): PipelineContext {
   const continuity = calcContinuity(violations);
 
   const overall = clamp(
-    legal * weights.equity * 0 + // legal no se pondera, siempre pesa
-    coverage * weights.coverage +
-    equity * weights.equity +
-    petitions * weights.petitions +
-    ergonomics * weights.ergonomics +
-    continuity * weights.continuity
+    legal * adjustedWeights.legal +
+    coverage * adjustedWeights.coverage +
+    equity * adjustedWeights.equity +
+    petitions * adjustedWeights.petitions +
+    ergonomics * adjustedWeights.ergonomics +
+    continuity * adjustedWeights.continuity
   );
 
-  // Legal siempre debe afectar: si hay críticos, el overall baja
-  const legalPenalty = violations.filter((v) => v.severity === "critical").length * 5;
-  const adjustedOverall = clamp(overall - legalPenalty);
+  const adjustedOverall = overall;
 
   const trafficLight: TrafficLight =
     adjustedOverall >= 80 ? "green" :
@@ -117,6 +142,40 @@ function calcErgonomics(violations: AuditViolation[]): number {
 function calcContinuity(violations: AuditViolation[]): number {
   const brokenTransitions = violations.filter((v) => v.rule === "CONTINUITY_BROKEN").length;
   return clamp(100 - brokenTransitions * 10);
+}
+
+/**
+ * Aplica BOOST a los pesos. Cada criterio con boost > 1 amplifica su categoría:
+ *   boost=1 → sin cambio | boost=3 → 1.4× | boost=5 → 1.8×
+ * Luego re-normaliza para que sumen 1.0
+ */
+function applyBoost(
+  weights: Record<string, number>,
+  criteria: OptionalCriteria[]
+): Record<string, number> {
+  if (criteria.length === 0) return weights;
+
+  const w = { ...weights };
+
+  for (const c of criteria) {
+    if (!c.enabled || c.boost <= 1) continue;
+    const category = BOOST_CATEGORY_MAP[c.id];
+    if (!category || !(category in w)) continue;
+
+    // boost=5 → multiplier=1.8, boost=3 → 1.4, boost=2 → 1.2
+    const multiplier = 1 + (c.boost - 1) * 0.2;
+    w[category] *= multiplier;
+  }
+
+  // Re-normalizar para que sumen 1.0
+  const sum = Object.values(w).reduce((a, b) => a + b, 0);
+  if (sum > 0) {
+    for (const key of Object.keys(w)) {
+      w[key] /= sum;
+    }
+  }
+
+  return w;
 }
 
 function clamp(value: number): number {

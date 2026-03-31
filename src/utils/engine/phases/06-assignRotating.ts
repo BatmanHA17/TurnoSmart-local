@@ -26,13 +26,16 @@ import {
   isRestOrAbsence,
   violates12hRest,
   countShiftOnDay,
+  countShiftOnDayExcluding,
   getWeeks,
   weeklyHours,
 } from "../helpers";
 import { ERGONOMIC_SEQUENCE, SHIFT_UNDESIRABILITY, TRANSITION_SHIFT, SPAIN_LABOR_LAW } from "../constants";
 
-/** Turnos a asignar en orden de prioridad (N primero porque es más restrictivo) */
-const ROTATION_SHIFTS: ShiftCode[] = ["N", "M", "T"];
+/** Turnos que rotan los FDA — solo M y T.
+ *  N lo cubre el Night Agent (FIJO_NOCHE).
+ *  Refuerzo nocturno solo si occupancy lo exige o FOM lo fuerza. */
+const ROTATION_SHIFTS: ShiftCode[] = ["M", "T"];
 
 export function assignRotating(ctx: PipelineContext): PipelineContext {
   const { grid, input, roleGroups, currentEquity } = ctx;
@@ -45,12 +48,53 @@ export function assignRotating(ctx: PipelineContext): PipelineContext {
   const rotatingEmployees = roleGroups.ROTA_COMPLETO;
   if (rotatingEmployees.length === 0) return ctx;
 
+  // FOM no cuenta para cobertura mínima — su turno fijo es adicional
+  const fomIds = new Set(
+    (roleGroups.FIJO_NO_ROTA ?? []).filter((e) => e.role === "FOM").map((e) => e.id)
+  );
+
+  // Determinar qué turnos necesitan cobertura FDA
+  // N ya cubierto por Night Agent (FIJO_NO_ROTA con fixedShift=N) → solo refuerzo si occupancy lo pide
+  const hasNightAgent = roleGroups.FIJO_NO_ROTA?.some(
+    (e) => e.fixedShift === "N" || e.role === "NIGHT_SHIFT_AGENT"
+  ) ?? false;
+  const coverageShifts: ShiftCode[] = hasNightAgent ? ["M", "T"] : ["M", "T", "N"];
+
+  // ===================================================================
+  // PASS 0 — NIGHT AGENT REST COVERAGE
+  // When Night Agent rests, FDAs cover N equitably. This runs FIRST so
+  // the FDA assigned to N is excluded from M/T rotation that day.
+  // The FDA also needs rest (locked D) the day after (12h rule: N→M = 0h).
+  // ===================================================================
+  if (hasNightAgent) {
+    const nightAgentRestDays = findNightAgentRestDays(grid, roleGroups, totalDays);
+    for (const restDay of nightAgentRestDays) {
+      const candidate = pickBestNightCandidate(
+        rotatingEmployees, grid, restDay, currentEquity, weeks, totalDays
+      );
+      if (candidate) {
+        grid[candidate.id][restDay] = makeAssignment("N", "engine");
+        updateEquity(currentEquity, candidate.id, "N");
+        // FDA needs rest after N (N ends 07:00, M starts 07:00 = 0h rest)
+        const nextDay = restDay + 1;
+        if (nextDay <= totalDays) {
+          const nextCell = grid[candidate.id][nextDay];
+          if (nextCell && !nextCell.locked) {
+            grid[candidate.id][nextDay] = makeAssignment("D", "engine");
+            grid[candidate.id][nextDay].locked = true;
+          }
+        }
+      }
+    }
+  }
+
   // ===================================================================
   // PASS 1 — COVERAGE: asegurar minCoveragePerShift por turno y día
+  // (sin contar FOM — su turno fijo es adicional)
   // ===================================================================
   for (let day = 1; day <= totalDays; day++) {
-    for (const shift of ROTATION_SHIFTS) {
-      const currentCount = countShiftOnDay(grid, day, shift);
+    for (const shift of coverageShifts) {
+      const currentCount = countShiftOnDayExcluding(grid, day, shift, fomIds);
       const minCoverage = constraints.minCoveragePerShift;
       if (currentCount >= minCoverage) continue;
 
@@ -109,9 +153,10 @@ export function assignRotating(ctx: PipelineContext): PipelineContext {
         if (assigned >= shiftsNeeded) break;
 
         // Elegir el mejor turno para este día (scoring)
+        // FDAs solo rotan M/T; N solo si no hay Night Agent
         const bestShift = pickBestShiftForDay(
           emp, grid, day, currentEquity, weights,
-          constraints.ergonomicRotation, period
+          constraints.ergonomicRotation, period, coverageShifts, fomIds
         );
         if (!bestShift) continue;
 
@@ -162,12 +207,14 @@ function pickBestShiftForDay(
   equity: Record<string, { morningCount: number; afternoonCount: number; nightCount: number }>,
   weights: WeightProfile,
   ergonomic: boolean,
-  period: { year: number; month: number }
+  period: { year: number; month: number },
+  allowedShifts: ShiftCode[] = ROTATION_SHIFTS,
+  fomIds: Set<string> = new Set()
 ): ShiftCode | string | null {
   let bestShift: ShiftCode | string | null = null;
   let bestScore = -Infinity;
 
-  for (const shift of ROTATION_SHIFTS) {
+  for (const shift of allowedShifts) {
     // Verificar 12h rest con día anterior
     if (day > 1) {
       const prevCode = grid[emp.id][day - 1]?.code;
@@ -197,8 +244,8 @@ function pickBestShiftForDay(
 
     const score = scoreShift(emp, grid, day, shift, equity, weights, ergonomic);
 
-    // Bonus por cobertura: si este turno tiene poca gente hoy, priorizar
-    const currentCount = countShiftOnDay(grid, day, shift);
+    // Bonus por cobertura: si este turno tiene poca gente hoy (sin contar FOM), priorizar
+    const currentCount = countShiftOnDayExcluding(grid, day, shift, fomIds);
     const coverageBonus = Math.max(0, 3 - currentCount) * 10 * weights.coverage;
 
     const totalScore = score + coverageBonus;
@@ -339,4 +386,74 @@ function updateEquity(
   if (shift === "M" || shift === "11x19") eq.morningCount++;
   else if (shift === "T") eq.afternoonCount++;
   else if (shift === "N") eq.nightCount++;
+}
+
+// ---------------------------------------------------------------------------
+// NIGHT AGENT REST COVERAGE HELPERS
+// ---------------------------------------------------------------------------
+
+/** Finds days where Night Agent has locked D (rest from Phase 04) */
+function findNightAgentRestDays(
+  grid: Record<string, Record<number, DayAssignmentV2>>,
+  roleGroups: PipelineContext["roleGroups"],
+  totalDays: number
+): number[] {
+  const restDays: number[] = [];
+  for (const na of roleGroups.FIJO_NO_ROTA.filter(e => e.role === "NIGHT_SHIFT_AGENT")) {
+    for (let d = 1; d <= totalDays; d++) {
+      const cell = grid[na.id][d];
+      if (cell && cell.code === "D" && cell.locked) {
+        restDays.push(d);
+      }
+    }
+  }
+  return restDays;
+}
+
+/** Picks the best FDA to cover N on a Night Agent rest day (equity-based) */
+function pickBestNightCandidate(
+  employees: EngineEmployee[],
+  grid: Record<string, Record<number, DayAssignmentV2>>,
+  day: number,
+  equity: Record<string, { morningCount: number; afternoonCount: number; nightCount: number }>,
+  weeks: number[][],
+  totalDays: number
+): EngineEmployee | null {
+  let bestEmp: EngineEmployee | null = null;
+  let bestScore = Infinity; // lower nightCount = better candidate
+
+  for (const emp of employees) {
+    const cell = grid[emp.id][day];
+    if (!cell || cell.locked) continue;
+    if (cell.code !== "D") continue; // already has a shift assigned
+    if (emp.isNewHire && emp.startDay && day < emp.startDay) continue;
+
+    // Check 12h rest with previous day
+    if (day > 1) {
+      const prevCode = grid[emp.id][day - 1]?.code;
+      if (prevCode && isWorkingShift(prevCode) && violates12hRest(prevCode, "N")) continue;
+    }
+
+    // Check 12h rest with next day — FDA needs D after N
+    if (day < totalDays) {
+      const nextCell = grid[emp.id][day + 1];
+      if (nextCell && nextCell.locked && isWorkingShift(nextCell.code)) continue;
+      if (nextCell && !nextCell.locked && nextCell.code !== "D") continue;
+    }
+
+    // Check weekly hours
+    const weekIdx = Math.floor((day - 1) / 7);
+    const weekDays = weeks[weekIdx] ?? [];
+    const currentHours = weeklyHours(grid[emp.id], weekDays);
+    if (currentHours >= (emp.weeklyHours ?? 40)) continue;
+
+    // Equity: prefer FDA with fewest night shifts
+    const nightCount = equity[emp.id]?.nightCount ?? 0;
+    if (nightCount < bestScore) {
+      bestScore = nightCount;
+      bestEmp = emp;
+    }
+  }
+
+  return bestEmp;
 }

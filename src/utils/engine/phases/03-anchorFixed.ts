@@ -15,12 +15,12 @@
 
 import type { PipelineContext, EngineEmployee, ShiftCode } from "../types";
 import { FOM_AFOM_MIRROR } from "../constants";
-import { makeAssignment, isWorkingShift, isWeekend, isSaturday, isSunday } from "../helpers";
+import { makeAssignment, isWorkingShift, isPeriodWeekend, isPeriodSaturday, isPeriodSunday } from "../helpers";
 
 export function anchorFixed(ctx: PipelineContext): PipelineContext {
   const { grid, roleGroups, input } = ctx;
   const totalDays = input.period.totalDays;
-  const { year, month } = input.period;
+  const startDate = input.period.startDate; // used to map period day → real calendar date
 
   // --- 1. Anclar ausencias pre-aprobadas para TODOS ---
   for (const emp of input.employees) {
@@ -59,7 +59,7 @@ export function anchorFixed(ctx: PipelineContext): PipelineContext {
       if (grid[fom.id][d].locked) continue; // ausencia/petición A ya anclada
       if (fom.isNewHire && fom.startDay && d < fom.startDay) continue;
 
-      if (isWeekend(year, month, d)) {
+      if (isPeriodWeekend(startDate, d)) {
         if (guardiaDays.has(d)) {
           // FOM tiene guardia este día → siempre G (tanto sábado como domingo)
           grid[fom.id][d] = makeAssignment("G", "engine");
@@ -111,14 +111,10 @@ export function anchorFixed(ctx: PipelineContext): PipelineContext {
     }
   }
 
-  // --- 5. Anclar Night Shift Agent (noche fija) ---
-  for (const nightAgent of roleGroups.FIJO_NO_ROTA.filter((e) => e.role === "NIGHT_SHIFT_AGENT")) {
-    for (let d = 1; d <= totalDays; d++) {
-      if (grid[nightAgent.id][d].locked) continue;
-      if (nightAgent.isNewHire && nightAgent.startDay && d < nightAgent.startDay) continue;
-      grid[nightAgent.id][d] = makeAssignment("N", "engine");
-    }
-  }
+  // --- 5. Night Shift Agent ---
+  // N assignment is intentionally deferred: Phase 04 will assign 2 consecutive
+  // rest days (locked D), then Phase 07 fills N on remaining unlocked D days.
+  // This avoids N coverage gaps caused by Phase 04 overwriting Phase 03's N slots.
 
   return { ...ctx, grid };
 }

@@ -1,4 +1,4 @@
-import { Calendar, Users, Clock, Settings, BarChart3, FileText, HelpCircle, Home, Building, UserCheck, Zap, Moon, Shield, ArrowRight, CalendarDays, FileBarChart, CreditCard, Crown, Plus, RotateCcw, CalendarClock, UsersIcon, Activity } from "lucide-react";
+import { Calendar, Users, Clock, Settings, BarChart3, FileText, HelpCircle, Home, Building, UserCheck, Zap, Moon, Shield, ArrowRight, CalendarDays, FileBarChart, CreditCard, Crown, Plus, RotateCcw, CalendarClock, UsersIcon, Activity, Send, User } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -11,23 +11,31 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { useUserRoleCanonical } from "@/hooks/useUserRoleCanonical";
+import { useTurnoSmartRole } from "@/hooks/useTurnoSmartRole";
 
-// Force rebuild - sidebar for admin access only
+// Force rebuild - sidebar RBAC v2
 
-const secondaryNavItems = [
-  { title: "Cuadrante", url: "/cuadrante", icon: Calendar },
+// ── Items por nivel de acceso ──────────────────────────────────────
+
+// Empleado: ve su horario y puede hacer peticiones
+const empleadoNavItems = [
+  { title: "Mi Horario", url: "/turnosmart/create-shift", icon: Calendar },
+  { title: "Mis Peticiones", url: "/turnosmart/peticiones", icon: Send },
 ];
 
-const configNavItems = [
-  { title: "Configuration Hub (Legacy)", url: "/configuracion-legacy", icon: Settings },
+// FOM/AFOM: gestión completa del cuadrante
+const fomNavItems = [
+  { title: "Calendario", url: "/turnosmart/create-shift", icon: Calendar },
+  { title: "Cuadrante", url: "/cuadrante", icon: CalendarDays },
+  { title: "Colaboradores", url: "/turnosmart/collaborators", icon: Users },
   { title: "Horarios Guardados", url: "/turnos/guardados", icon: RotateCcw },
-  { title: "Old-Turnosmart.app", url: "/old-turnosmart", icon: Calendar },
 ];
 
+// Super-Admin: administración
 const adminNavItems = [
   { title: "Panel de Super Admin", url: "/perfil-admin", icon: Crown },
   { title: "Actividad", url: "/activity", icon: Activity },
+  { title: "Configuración", url: "/configuracion-legacy", icon: Settings },
 ];
 
 const helpNavItems = [
@@ -40,7 +48,7 @@ export function AppSidebar() {
   const location = useLocation();
   const currentPath = location.pathname;
   const collapsed = state === "collapsed";
-  const { isOwner } = useUserRoleCanonical();
+  const { tsRole, canManage, isSuperAdmin } = useTurnoSmartRole();
 
   const isActive = (path: string) => {
     if (path === "/") {
@@ -55,12 +63,12 @@ export function AppSidebar() {
       : "text-muted-foreground hover:bg-muted/50 hover:text-foreground";
   };
 
-  const SidebarSection = ({ 
-    label, 
+  const SidebarSection = ({
+    label,
     items
-  }: { 
-    label: string; 
-    items: typeof secondaryNavItems; 
+  }: {
+    label: string;
+    items: typeof empleadoNavItems;
   }) => {
     return (
       <SidebarGroup>
@@ -72,8 +80,8 @@ export function AppSidebar() {
             {items.map((item) => (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton asChild>
-                  <NavLink 
-                    to={item.url} 
+                  <NavLink
+                    to={item.url}
                     className={`flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200 ${getNavClass(item.url)}`}
                   >
                     <item.icon className="h-4 w-4 flex-shrink-0" />
@@ -100,9 +108,21 @@ export function AppSidebar() {
       <SidebarContent className="gap-0">
         {/* Navigation */}
         <div className="flex-1 py-4">
-          <SidebarSection label="Gestión" items={secondaryNavItems} />
-          <SidebarSection label="Configuración" items={configNavItems} />
-          {isOwner && <SidebarSection label="Administración" items={adminNavItems} />}
+          {/* Empleado: solo su horario y peticiones */}
+          {!canManage && (
+            <SidebarSection label="Mi Espacio" items={empleadoNavItems} />
+          )}
+
+          {/* FOM/Super-Admin: gestión completa */}
+          {canManage && (
+            <SidebarSection label="Gestión" items={fomNavItems} />
+          )}
+
+          {/* Super-Admin: panel de administración */}
+          {isSuperAdmin && (
+            <SidebarSection label="Administración" items={adminNavItems} />
+          )}
+
           <SidebarSection label="Ayuda" items={helpNavItems} />
         </div>
 
@@ -111,9 +131,14 @@ export function AppSidebar() {
           <div className="border-t border-border/40 p-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center">
-                <Users className="w-3 h-3" />
+                <User className="w-3 h-3" />
               </div>
-              <span>Hotel Cantaclaro</span>
+              <div className="flex flex-col">
+                <span className="text-xs font-medium">Hotel Cantaclaro</span>
+                <span className="text-[10px] uppercase tracking-wider opacity-70">
+                  {tsRole === 'super_admin' ? 'Super Admin' : tsRole === 'fom' ? 'FOM' : 'Empleado'}
+                </span>
+              </div>
             </div>
           </div>
         )}

@@ -21,9 +21,9 @@ import {
   violates12hRest,
   isWeekend,
   isRestOrAbsence,
-  countShiftOnDay,
+  countShiftOnDayExcluding,
 } from "../helpers";
-import { SPAIN_LABOR_LAW, ERGONOMIC_SEQUENCE } from "../constants";
+import { SPAIN_LABOR_LAW, ERGONOMIC_SEQUENCE, MAX_CONSECUTIVE_NIGHTS } from "../constants";
 
 export function audit(ctx: PipelineContext): PipelineContext {
   const { grid, input } = ctx;
@@ -107,7 +107,7 @@ export function audit(ctx: PipelineContext): PipelineContext {
               employeeId: emp.id,
               day: weekDays[0],
               rule: "CONSECUTIVE_REST",
-              severity: "warning",
+              severity: "info",
               description: `Semana ${wi + 1}: libres no consecutivos`,
               overridable: true,
               category: "ergonomics",
@@ -179,19 +179,20 @@ export function audit(ctx: PipelineContext): PipelineContext {
 
   // --- COVERAGE CHECKS ---
 
-  // CK-08: Cobertura mínima por turno
+  // CK-08: Cobertura mínima por turno (sin contar FOM — su turno fijo es adicional)
+  const fomIds = new Set(employees.filter((e) => e.role === "FOM").map((e) => e.id));
   const coverageShifts: ShiftCode[] = ["M", "T", "N"];
   for (let d = 1; d <= totalDays; d++) {
     for (const shift of coverageShifts) {
-      const count = countShiftOnDay(grid, d, shift);
+      const count = countShiftOnDayExcluding(grid, d, shift, fomIds);
       if (count < constraints.minCoveragePerShift) {
         violations.push({
           employeeId: "_global",
           day: d,
           rule: "MIN_COVERAGE",
           severity: "critical",
-          description: `Día ${d} turno ${shift}: ${count} persona(s) (mínimo ${constraints.minCoveragePerShift})`,
-          overridable: true,
+          description: `Día ${d} turno ${shift}: ${count} persona(s) sin contar FOM (mínimo ${constraints.minCoveragePerShift})`,
+          overridable: false,
           category: "coverage",
         });
       }
@@ -228,7 +229,7 @@ export function audit(ctx: PipelineContext): PipelineContext {
   // Equity checks
   const equityDeviation = calculateEquityDeviation(grid, employees, totalDays);
   for (const [empId, dev] of Object.entries(equityDeviation)) {
-    if (dev > 3) {
+    if (dev > 4) {
       violations.push({
         employeeId: empId,
         rule: "EQUITY_DEVIATION",
@@ -257,6 +258,128 @@ export function audit(ctx: PipelineContext): PipelineContext {
             overridable: true,
             category: "petitions",
           });
+        }
+      }
+    }
+  }
+
+  // CK-12: Noches consecutivas máximas (solo ROTA_COMPLETO, no Night Agent)
+  for (const emp of employees) {
+    if (emp.rotationType !== "ROTA_COMPLETO") continue;
+    let consecutive = 0;
+    for (let d = 1; d <= totalDays; d++) {
+      if (grid[emp.id][d]?.code === "N") {
+        consecutive++;
+        if (consecutive > MAX_CONSECUTIVE_NIGHTS) {
+          violations.push({
+            employeeId: emp.id,
+            day: d,
+            rule: "MAX_CONSECUTIVE_NIGHTS",
+            severity: "warning",
+            description: `${consecutive} noches consecutivas (alerta a partir de ${MAX_CONSECUTIVE_NIGHTS})`,
+            overridable: true,
+            category: "ergonomics",
+          });
+        }
+      } else {
+        consecutive = 0;
+      }
+    }
+  }
+
+  // CK-13: Horas semanales vs contrato (contractUnits × 40 = horas semanales esperadas)
+  for (const emp of employees) {
+    const expectedWeekly = emp.contractUnits * SPAIN_LABOR_LAW.maxWeeklyHours;
+    if (Math.abs(emp.weeklyHours - expectedWeekly) > 0.5) {
+      violations.push({
+        employeeId: emp.id,
+        rule: "CONTRACT_HOURS_MATCH",
+        severity: "warning",
+        description: `Contrato ${emp.weeklyHours}h/sem pero unidades (${emp.contractUnits}) implican ${expectedWeekly}h`,
+        overridable: true,
+        category: "legal",
+      });
+    }
+  }
+
+  // CK-14: Continuidad 12h con período anterior
+  if (input.continuity?.lastWeek) {
+    for (const emp of employees) {
+      const lastWeek = input.continuity.lastWeek[emp.id];
+      if (!lastWeek || lastWeek.length === 0) continue;
+      const lastDay = lastWeek[lastWeek.length - 1];
+      const firstDay = grid[emp.id][1];
+      if (lastDay && firstDay && isWorkingShift(lastDay.code) && isWorkingShift(firstDay.code)) {
+        if (violates12hRest(lastDay.code, firstDay.code)) {
+          violations.push({
+            employeeId: emp.id,
+            day: 1,
+            rule: "CROSS_PERIOD_12H",
+            severity: "critical",
+            description: `Menos de 12h entre último turno anterior (${lastDay.code}) y día 1 (${firstDay.code})`,
+            overridable: false,
+            category: "legal",
+          });
+        }
+      }
+    }
+  }
+
+  // CK-15: Understaffing por ocupación (días con refuerzo necesario pero cobertura mínima)
+  if (input.occupancy.length > 0) {
+    for (const occ of input.occupancy) {
+      if (!occ.needsReinforcement) continue;
+      const d = occ.day;
+      if (d < 1 || d > totalDays) continue;
+      // Contar total de personas trabajando ese día (excluyendo FOM)
+      let workingCount = 0;
+      for (const emp of employees) {
+        if (emp.role === "FOM") continue;
+        if (grid[emp.id][d] && isWorkingShift(grid[emp.id][d].code)) workingCount++;
+      }
+      // Si solo hay cobertura mínima × 3 turnos, es understaffing
+      if (workingCount <= constraints.minCoveragePerShift * 3) {
+        violations.push({
+          employeeId: "_global",
+          day: d,
+          rule: "OCCUPANCY_UNDERSTAFFING",
+          severity: "info",
+          description: `Día ${d}: ${occ.totalMovements} movimientos, refuerzo recomendado pero solo ${workingCount} persona(s) trabajando`,
+          overridable: true,
+          category: "coverage",
+        });
+      }
+    }
+  }
+
+  // CK-16: Equidad de fines de semana trabajados (solo ROTA_COMPLETO)
+  {
+    const rotatingEmps = employees.filter((e) => e.rotationType === "ROTA_COMPLETO");
+    if (rotatingEmps.length >= 2) {
+      const weekendCounts: Record<string, number> = {};
+      for (const emp of rotatingEmps) {
+        weekendCounts[emp.id] = 0;
+        for (let d = 1; d <= totalDays; d++) {
+          if (isWeekend(period.year, period.month, d) && grid[emp.id][d] && isWorkingShift(grid[emp.id][d].code)) {
+            weekendCounts[emp.id]++;
+          }
+        }
+      }
+      const vals = Object.values(weekendCounts);
+      const maxW = Math.max(...vals);
+      const minW = Math.min(...vals);
+      if (maxW - minW > 3) {
+        for (const emp of rotatingEmps) {
+          if (weekendCounts[emp.id] === maxW) {
+            violations.push({
+              employeeId: emp.id,
+              rule: "WEEKEND_EQUITY",
+              severity: "warning",
+              description: `${weekendCounts[emp.id]} FDS trabajados vs mínimo del equipo ${minW} (diferencia >3)`,
+              overridable: true,
+              category: "equity",
+            });
+          }
         }
       }
     }

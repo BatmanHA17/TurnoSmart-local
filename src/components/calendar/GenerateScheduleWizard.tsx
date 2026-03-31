@@ -17,8 +17,9 @@
  */
 
 import { useState, useMemo } from "react";
-import { format, startOfMonth } from "date-fns";
+import { format, startOfMonth, addDays } from "date-fns";
 import { es } from "date-fns/locale";
+import { buildGenerationPeriod } from "@/utils/engine/helpers";
 import {
   Sheet,
   SheetContent,
@@ -47,7 +48,8 @@ import {
   Shield,
 } from "lucide-react";
 import { ScoreDisplay } from "./ScoreDisplay";
-import type { GenerationResult, ExistingShiftsPolicy } from "@/utils/engine";
+import type { GenerationResult, ExistingShiftsPolicy, DailyOccupancy } from "@/utils/engine";
+import type { PetitionRecord } from "@/hooks/usePetitions";
 
 // ---------------------------------------------------------------------------
 // TYPES
@@ -63,6 +65,14 @@ interface WizardProps {
   pendingPetitionsCount: number;
   /** true si hay datos de ocupación cargados */
   hasOccupancyData: boolean;
+  /** Peticiones reales para detalle en resumen */
+  petitions?: PetitionRecord[];
+  /** Datos de ocupación procesados */
+  occupancyData?: DailyOccupancy[];
+  /** Abrir panel de peticiones */
+  onOpenPetitions?: () => void;
+  /** Abrir diálogo de ocupación */
+  onOpenOccupancy?: () => void;
   /** Llamado al generar */
   onGenerate: (config: WizardConfig) => void;
   /** Resultado de la generación (llega async) */
@@ -74,7 +84,7 @@ interface WizardProps {
 }
 
 export interface WizardConfig {
-  weeks: 1 | 2 | 3 | 4;
+  weeks: number;
   existingShiftsPolicy: ExistingShiftsPolicy;
   /** Días del período (1-based) donde FOM tiene Guardia (G/GT) */
   fomGuardiaDays: number[];
@@ -105,13 +115,17 @@ export function GenerateScheduleWizard({
   hasExistingShifts,
   pendingPetitionsCount,
   hasOccupancyData,
+  petitions,
+  occupancyData,
+  onOpenPetitions,
+  onOpenOccupancy,
   onGenerate,
   generation,
   isGenerating,
   onApplyAlternative,
 }: WizardProps) {
   const [step, setStep] = useState(1);
-  const [weeks, setWeeks] = useState<1 | 2 | 3 | 4>(4);
+  const [weeks, setWeeks] = useState<number>(4);
   const [existingPolicy, setExistingPolicy] = useState<ExistingShiftsPolicy>("overwrite");
   const [fomGuardiaDays, setFomGuardiaDays] = useState<number[]>([]);
 
@@ -184,7 +198,7 @@ export function GenerateScheduleWizard({
         {/* Step content */}
         <div className="min-h-[300px]">
           {step === 1 && <Step1Position monthLabel={monthLabel} />}
-          {step === 2 && <Step2Weeks weeks={weeks} onWeeksChange={setWeeks} />}
+          {step === 2 && <Step2Weeks currentWeek={currentWeek} weeks={weeks} onWeeksChange={setWeeks} />}
           {step === 3 && (
             <Step3Guardias
               currentWeek={currentWeek}
@@ -201,6 +215,10 @@ export function GenerateScheduleWizard({
               pendingPetitions={pendingPetitionsCount}
               hasOccupancy={hasOccupancyData}
               guardiaDays={fomGuardiaDays}
+              petitions={petitions}
+              occupancyData={occupancyData}
+              onOpenPetitions={onOpenPetitions}
+              onOpenOccupancy={onOpenOccupancy}
             />
           )}
           {step === 6 && <Step6Generate isGenerating={isGenerating} generation={generation} />}
@@ -272,21 +290,40 @@ function Step1Position({ monthLabel }: { monthLabel: string }) {
 // ---------------------------------------------------------------------------
 
 function Step2Weeks({
+  currentWeek,
   weeks,
   onWeeksChange,
 }: {
-  weeks: 1 | 2 | 3 | 4;
-  onWeeksChange: (w: 1 | 2 | 3 | 4) => void;
+  currentWeek: Date;
+  weeks: number;
+  onWeeksChange: (w: number) => void;
 }) {
+  const monthStart = startOfMonth(currentWeek);
+  const year = monthStart.getFullYear();
+  const month = monthStart.getMonth() + 1;
+  const period = buildGenerationPeriod(year, month);
+  const fullMonthWeeks = period.totalWeeks;
+
+  // "mes" = valor especial que indica auto-cálculo completo
+  const isMes = weeks >= 4;
+  const effectiveWeeks = isMes ? fullMonthWeeks : weeks;
+  const effectivePeriod = buildGenerationPeriod(year, month, effectiveWeeks);
+
   return (
     <div className="space-y-4">
       <Label className="text-sm font-medium">¿Cuántas semanas generar?</Label>
       <RadioGroup
-        value={String(weeks)}
-        onValueChange={(v) => onWeeksChange(parseInt(v) as 1 | 2 | 3 | 4)}
+        value={isMes ? "mes" : String(weeks)}
+        onValueChange={(v) => {
+          if (v === "mes") {
+            onWeeksChange(fullMonthWeeks);
+          } else {
+            onWeeksChange(parseInt(v));
+          }
+        }}
         className="space-y-2"
       >
-        {([1, 2, 3, 4] as const).map((w) => (
+        {([1, 2, 3] as const).map((w) => (
           <label
             key={w}
             className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors"
@@ -298,14 +335,27 @@ function Step2Weeks({
                 ({w * 7} días)
               </span>
             </div>
-            {w === 4 && (
-              <Badge variant="secondary" className="ml-auto text-[10px]">
-                Mes completo
-              </Badge>
-            )}
           </label>
         ))}
+        <label className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
+          <RadioGroupItem value="mes" />
+          <div className="flex-1">
+            <span className="font-medium">Mes completo</span>
+            <span className="text-xs text-muted-foreground ml-2">
+              ({fullMonthWeeks} semanas · {fullMonthWeeks * 7} días)
+            </span>
+          </div>
+          <Badge variant="secondary" className="text-[10px]">
+            Recomendado
+          </Badge>
+        </label>
       </RadioGroup>
+
+      <p className="text-xs text-muted-foreground">
+        Período: <strong>{format(new Date(effectivePeriod.startDate + "T00:00:00"), "EEE d MMM", { locale: es })}</strong>
+        {" → "}
+        <strong>{format(new Date(effectivePeriod.endDate + "T00:00:00"), "EEE d MMM yyyy", { locale: es })}</strong>
+      </p>
     </div>
   );
 }
@@ -321,30 +371,37 @@ function Step3Guardias({
   onGuardiaDaysChange,
 }: {
   currentWeek: Date;
-  weeks: 1 | 2 | 3 | 4;
+  weeks: number;
   guardiaDays: number[];
   onGuardiaDaysChange: (days: number[]) => void;
 }) {
-  // Calcular los fines de semana del período
+  // Calcular el período real usando la misma lógica que el engine
   const monthStart = startOfMonth(currentWeek);
   const year = monthStart.getFullYear();
-  const month = monthStart.getMonth() + 1; // 1-indexed
-  const totalDays = weeks * 7;
+  const month = monthStart.getMonth() + 1;
+  const period = buildGenerationPeriod(year, month, weeks || undefined);
+  const periodStart = new Date(period.startDate + "T00:00:00");
+  const totalWeeks = period.totalWeeks;
 
-  // Encontrar S+D agrupados por fin de semana
-  const weekends: Array<{ weekNum: number; satDay: number | null; sunDay: number | null; satDate: string; sunDate: string }> = [];
+  // Encontrar S+D agrupados por fin de semana, usando fechas reales del período
+  const weekends: Array<{
+    weekNum: number;
+    satDay: number | null;
+    sunDay: number | null;
+    satDate: string;
+    sunDate: string;
+  }> = [];
 
-  for (let wi = 0; wi < weeks; wi++) {
-    const weekDays = Array.from({ length: 7 }, (_, i) => wi * 7 + i + 1);
+  for (let wi = 0; wi < totalWeeks; wi++) {
     let satDay: number | null = null;
     let sunDay: number | null = null;
 
-    for (const d of weekDays) {
-      if (d > totalDays) break;
-      const date = new Date(year, month - 1, d);
-      const dow = date.getDay(); // 0=dom, 6=sáb
-      if (dow === 6) satDay = d;
-      if (dow === 0) sunDay = d;
+    for (let di = 0; di < 7; di++) {
+      const dayIndex = wi * 7 + di + 1; // 1-based dentro del período
+      const realDate = addDays(periodStart, dayIndex - 1);
+      const dow = realDate.getDay(); // 0=dom, 6=sáb
+      if (dow === 6) satDay = dayIndex;
+      if (dow === 0) sunDay = dayIndex;
     }
 
     if (satDay || sunDay) {
@@ -352,8 +409,12 @@ function Step3Guardias({
         weekNum: wi + 1,
         satDay,
         sunDay,
-        satDate: satDay ? format(new Date(year, month - 1, satDay), "d MMM", { locale: es }) : "",
-        sunDate: sunDay ? format(new Date(year, month - 1, sunDay), "d MMM", { locale: es }) : "",
+        satDate: satDay
+          ? format(addDays(periodStart, satDay - 1), "d MMM", { locale: es })
+          : "",
+        sunDate: sunDay
+          ? format(addDays(periodStart, sunDay - 1), "d MMM", { locale: es })
+          : "",
       });
     }
   }
@@ -502,12 +563,20 @@ function Step5Summary({
   pendingPetitions,
   hasOccupancy,
   guardiaDays,
+  petitions,
+  occupancyData,
+  onOpenPetitions,
+  onOpenOccupancy,
 }: {
   weeks: number;
   policy: ExistingShiftsPolicy;
   pendingPetitions: number;
   hasOccupancy: boolean;
   guardiaDays: number[];
+  petitions?: PetitionRecord[];
+  occupancyData?: DailyOccupancy[];
+  onOpenPetitions?: () => void;
+  onOpenOccupancy?: () => void;
 }) {
   const policyLabels: Record<ExistingShiftsPolicy, string> = {
     overwrite: "Sobreescribir todo",
@@ -561,6 +630,70 @@ function Step5Summary({
           </div>
         </CardContent>
       </Card>
+
+      {/* Detalle de peticiones */}
+      {petitions && petitions.length > 0 && (
+        <Card>
+          <CardContent className="pt-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-medium text-muted-foreground uppercase">Peticiones</h4>
+              {onOpenPetitions && (
+                <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={onOpenPetitions}>
+                  Gestionar
+                </Button>
+              )}
+            </div>
+            {(["A", "B", "C", "D"] as const).map(type => {
+              const ofType = petitions.filter(p => p.type === type);
+              if (ofType.length === 0) return null;
+              const pending = ofType.filter(p => p.status === "pending").length;
+              const approved = ofType.filter(p => p.status === "approved").length;
+              const typeLabels = { A: "Dura", B: "Blanda", C: "Intercambio", D: "Recurrente" };
+              return (
+                <div key={type} className="text-xs">
+                  <span className="font-medium">Tipo {type} ({typeLabels[type]}):</span>{" "}
+                  {ofType.map(p => p.employee_name || "?").join(", ")}
+                  <span className="text-muted-foreground ml-1">
+                    ({approved} aprobada{approved !== 1 ? "s" : ""}, {pending} pendiente{pending !== 1 ? "s" : ""})
+                  </span>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Detalle de ocupación */}
+      {occupancyData && occupancyData.length > 0 && (
+        <Card>
+          <CardContent className="pt-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-medium text-muted-foreground uppercase">Ocupación</h4>
+              {onOpenOccupancy && (
+                <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={onOpenOccupancy}>
+                  Gestionar
+                </Button>
+              )}
+            </div>
+            {(() => {
+              const avg = Math.round(occupancyData.reduce((s, d) => s + d.totalMovements, 0) / occupancyData.length);
+              const peak = Math.max(...occupancyData.map(d => d.totalMovements));
+              const peakDays = occupancyData.filter(d => d.totalMovements === peak).map(d => d.day);
+              const reinforceDays = occupancyData.filter(d => d.needsReinforcement).length;
+              return (
+                <div className="text-xs space-y-1">
+                  <div>{occupancyData.length} días con datos</div>
+                  <div>Media: {avg} movimientos/día</div>
+                  <div>Pico: {peak} mov. (día{peakDays.length > 1 ? "s" : ""} {peakDays.join(", ")})</div>
+                  {reinforceDays > 0 && (
+                    <div className="text-orange-600">{reinforceDays} día{reinforceDays !== 1 ? "s" : ""} requieren refuerzo</div>
+                  )}
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
 
       <p className="text-xs text-muted-foreground text-center">
         Se generarán 3 alternativas (Equilibrio, Peticiones, Cobertura)

@@ -145,29 +145,32 @@ export const WEIGHT_PROFILES: WeightProfile[] = [
   {
     name: "balanced",
     label: "Equilibrio",
-    equity: 0.3,
-    coverage: 0.3,
-    petitions: 0.2,
-    ergonomics: 0.1,
-    continuity: 0.1,
+    legal: 0.10,
+    equity: 0.25,
+    coverage: 0.25,
+    petitions: 0.20,
+    ergonomics: 0.10,
+    continuity: 0.10,
   },
   {
     name: "petitions",
     label: "Peticiones",
-    equity: 0.1,
-    coverage: 0.2,
-    petitions: 0.5,
-    ergonomics: 0.1,
-    continuity: 0.1,
+    legal: 0.10,
+    equity: 0.10,
+    coverage: 0.15,
+    petitions: 0.45,
+    ergonomics: 0.10,
+    continuity: 0.10,
   },
   {
     name: "coverage",
     label: "Cobertura",
+    legal: 0.10,
     equity: 0.15,
-    coverage: 0.5,
-    petitions: 0.1,
-    ergonomics: 0.1,
-    continuity: 0.15,
+    coverage: 0.45,
+    petitions: 0.10,
+    ergonomics: 0.10,
+    continuity: 0.10,
   },
 ];
 
@@ -199,6 +202,9 @@ export const DEFAULT_REINFORCEMENT_THRESHOLD = 40;
 
 /** Días de FDS largo por empleado al mes */
 export const LONG_WEEKEND_PER_MONTH = 1;
+
+/** Noches consecutivas máximas para FDA antes de alerta (configurable, no aplica a Night Agent) */
+export const MAX_CONSECUTIVE_NIGHTS = 3;
 
 /** Versión del motor */
 export const ENGINE_VERSION = "2.0";

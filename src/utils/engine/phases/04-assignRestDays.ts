@@ -14,14 +14,14 @@ import type { PipelineContext, EngineEmployee, DayAssignmentV2 } from "../types"
 import { LONG_WEEKEND_PER_MONTH } from "../constants";
 import {
   getWeeks,
-  isWeekend,
-  isSaturday,
-  isSunday,
-  isMonday,
   makeAssignment,
   isAssigned,
   isRestOrAbsence,
-  dayOfWeekISO,
+  isPeriodWeekend,
+  isPeriodSaturday,
+  isPeriodSunday,
+  isPeriodMonday,
+  periodDayOfWeekISO,
 } from "../helpers";
 
 /** Crea un día libre marcado como locked (no sobreescribible por Phase 06) */
@@ -37,8 +37,13 @@ export function assignRestDays(ctx: PipelineContext): PipelineContext {
   const totalDays = period.totalDays;
   const weeks = getWeeks(totalDays);
 
+  const startDate = period.startDate;
+
   // --- 1. Planificar FDS largos (1 por empleado al mes) ---
-  const longWeekendPlan = planLongWeekends(employees, weeks, grid, period, currentEquity);
+  const longWeekendPlan = planLongWeekends(employees, weeks, grid, startDate, currentEquity);
+
+  // FOM IDs — sus libres son fijos (S+D), no cuentan para colisión de cobertura
+  const fomIds = new Set(employees.filter((e) => e.role === "FOM").map((e) => e.id));
 
   // --- 2. Asignar libres semana a semana ---
   for (const emp of employees) {
@@ -65,13 +70,13 @@ export function assignRestDays(ctx: PipelineContext): PipelineContext {
       const lwPlan = longWeekendPlan.get(emp.id);
       if (lwPlan && lwPlan.weekIndex === wi) {
         // FDS largo: S+D de esta semana
-        assignLongWeekendDays(grid, emp, weekDays, period, needed);
+        assignLongWeekendDays(grid, emp, weekDays, startDate, needed);
       } else if (lwPlan && lwPlan.weekIndex + 1 === wi) {
         // Semana siguiente al FDS largo: L+M libres
-        assignPostLongWeekendDays(grid, emp, weekDays, period, needed);
+        assignPostLongWeekendDays(grid, emp, weekDays, startDate, needed);
       } else {
-        // Semana normal: elegir 2 días consecutivos
-        assignNormalRestDays(grid, emp, effectiveDays, period, needed, constraints.fairWeekendDistribution, currentEquity);
+        // Semana normal: elegir 2 días consecutivos, escalonados con otros empleados
+        assignNormalRestDays(grid, emp, effectiveDays, startDate, needed, constraints.fairWeekendDistribution, currentEquity, employees, fomIds);
       }
     }
   }
@@ -95,7 +100,7 @@ function planLongWeekends(
   employees: EngineEmployee[],
   weeks: number[][],
   grid: Record<string, Record<number, DayAssignmentV2>>,
-  period: { year: number; month: number },
+  startDate: string,
   equity: Record<string, { longWeekendCount: number; weekendWorkedCount: number }>
 ): Map<string, LongWeekendAssignment> {
   const plan = new Map<string, LongWeekendAssignment>();
@@ -117,18 +122,18 @@ function planLongWeekends(
       if (usedWeeks.has(wi)) continue; // ya asignado a otro empleado
 
       const weekDays = weeks[wi];
-      const hasSat = weekDays.some((d) => isSaturday(period.year, period.month, d));
-      const hasSun = weekDays.some((d) => isSunday(period.year, period.month, d));
+      const hasSat = weekDays.some((d) => isPeriodSaturday(startDate, d));
+      const hasSun = weekDays.some((d) => isPeriodSunday(startDate, d));
       if (!hasSat || !hasSun) continue;
 
       // Verificar que no tiene ausencias que bloqueen el FDS
-      const satDay = weekDays.find((d) => isSaturday(period.year, period.month, d))!;
-      const sunDay = weekDays.find((d) => isSunday(period.year, period.month, d))!;
+      const satDay = weekDays.find((d) => isPeriodSaturday(startDate, d))!;
+      const sunDay = weekDays.find((d) => isPeriodSunday(startDate, d))!;
       if (grid[emp.id][satDay]?.locked || grid[emp.id][sunDay]?.locked) continue;
 
       // Verificar que la semana siguiente tiene L+M disponible
       const nextWeek = weeks[wi + 1];
-      const monDay = nextWeek?.find((d) => isMonday(period.year, period.month, d));
+      const monDay = nextWeek?.find((d) => isPeriodMonday(startDate, d));
       if (!monDay || grid[emp.id][monDay]?.locked) continue;
       const tueDay = monDay + 1;
       if (tueDay > nextWeek[nextWeek.length - 1] || grid[emp.id][tueDay]?.locked) continue;
@@ -146,14 +151,14 @@ function assignLongWeekendDays(
   grid: Record<string, Record<number, DayAssignmentV2>>,
   emp: EngineEmployee,
   weekDays: number[],
-  period: { year: number; month: number },
+  startDate: string,
   needed: number
 ): void {
   // S+D de esta semana como libres
   for (const d of weekDays) {
     if (needed <= 0) break;
     if (grid[emp.id][d]?.locked) continue;
-    if (isSaturday(period.year, period.month, d) || isSunday(period.year, period.month, d)) {
+    if (isPeriodSaturday(startDate, d) || isPeriodSunday(startDate, d)) {
       grid[emp.id][d] = makeLockedRest();
       needed--;
     }
@@ -164,14 +169,14 @@ function assignPostLongWeekendDays(
   grid: Record<string, Record<number, DayAssignmentV2>>,
   emp: EngineEmployee,
   weekDays: number[],
-  period: { year: number; month: number },
+  startDate: string,
   needed: number
 ): void {
   // L+M de esta semana como libres (continuación del FDS largo)
   for (const d of weekDays) {
     if (needed <= 0) break;
     if (grid[emp.id][d]?.locked) continue;
-    const dow = dayOfWeekISO(period.year, period.month, d);
+    const dow = periodDayOfWeekISO(startDate, d);
     if (dow === 0 || dow === 1) { // lunes o martes
       grid[emp.id][d] = makeLockedRest();
       needed--;
@@ -183,17 +188,35 @@ function assignPostLongWeekendDays(
 // LIBRES NORMALES (semana sin FDS largo)
 // ---------------------------------------------------------------------------
 
+/** Cuenta cuántos empleados (excluyendo FOM y el propio) ya tienen libre locked un día */
+function countRestOnDay(
+  grid: Record<string, Record<number, DayAssignmentV2>>,
+  day: number,
+  excludeId: string,
+  fomIds: Set<string>
+): number {
+  let count = 0;
+  for (const empId of Object.keys(grid)) {
+    if (empId === excludeId || fomIds.has(empId)) continue;
+    const cell = grid[empId][day];
+    if (cell?.locked && isRestOrAbsence(cell.code)) count++;
+  }
+  return count;
+}
+
 function assignNormalRestDays(
   grid: Record<string, Record<number, DayAssignmentV2>>,
   emp: EngineEmployee,
   weekDays: number[],
-  period: { year: number; month: number },
+  startDate: string,
   needed: number,
   fairWeekend: boolean,
-  equity: Record<string, { weekendWorkedCount: number }>
+  equity: Record<string, { weekendWorkedCount: number }>,
+  allEmployees: EngineEmployee[],
+  fomIds: Set<string>
 ): void {
   // Intentar asignar 2 días consecutivos
-  // Priorizar entre semana si el empleado ya ha librado muchos FDS (equidad)
+  // Escalonar libres: penalizar días donde ya descansan otros (sin contar FOM)
   const candidates: Array<{ startDay: number; score: number }> = [];
 
   for (let i = 0; i < weekDays.length - 1; i++) {
@@ -202,8 +225,8 @@ function assignNormalRestDays(
     if (grid[emp.id][d1]?.locked || grid[emp.id][d2]?.locked) continue;
 
     let score = 0;
-    const d1Weekend = isWeekend(period.year, period.month, d1);
-    const d2Weekend = isWeekend(period.year, period.month, d2);
+    const d1Weekend = isPeriodWeekend(startDate, d1);
+    const d2Weekend = isPeriodWeekend(startDate, d2);
 
     if (fairWeekend) {
       // Empleados con más FDS trabajados → más probabilidad de librar FDS
@@ -212,8 +235,13 @@ function assignNormalRestDays(
     }
 
     // Ligera preferencia por días a mitad de semana (mejor distribución)
-    const dow1 = dayOfWeekISO(period.year, period.month, d1);
+    const dow1 = periodDayOfWeekISO(startDate, d1);
     if (dow1 >= 1 && dow1 <= 3) score += 1; // mar-jue
+
+    // ESCALONAMIENTO: penalizar fuertemente días donde ya descansan otros empleados
+    const restD1 = countRestOnDay(grid, d1, emp.id, fomIds);
+    const restD2 = countRestOnDay(grid, d2, emp.id, fomIds);
+    score -= (restD1 + restD2) * 10; // -10 por cada empleado ya descansando
 
     candidates.push({ startDay: d1, score });
   }
@@ -224,7 +252,7 @@ function assignNormalRestDays(
     return;
   }
 
-  // Elegir el par con mejor score
+  // Elegir el par con mejor score (menos colisiones)
   candidates.sort((a, b) => b.score - a.score);
   const best = candidates[0];
 

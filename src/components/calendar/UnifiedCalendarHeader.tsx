@@ -14,6 +14,7 @@ import {
   Eraser,
   Wand2,
   Copy,
+  Sparkles,
 } from "lucide-react";
 import { format, addDays, subDays, addWeeks, subWeeks, startOfWeek, addMonths, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
@@ -64,6 +65,11 @@ interface UnifiedCalendarHeaderProps {
   
   // Settings/Delete
   onOpenSettings?: () => void;
+  onOpenPetitions?: () => void;
+  onOpenOccupancy?: () => void;
+  onOpenCriteria?: () => void;
+  pendingPetitionsCount?: number;
+  postPubChangeCount?: number;
   onDelete?: () => void;
   canEdit?: boolean;
   
@@ -85,6 +91,10 @@ interface UnifiedCalendarHeaderProps {
   // Generate SMART schedule
   onGenerate?: () => void;
   isGenerating?: boolean;
+
+  // SMART+IA suggestions
+  onOpenSmartIA?: () => void;
+  smartPendingCount?: number;
 
   // Duplicate week (biweek view only)
   onDuplicateWeek?: () => void;
@@ -116,6 +126,11 @@ export function UnifiedCalendarHeader({
   onShowBackups,
   onClean,
   onOpenSettings,
+  onOpenPetitions,
+  onOpenOccupancy,
+  onOpenCriteria,
+  pendingPetitionsCount = 0,
+  postPubChangeCount = 0,
   onDelete,
   canEdit = true,
   isPublished,
@@ -131,6 +146,8 @@ export function UnifiedCalendarHeader({
   onRefreshAudit,
   onGenerate,
   isGenerating = false,
+  onOpenSmartIA,
+  smartPendingCount = 0,
   onDuplicateWeek,
   exportButton,
   employeeCount,
@@ -218,6 +235,23 @@ export function UnifiedCalendarHeader({
             </Button>
           )}
 
+          {onOpenSmartIA && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onOpenSmartIA}
+              className="relative gap-1.5 h-8 text-violet-500 hover:text-violet-600 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">SMART+IA</span>
+              {smartPendingCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-violet-600 text-[9px] text-white font-bold">
+                  {smartPendingCount}
+                </span>
+              )}
+            </Button>
+          )}
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground">
@@ -287,6 +321,17 @@ export function UnifiedCalendarHeader({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-popover border border-border shadow-lg">
                 <DropdownMenuItem onClick={onOpenSettings}>Configuración</DropdownMenuItem>
+                {onOpenPetitions && (
+                  <DropdownMenuItem onClick={onOpenPetitions}>
+                    Peticiones {pendingPetitionsCount > 0 && `(${pendingPetitionsCount})`}
+                  </DropdownMenuItem>
+                )}
+                {onOpenOccupancy && (
+                  <DropdownMenuItem onClick={onOpenOccupancy}>Ocupación</DropdownMenuItem>
+                )}
+                {onOpenCriteria && (
+                  <DropdownMenuItem onClick={onOpenCriteria}>Criterios SMART</DropdownMenuItem>
+                )}
                 <DropdownMenuItem>Horarios rotativos</DropdownMenuItem>
                 <DropdownMenuItem>Balance anual</DropdownMenuItem>
               </DropdownMenuContent>
@@ -407,6 +452,11 @@ export function UnifiedCalendarHeader({
             <Badge variant="outline" className="gap-1 text-xs">
               <CalendarIcon className="h-3 w-3" />
               {dayCount}
+            </Badge>
+          )}
+          {postPubChangeCount > 0 && (
+            <Badge variant="default" className="gap-1 text-xs bg-blue-600">
+              {postPubChangeCount} cambios post-pub
             </Badge>
           )}
         </div>

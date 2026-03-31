@@ -30,6 +30,7 @@ import { getSavedShifts, getSavedShiftsSync, SavedShift } from "@/store/savedShi
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useUserRoleCanonical } from "@/hooks/useUserRoleCanonical";
+import { useTurnoSmartRole } from "@/hooks/useTurnoSmartRole";
 import { useAuth } from "@/hooks/useAuth";
 import { useActivityLog } from "@/hooks/useActivityLog";
 import { EmployeeCompensatoryBalance } from "./EmployeeCompensatoryBalance";
@@ -47,6 +48,16 @@ import { useEmployeeSortOrder } from "@/hooks/useEmployeeSortOrder";
 
 import { VersionHistoryDialog } from "./calendar/VersionHistoryDialog";
 import { OperationBackupsDialog } from "./calendar/OperationBackupsDialog";
+import { PetitionsListPanel } from "./calendar/PetitionsListPanel";
+import { PetitionFormDialog } from "./calendar/PetitionFormDialog";
+import { OccupancyImportDialog } from "./calendar/OccupancyImportDialog";
+import { CriteriaConfigDialog } from "./calendar/CriteriaConfigDialog";
+import { ConflictResolutionDialog } from "./calendar/ConflictResolutionDialog";
+import { useEditLog } from "@/hooks/useEditLog";
+import { useCriteria } from "@/hooks/useCriteria";
+import { useGenerationHistory } from "@/hooks/useGenerationHistory";
+import { usePetitions } from "@/hooks/usePetitions";
+import { useOccupancyData } from "@/hooks/useOccupancyData";
 import { ConfirmationDialog } from "./calendar/ConfirmationDialog";
 import { useDataProtection } from "@/hooks/useDataProtection";
 import { useDataPersistence } from "@/hooks/useDataPersistence";
@@ -68,6 +79,8 @@ import { AuditCellHighlight, EmployeeViolationBadge } from "@/components/audit";
 import { AuditViolationTooltip } from "@/components/audit/AuditViolationTooltip";
 import { useSmartGenerate } from "@/hooks/useSmartGenerate";
 import { useSmartGenerateV2 } from "@/hooks/useSmartGenerateV2";
+import { useSmartSuggestions } from "@/hooks/useSmartSuggestions";
+import { SmartSuggestionsPanel } from "./calendar/SmartSuggestionsPanel";
 import { GenerateScheduleSheet, GenerateConfig } from "@/components/calendar/GenerateScheduleSheet";
 import { AlternativesResultSheet } from "@/components/calendar/AlternativesResultSheet";
 import { GenerateScheduleWizard } from "@/components/calendar/GenerateScheduleWizard";
@@ -99,9 +112,10 @@ interface GoogleCalendarStyleProps {
 export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarStyleProps = {}) {
   const navigate = useNavigate();
   const { role, loading: roleLoading, isAdmin, isManager, isOwner } = useUserRoleCanonical();
+  const { tsRole, colaboradorId, canManage, isEmpleado, loading: tsRoleLoading } = useTurnoSmartRole();
   const { user } = useAuth();
-  const isEmployee = role === 'EMPLOYEE';
-  const canEdit = !isEmployee; // Los empleados no pueden editar
+  const isEmployee = isEmpleado; // Usar TurnoSmart role (no canonical)
+  const canEdit = canManage; // Solo FOM/Super-Admin pueden editar
   const { org } = useCurrentOrganization();
   const { logActivity } = useActivityLog();
   const { favoriteShifts, addToFavorites, removeFromFavorites, isFavorite} = useFavoriteShifts();
@@ -451,6 +465,12 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showOperationBackups, setShowOperationBackups] = useState(false);
   const [showCleanDialog, setShowCleanDialog] = useState(false);
+  const [showPetitions, setShowPetitions] = useState(false);
+  const [showPetitionForm, setShowPetitionForm] = useState(false);
+  const [showOccupancyImport, setShowOccupancyImport] = useState(false);
+  const [showCriteriaConfig, setShowCriteriaConfig] = useState(false);
+  const [showConflictDialog, setShowConflictDialog] = useState(false);
+  const [pendingPostPubShift, setPendingPostPubShift] = useState<{ shift: ShiftBlock; conflictInfo: any } | null>(null);
   
   // Confirmation dialogs state  
   const [confirmClearCalendar, setConfirmClearCalendar] = useState(false);
@@ -473,6 +493,47 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     isDraft,
     clearError: clearPublishError
   } = useCalendarPublishState(currentWeek);
+
+  // Generation history for VersionHistoryDialog tab
+  const {
+    generations,
+    isLoading: isLoadingGenerations,
+  } = useGenerationHistory({ organizationId: org?.id });
+
+  // Petitions
+  const {
+    petitions,
+    createPetition,
+    updatePetitionStatus,
+    refresh: refreshPetitions,
+  } = usePetitions({ organizationId: org?.id });
+  const pendingPetitionsCount = petitions.filter(p => p.status === 'pending').length;
+
+  // Post-publication edit log
+  const {
+    logEdit,
+    isPostPubEdited,
+    postPubCount,
+  } = useEditLog({ organizationId: org?.id });
+
+  // Criteria for the SMART engine
+  const {
+    criteria,
+    isLoading: criteriaLoading,
+    upsertCriteria,
+    seedDefaults,
+  } = useCriteria({ organizationId: org?.id });
+
+  // Occupancy data for OccupancyImportDialog
+  const {
+    occupancy: occupancyForWizard,
+    records: occupancyRecords,
+    upsertBatch: upsertOccupancyBatch,
+  } = useOccupancyData({
+    organizationId: org?.id,
+    year: currentWeek.getFullYear(),
+    month: currentWeek.getMonth() + 1,
+  });
 
   // Auto-save function
   const saveCalendarState = async (shiftBlocksToSave: ShiftBlock[]) => {
@@ -1781,15 +1842,8 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       return;
     }
     
-    // 🔒 BLOQUEO: Si calendario está publicado, no permitir edición
-    if (isPublished) {
-      toast({
-        title: "Calendario publicado",
-        description: "No se pueden realizar cambios en un calendario publicado",
-        variant: "destructive"
-      });
-      return;
-    }
+    // 🔒 Si está publicado: permite el flujo pero resolución de conflicto post-pub
+    // (ConflictResolutionDialog se abre en handleShiftSelected si isPublished)
     
     const existingShift = getShiftForEmployeeAndDate(employee.id, date);
     
@@ -1931,6 +1985,30 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       absenceCode: isAbsence ? (selectedShift.absenceCode || selectedShift.name) : undefined
     };
     
+    // Si el calendario está publicado → abrir ConflictResolutionDialog
+    if (isPublished) {
+      const existingShift = shiftBlocks.find(
+        s => s.employeeId === employeeId &&
+        format(s.date instanceof Date ? s.date : new Date(s.date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+      );
+      const employee = employees.find(e => e.id === employeeId);
+      setPendingPostPubShift({
+        shift: newShift,
+        conflictInfo: {
+          rule: "POST_PUBLICATION_EDIT",
+          severity: "warning",
+          description: "Este calendario está publicado. Editar un turno publicado requiere registrar el motivo (fuerza mayor) o realizar un intercambio.",
+          employeeId,
+          employeeName: employee?.name || employeeId,
+          day: date.getDate(),
+          currentCode: existingShift?.name || "—",
+          newCode: newShift.name,
+        },
+      });
+      setShowConflictDialog(true);
+      return;
+    }
+
     // CRITICAL FIX: Usar callback para mantener estado consistente + Undo/Redo
     setShiftBlocksWithHistory(currentShifts => {
       const updatedShifts = [...currentShifts, newShift];
@@ -1938,7 +2016,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       localStorage.setItem('calendar-shift-blocks', JSON.stringify(updatedShifts));
       return updatedShifts;
     });
-    
+
     // CRÍTICO: Persistir inmediatamente en Supabase
     persistShiftToSupabase(newShift).catch(error => {
       console.error('Error crítico guardando turno en Supabase:', error);
@@ -2708,6 +2786,32 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   const [showWizard, setShowWizard] = useState(false);
   const hasExistingShifts = shiftBlocks.length > 0;
 
+  // SMART+IA: sugerencias proactivas
+  const [showSmartSuggestions, setShowSmartSuggestions] = useState(false);
+  const savedShiftCodes = useMemo(
+    () => getSavedShiftsSync().map((s: any) => s.name as string),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+  const employeesForIA = useMemo(
+    () =>
+      employees.map((e) => ({
+        id: e.id,
+        name: e.name,
+        vacationDaysUsed: 0,   // TODO: conectar con contador real cuando exista
+        vacationDaysTotal: 30,
+      })),
+    [employees]
+  );
+  const {
+    suggestions: smartSuggestions,
+    detectAfterGeneration,
+    acceptSuggestion,
+    dismissSuggestion,
+    clearAll: clearSmartSuggestions,
+    pendingCount: smartPendingCount,
+  } = useSmartSuggestions({ savedShiftCodes, employees: employeesForIA });
+
   const handleOpenGenerateSheet = () => setShowWizard(true);
   const handleGenerate = (config: GenerateConfig) => {
     // Legacy: redirigir al wizard
@@ -2723,6 +2827,11 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     applyAlternative(index);
     setShowWizard(false);
     setShowAlternativesSheet(false);
+    // SMART+IA: detectar patrones tras aplicar alternativa
+    if (smartGeneration) {
+      detectAfterGeneration(smartGeneration);
+    }
+    // Persistencia automática: setShiftBlocks updater ya llama persistShiftsBatch
   };
 
   // Transformar shiftBlocks a formato de auditoría
@@ -2776,6 +2885,11 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           onShowHistory={() => setShowVersionHistory(true)}
           onShowBackups={() => setShowOperationBackups(true)}
           onOpenSettings={() => setShowShiftConfiguration(true)}
+          onOpenPetitions={() => setShowPetitions(true)}
+          onOpenOccupancy={() => setShowOccupancyImport(true)}
+          onOpenCriteria={() => setShowCriteriaConfig(true)}
+          pendingPetitionsCount={pendingPetitionsCount}
+          postPubChangeCount={postPubCount}
           onDelete={handleDeleteCalendar}
           canEdit={canEdit}
           isPublished={isPublished}
@@ -2788,6 +2902,8 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           onUnpublish={handleUnpublishCalendar}
           onGenerate={canEdit && !isPublished ? handleOpenGenerateSheet : undefined}
           isGenerating={isGenerating}
+          onOpenSmartIA={() => setShowSmartSuggestions(true)}
+          smartPendingCount={smartPendingCount}
           auditResult={auditResult}
           isAuditing={isAuditing}
           onRefreshAudit={runAudit}
@@ -3319,6 +3435,10 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
                                   cellSeverity === 'warning' ? 'bg-amber-500' : 'bg-primary'
                                 }`} />
                               )}
+                              {/* Indicador de edición post-publicación */}
+                              {isPostPubEdited(employee.id, format(day, 'yyyy-MM-dd')) && (
+                                <div className="absolute top-0 left-0 w-2 h-2 rounded-full z-10 bg-blue-500" title="Editado post-publicación" />
+                              )}
                               {shifts.map((shift, shiftIndex) => (
                                 <div key={shift.id} className={`${shifts.length > 1 ? 'h-8' : 'h-full'} w-full`}>
                                    <ShiftCard
@@ -3648,8 +3768,12 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         onOpenChange={setShowWizard}
         currentWeek={currentWeek}
         hasExistingShifts={hasExistingShifts}
-        pendingPetitionsCount={0}
-        hasOccupancyData={false}
+        pendingPetitionsCount={pendingPetitionsCount}
+        hasOccupancyData={occupancyRecords.length > 0}
+        petitions={petitions}
+        occupancyData={occupancyForWizard}
+        onOpenPetitions={() => setShowPetitions(true)}
+        onOpenOccupancy={() => setShowOccupancyImport(true)}
         onGenerate={handleWizardGenerate}
         generation={smartGeneration}
         isGenerating={isGeneratingV2}
@@ -3667,6 +3791,8 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         open={showVersionHistory}
         onOpenChange={setShowVersionHistory}
         onRestore={handleRestoreVersion}
+        generations={generations as any}
+        isLoadingGenerations={isLoadingGenerations}
       />
       
       {/* Operation Backups Dialog */}
@@ -4084,6 +4210,149 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           onSuccess={() => {
             loadShiftsFromSupabase(employees.map(e => e.id));
           }}
+        />
+
+        {/* Petitions Panel */}
+        <PetitionsListPanel
+          open={showPetitions}
+          onOpenChange={setShowPetitions}
+          petitions={petitions}
+          isLoading={false}
+          onApprove={(id) => updatePetitionStatus(id, 'approved')}
+          onReject={(id) => updatePetitionStatus(id, 'rejected')}
+          onDelete={(id) => updatePetitionStatus(id, 'rejected')}
+          onCreateNew={() => setShowPetitionForm(true)}
+        />
+
+        {/* Petition Form Dialog */}
+        <PetitionFormDialog
+          open={showPetitionForm}
+          onOpenChange={setShowPetitionForm}
+          employees={employees.map(e => ({ id: e.id, name: e.name }))}
+          organizationId={org?.id || ''}
+          periodStart={format(weekStart, 'yyyy-MM-dd')}
+          periodEnd={format(addDays(weekStart, 6), 'yyyy-MM-dd')}
+          totalDays={7}
+          onSubmit={async (data) => {
+            await createPetition(data as any);
+            refreshPetitions();
+          }}
+        />
+
+        {/* Occupancy Import Dialog */}
+        <OccupancyImportDialog
+          open={showOccupancyImport}
+          onOpenChange={setShowOccupancyImport}
+          totalDays={new Date(currentWeek.getFullYear(), currentWeek.getMonth() + 1, 0).getDate()}
+          year={currentWeek.getFullYear()}
+          month={currentWeek.getMonth() + 1}
+          existingData={occupancyRecords.map(r => ({
+            day: new Date(r.date).getDate(),
+            checkIns: r.check_ins,
+            checkOuts: r.check_outs,
+          }))}
+          onImport={async (entries) => {
+            const batch = entries.map(e => ({
+              date: `${currentWeek.getFullYear()}-${String(currentWeek.getMonth() + 1).padStart(2, '0')}-${String(e.day).padStart(2, '0')}`,
+              checkIns: e.checkIns,
+              checkOuts: e.checkOuts,
+            }));
+            await upsertOccupancyBatch(batch);
+          }}
+        />
+
+        {/* Criteria Config Dialog */}
+        <CriteriaConfigDialog
+          open={showCriteriaConfig}
+          onOpenChange={setShowCriteriaConfig}
+          criteria={criteria}
+          isLoading={criteriaLoading}
+          onToggle={upsertCriteria}
+          onSeedDefaults={seedDefaults}
+        />
+
+        {/* Conflict Resolution Dialog (post-publication edits) */}
+        <ConflictResolutionDialog
+          open={showConflictDialog}
+          onOpenChange={(open) => {
+            setShowConflictDialog(open);
+            if (!open) setPendingPostPubShift(null);
+          }}
+          conflict={pendingPostPubShift?.conflictInfo ?? null}
+          employees={employees.map(e => ({
+            id: e.id,
+            name: e.name,
+            currentShift: shiftBlocks.find(
+              s => s.employeeId === e.id &&
+              pendingPostPubShift &&
+              format(s.date instanceof Date ? s.date : new Date(s.date), 'yyyy-MM-dd') ===
+              format(pendingPostPubShift.shift.date instanceof Date ? pendingPostPubShift.shift.date : new Date(pendingPostPubShift.shift.date), 'yyyy-MM-dd')
+            )?.name,
+          }))}
+          onSwap={async (partnerId) => {
+            if (!pendingPostPubShift) return;
+            const { shift } = pendingPostPubShift;
+            const dateKey = format(shift.date instanceof Date ? shift.date : new Date(shift.date), 'yyyy-MM-dd');
+            // Swap: apply new shift for requester; give requester's old shift to partner
+            const partnerCurrentShift = shiftBlocks.find(
+              s => s.employeeId === partnerId &&
+              format(s.date instanceof Date ? s.date : new Date(s.date), 'yyyy-MM-dd') === dateKey
+            );
+            setShiftBlocksWithHistory(currentShifts => {
+              const filtered = currentShifts.filter(
+                s => !(s.employeeId === shift.employeeId && format(s.date instanceof Date ? s.date : new Date(s.date), 'yyyy-MM-dd') === dateKey) &&
+                     !(s.employeeId === partnerId && format(s.date instanceof Date ? s.date : new Date(s.date), 'yyyy-MM-dd') === dateKey)
+              );
+              const newBlocks = [...filtered, shift];
+              if (partnerCurrentShift) {
+                newBlocks.push({ ...partnerCurrentShift, id: crypto.randomUUID(), employeeId: shift.employeeId });
+              }
+              return newBlocks;
+            });
+            await logEdit({
+              employeeId: shift.employeeId,
+              shiftDate: dateKey,
+              previousCode: pendingPostPubShift.conflictInfo.currentCode,
+              newCode: shift.name,
+              changeType: 'swap',
+              reason: `Intercambio con empleado ${partnerId}`,
+            });
+            setPendingPostPubShift(null);
+          }}
+          onForceMajeure={async (reason) => {
+            if (!pendingPostPubShift) return;
+            const { shift } = pendingPostPubShift;
+            const dateKey = format(shift.date instanceof Date ? shift.date : new Date(shift.date), 'yyyy-MM-dd');
+            setShiftBlocksWithHistory(currentShifts => {
+              const filtered = currentShifts.filter(
+                s => !(s.employeeId === shift.employeeId && format(s.date instanceof Date ? s.date : new Date(s.date), 'yyyy-MM-dd') === dateKey)
+              );
+              return [...filtered, shift];
+            });
+            persistShiftToSupabase(shift).catch(console.error);
+            await logEdit({
+              employeeId: shift.employeeId,
+              shiftDate: dateKey,
+              previousCode: pendingPostPubShift.conflictInfo.currentCode,
+              newCode: shift.name,
+              changeType: 'force_majeure',
+              reason,
+            });
+            setPendingPostPubShift(null);
+          }}
+          onDismiss={() => {
+            setPendingPostPubShift(null);
+          }}
+        />
+
+        {/* SMART+IA Suggestions Panel */}
+        <SmartSuggestionsPanel
+          open={showSmartSuggestions}
+          onOpenChange={setShowSmartSuggestions}
+          suggestions={smartSuggestions}
+          onAccept={acceptSuggestion}
+          onDismiss={dismissSuggestion}
+          onClearAll={clearSmartSuggestions}
         />
     </TooltipProvider>
   );

@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 // Imports críticos (carga inmediata)
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminRoute from "@/components/AdminRoute";
+import RoleGuard from "@/components/RoleGuard";
 import { TurnoSmartLanding } from "@/components/turnosmart/TurnoSmartLanding";
 import NotFound from "@/pages/NotFound";
 import Auth from "@/pages/Auth";
@@ -245,10 +246,10 @@ export const AppRoutes = () => {
           <Route path="/dashboard-owner-preview" element={<DashboardOwner />} />
           <Route path="/mi-actividad" element={<ProtectedRoute><MiActividad /></ProtectedRoute>} />
 
-          {/* Colaboradores */}
+          {/* Colaboradores — solo FOM+ */}
           <Route path="/turnosmart/collaborators">
-            <Route index element={<ProtectedRoute><SectionErrorBoundary label="colaboradores"><Colaboradores /></SectionErrorBoundary></ProtectedRoute>} />
-            <Route path="new" element={<ProtectedRoute><AddColaboradorSheetRoute /></ProtectedRoute>} />
+            <Route index element={<ProtectedRoute><RoleGuard minRole="fom"><SectionErrorBoundary label="colaboradores"><Colaboradores /></SectionErrorBoundary></RoleGuard></ProtectedRoute>} />
+            <Route path="new" element={<ProtectedRoute><RoleGuard minRole="fom"><AddColaboradorSheetRoute /></RoleGuard></ProtectedRoute>} />
           </Route>
 
           {/* Reception Employee Manager - Phase 3 Testing */}
@@ -283,8 +284,8 @@ export const AppRoutes = () => {
 
           <Route path="/turnosmart/collaborators/:empleadoId/work-time" element={<ProtectedRoute><TiempoTrabajo /></ProtectedRoute>} />
 
-          {/* HR */}
-          <Route path="/turnosmart/hr" element={<ProtectedRoute><HR /></ProtectedRoute>} />
+          {/* HR — solo FOM+ */}
+          <Route path="/turnosmart/hr" element={<ProtectedRoute><RoleGuard minRole="fom"><HR /></RoleGuard></ProtectedRoute>} />
           <Route path="/turnosmart/hr/home" element={<ProtectedRoute><HRResumen /></ProtectedRoute>} />
           <Route path="/turnosmart/hr/onboarding" element={<ProtectedRoute><HROnboarding /></ProtectedRoute>} />
           <Route path="/turnosmart/hr/exits" element={<ProtectedRoute><HRExits /></ProtectedRoute>} />
@@ -357,8 +358,8 @@ export const AppRoutes = () => {
           <Route path="/solicitudes-ausencia" element={<Navigate to="/turnosmart/absence-requests" replace />} />
           <Route path="/balance-anual" element={<Navigate to="/turnosmart/annual-balance" replace />} />
 
-          {/* Settings */}
-          <Route path="/turnosmart/settings" element={<ProtectedRoute><SettingsLayout /></ProtectedRoute>}>
+          {/* Settings — solo FOM+ */}
+          <Route path="/turnosmart/settings" element={<ProtectedRoute><RoleGuard minRole="fom"><SettingsLayout /></RoleGuard></ProtectedRoute>}>
             <Route index element={null} />
             <Route path="contact" element={<ContactSettings />} />
             <Route path="collective-agreement" element={<CollectiveAgreementSettings />} />
@@ -451,8 +452,11 @@ export const AppRoutes = () => {
           <Route path="/admin/stats" element={<ProtectedRoute><AdminRoute><AdminStats /></AdminRoute></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute><AdminRoute><AdminSettings /></AdminRoute></ProtectedRoute>} />
 
-          {/* Nóminas — OWNER/ADMIN/MANAGER */}
-          <Route path="/turnosmart/nominas" element={<ProtectedRoute><Nominas /></ProtectedRoute>} />
+          {/* Peticiones del empleado (todos los roles) */}
+          <Route path="/turnosmart/peticiones" element={<ProtectedRoute><SectionErrorBoundary label="peticiones"><MainLayout><DashboardEmpleado /></MainLayout></SectionErrorBoundary></ProtectedRoute>} />
+
+          {/* Nóminas — solo FOM+ */}
+          <Route path="/turnosmart/nominas" element={<ProtectedRoute><RoleGuard minRole="fom"><Nominas /></RoleGuard></ProtectedRoute>} />
 
           {/* Mensajería interna */}
           <Route path="/turnosmart/mensajes" element={<ProtectedRoute><Mensajes /></ProtectedRoute>} />
@@ -460,8 +464,8 @@ export const AppRoutes = () => {
           {/* Wiki / Knowledge Base */}
           <Route path="/turnosmart/wiki" element={<ProtectedRoute><Wiki /></ProtectedRoute>} />
 
-          {/* Productividad — OWNER/ADMIN/MANAGER */}
-          <Route path="/turnosmart/productividad" element={<ProtectedRoute><Productividad /></ProtectedRoute>} />
+          {/* Productividad — solo FOM+ */}
+          <Route path="/turnosmart/productividad" element={<ProtectedRoute><RoleGuard minRole="fom"><Productividad /></RoleGuard></ProtectedRoute>} />
 
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />

@@ -58,6 +58,9 @@ interface CalendarToolbarProps {
   
   // Settings
   onOpenSettings?: () => void;
+  onOpenPetitions?: () => void;
+  onOpenOccupancy?: () => void;
+  pendingPetitionsCount?: number;
   onDelete?: () => void;
   canEdit?: boolean;
   
@@ -90,6 +93,9 @@ export function CalendarToolbar({
   onPublish,
   onUnpublish,
   onOpenSettings,
+  onOpenPetitions,
+  onOpenOccupancy,
+  pendingPetitionsCount = 0,
   onDelete,
   canEdit = true,
   sortByTime,
@@ -268,6 +274,14 @@ export function CalendarToolbar({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-popover border border-border shadow-lg">
                 <DropdownMenuItem onClick={onOpenSettings}>Configuración</DropdownMenuItem>
+                {onOpenPetitions && (
+                  <DropdownMenuItem onClick={onOpenPetitions}>
+                    Peticiones {pendingPetitionsCount > 0 && `(${pendingPetitionsCount})`}
+                  </DropdownMenuItem>
+                )}
+                {onOpenOccupancy && (
+                  <DropdownMenuItem onClick={onOpenOccupancy}>Ocupación</DropdownMenuItem>
+                )}
                 <DropdownMenuItem>Horarios rotativos</DropdownMenuItem>
                 <DropdownMenuItem>Balance anual</DropdownMenuItem>
               </DropdownMenuContent>
