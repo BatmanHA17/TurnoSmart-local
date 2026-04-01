@@ -84,13 +84,13 @@ export function assignRotating(ctx: PipelineContext): PipelineContext {
         if (nextDay <= totalDays && !nightRestSet.has(nextDay)) {
           const nextCell = grid[candidate.id][nextDay];
           if (nextCell && !nextCell.locked) {
-            // Don't add a 3rd rest day if the employee already has 2 locked rest
-            // days in the same week — the 12h rule will block any bad shift anyway
+            // Don't add a 3rd rest day — count ALL rest/absence days in the week
+            // (locked or not) to avoid employees with 3+ rest = only 32h
             const candidateWeek = weeks.find((w) => w.includes(nextDay)) ?? [];
-            const lockedRests = candidateWeek.filter(
-              (d) => grid[candidate.id][d]?.locked && isRestOrAbsence(grid[candidate.id][d]?.code)
+            const totalRests = candidateWeek.filter(
+              (d) => isRestOrAbsence(grid[candidate.id][d]?.code)
             ).length;
-            if (lockedRests < 2) {
+            if (totalRests < 2) {
               grid[candidate.id][nextDay] = makeAssignment("D", "engine");
               grid[candidate.id][nextDay].locked = true;
             }

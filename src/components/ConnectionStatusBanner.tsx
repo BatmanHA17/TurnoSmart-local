@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Wifi, WifiOff, RefreshCw, CheckCircle2, AlertTriangle, Cloud, CloudOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -25,32 +25,35 @@ export function ConnectionStatusBanner({
   className,
 }: ConnectionStatusBannerProps) {
   const [isVisible, setIsVisible] = useState(false);
-  const [lastShownSaveTime, setLastShownSaveTime] = useState<number | null>(null);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Mostrar banner cuando hay problemas o cambios recientes
+  // Mostrar banner cuando hay problemas; auto-ocultar en estado OK
   useEffect(() => {
+    // Limpiar timer anterior
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+
     if (connectionStatus === 'offline' || connectionStatus === 'reconnecting') {
-      setIsVisible(true);
+      setIsVisible(true); // Queda visible hasta reconectar
     } else if (saveStatus === 'error') {
-      setIsVisible(true);
-    } else if (pendingCount > 0) {
-      setIsVisible(true);
+      setIsVisible(true); // Queda visible hasta resolver
     } else if (saveStatus === 'saved' && lastSavedAt) {
-      const saveTime = lastSavedAt.getTime();
-      // Solo mostrar si han pasado >5s desde el último banner mostrado (evitar re-trigger por auto-save)
-      if (!lastShownSaveTime || saveTime - lastShownSaveTime > 5000) {
-        setLastShownSaveTime(saveTime);
-        setIsVisible(true);
-        // Auto-ocultar después de 2 segundos
-        const timeout = setTimeout(() => {
-          setIsVisible(false);
-        }, 2000);
-        return () => clearTimeout(timeout);
-      }
-    } else if (connectionStatus === 'online' && pendingCount === 0 && saveStatus === 'idle') {
+      setIsVisible(true);
+      // Auto-ocultar tras 2s
+      hideTimerRef.current = setTimeout(() => setIsVisible(false), 2000);
+    } else if (pendingCount > 0 && isSyncing) {
+      setIsVisible(true);
+      hideTimerRef.current = setTimeout(() => setIsVisible(false), 3000);
+    } else {
       setIsVisible(false);
     }
-  }, [connectionStatus, saveStatus, pendingCount, lastSavedAt, lastShownSaveTime]);
+
+    return () => {
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    };
+  }, [connectionStatus, saveStatus, pendingCount, isSyncing, lastSavedAt]);
 
   // Formatear tiempo relativo
   const getRelativeTime = (date: Date) => {
