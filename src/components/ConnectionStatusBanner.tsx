@@ -37,14 +37,14 @@ export function ConnectionStatusBanner({
       setIsVisible(true);
     } else if (saveStatus === 'saved' && lastSavedAt) {
       const saveTime = lastSavedAt.getTime();
-      // Solo mostrar si es un nuevo guardado (diferente timestamp)
-      if (lastShownSaveTime !== saveTime) {
+      // Solo mostrar si han pasado >5s desde el último banner mostrado (evitar re-trigger por auto-save)
+      if (!lastShownSaveTime || saveTime - lastShownSaveTime > 5000) {
         setLastShownSaveTime(saveTime);
         setIsVisible(true);
-        // Auto-ocultar después de 3 segundos de éxito
+        // Auto-ocultar después de 2 segundos
         const timeout = setTimeout(() => {
           setIsVisible(false);
-        }, 3000);
+        }, 2000);
         return () => clearTimeout(timeout);
       }
     } else if (connectionStatus === 'online' && pendingCount === 0 && saveStatus === 'idle') {
