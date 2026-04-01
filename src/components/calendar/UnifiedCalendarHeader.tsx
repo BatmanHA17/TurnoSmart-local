@@ -24,7 +24,7 @@ import { UndoRedoToolbar } from "./UndoRedoToolbar";
 import { AuditPanelSheet } from "@/components/audit/AuditPanel";
 import { PlantillaCalculator } from "./PlantillaCalculator";
 import { cn } from "@/lib/utils";
-import { Calculator } from "lucide-react";
+import { Calculator, BarChart3 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Calendar } from "@/components/ui/calendar";
 import type { AuditResult } from "@/types/audit";
 
@@ -90,6 +91,7 @@ interface UnifiedCalendarHeaderProps {
   isAuditing?: boolean;
   onRefreshAudit?: () => void;
   onApplyAuditFix?: (fix: import('@/types/audit').SuggestedFix, violation: import('@/types/audit').AuditViolation) => void;
+  onViolationClick?: (violation: import('@/types/audit').AuditViolation) => void;
   
   // Generate SMART schedule
   onGenerate?: () => void;
@@ -112,6 +114,10 @@ interface UnifiedCalendarHeaderProps {
   // Badges
   employeeCount?: number;
   dayCount?: number;
+  /** Personas programadas hoy (para alerta exceso en PlantillaCalculator) */
+  scheduledToday?: number;
+  /** Media de movimientos/día (check-in + check-out) para tooltip ocupación */
+  avgMovementsPerDay?: number;
 }
 
 export function UnifiedCalendarHeader({
@@ -152,6 +158,7 @@ export function UnifiedCalendarHeader({
   isAuditing = false,
   onRefreshAudit,
   onApplyAuditFix,
+  onViolationClick,
   onGenerate,
   isGenerating = false,
   currentDate,
@@ -162,6 +169,8 @@ export function UnifiedCalendarHeader({
   exportButton,
   employeeCount,
   dayCount,
+  scheduledToday,
+  avgMovementsPerDay,
 }: UnifiedCalendarHeaderProps) {
   const generateLabel = (() => {
     if (isGenerating) return "Generando…";
@@ -241,7 +250,7 @@ export function UnifiedCalendarHeader({
             </Button>
           )}
 
-          {canEdit && onGenerate && (
+          {canEdit && onGenerate && (viewMode === 'week' || viewMode === 'month') && (
             <Button
               data-tour="generate-button"
               variant="ghost"
@@ -456,9 +465,42 @@ export function UnifiedCalendarHeader({
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-80 p-0" align="end">
-                <PlantillaCalculator employeeCount={employeeCount} />
+                <PlantillaCalculator
+                  employeeCount={employeeCount}
+                  scheduledToday={scheduledToday}
+                />
               </PopoverContent>
             </Popover>
+          )}
+
+          {/* Media movimientos/día (ocupación) */}
+          {avgMovementsPerDay !== undefined && avgMovementsPerDay > 0 && (
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "h-8 px-2.5 gap-1.5 cursor-default text-xs font-medium",
+                      avgMovementsPerDay >= 40
+                        ? "border-amber-400 text-amber-700 bg-amber-50"
+                        : "border-muted text-muted-foreground"
+                    )}
+                  >
+                    <BarChart3 className="h-3.5 w-3.5" />
+                    {avgMovementsPerDay.toFixed(0)} mov/día
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs">
+                  <p className="text-xs">
+                    <span className="font-medium">Media de movimientos/día</span> (check-in + check-out).
+                    {avgMovementsPerDay >= 40
+                      ? " ⚠️ Supera el umbral de refuerzo (40). Verifica cobertura."
+                      : " Por debajo del umbral de refuerzo (40)."}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
 
           {/* Auditoría */}
@@ -469,6 +511,7 @@ export function UnifiedCalendarHeader({
               isAuditing={isAuditing}
               onRefresh={onRefreshAudit}
               onApplyFix={onApplyAuditFix}
+              onViolationClick={onViolationClick}
             />
             </span>
           )}

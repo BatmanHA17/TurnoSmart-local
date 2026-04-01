@@ -63,7 +63,7 @@ export const GoTurnoStep3Mobile = forwardRef<
         initialAssignments.push({
           employeeId: employee.id,
           date: format(day, "yyyy-MM-dd"),
-          statusCode: "L",
+          statusCode: "D",
           startTime: ""
         });
       });
@@ -77,7 +77,7 @@ export const GoTurnoStep3Mobile = forwardRef<
       const updated = prev.map(assignment => {
         if (assignment.employeeId === employeeId && assignment.date === date) {
           if (field === "statusCode") {
-            const newStartTime = value === "L" ? "" : assignment.startTime;
+            const newStartTime = value === "D" ? "" : assignment.startTime;
             return { ...assignment, [field]: value, startTime: newStartTime };
           }
           if (field === "startTime" && value !== "") {

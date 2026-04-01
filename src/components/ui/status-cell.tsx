@@ -15,7 +15,7 @@ export function StatusCell({ status, className, onClick }: StatusCellProps) {
         return `${baseClasses} bg-matcha-light text-stone border border-matcha/20`;
       case 'XB':
         return `${baseClasses} bg-bamboo-light text-stone border border-bamboo/20`;
-      case 'L':
+      case 'D':
         return `${baseClasses} bg-sky-light text-stone border border-sky/20`;
       case 'V':
         return `${baseClasses} bg-sunset-light text-stone border border-sunset/20`;

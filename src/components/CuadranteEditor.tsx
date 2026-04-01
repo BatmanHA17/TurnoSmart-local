@@ -523,7 +523,7 @@ export function CuadranteEditor({ selectedCuadranteId, readOnly = false, onBack 
       let currentUnits = 1.0;
       let currentDept: 'PROPIO' | 'ETT' = 'PROPIO';
 
-      const isValidCode = (c: string) => ['X','XB','L','V','C','E','F','P','H','S'].includes((c||'').toUpperCase());
+      const isValidCode = (c: string) => ['X','XB','D','V','C','E','F','P','H','S'].includes((c||'').toUpperCase());
 
       for (let i = numbersRowIndex + 1; i < rows.length; i++) {
         const row = rows[i];

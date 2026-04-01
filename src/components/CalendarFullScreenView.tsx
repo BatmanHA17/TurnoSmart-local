@@ -185,7 +185,7 @@ export function CalendarFullScreenView({
                         className="p-1.5 min-h-[70px] border rounded-md bg-background/50 print:min-h-[40px] print:p-0.5 print:border-gray-300 print:text-xs"
                       >
                         {shift ? (
-                          shift.name === "Descanso Semanal" || shift.absenceCode === 'L' || shift.type === 'absence' ? (
+                          shift.name === "Descanso Semanal" || shift.absenceCode === 'D' || shift.type === 'absence' ? (
                             // Banner estrecho para Descanso Semanal - igual que ShiftCard.tsx
                             <div className="bg-slate-200/90 border border-slate-300/60 hover:bg-slate-300/90 w-full h-6 rounded-md mt-0.5 shadow-sm flex items-center justify-center px-2 py-1 print:h-4 print:mt-0">
                               <div className="text-[9px] font-medium text-slate-600 truncate leading-none print:text-[7px]">

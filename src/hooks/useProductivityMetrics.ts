@@ -43,12 +43,12 @@ interface RawShift {
   } | null;
 }
 
-const ABSENCE_CODES = new Set(["V", "E", "P", "F", "H", "S", "C", "L", "X", "XB"]);
+const ABSENCE_CODES = new Set(["V", "E", "P", "F", "H", "S", "C", "D", "X", "XB"]);
 
 function isAbsenceShift(shiftName: string): boolean {
   const upper = (shiftName || "").toUpperCase().trim();
   if (ABSENCE_CODES.has(upper)) return true;
-  if (upper.includes("LIBRE") || upper.includes("VACACION") || upper.includes("ENFERM")) return true;
+  if (upper.includes("LIBRE") || upper.includes("DESCANSO") || upper.includes("VACACION") || upper.includes("ENFERM")) return true;
   return false;
 }
 

@@ -37,7 +37,7 @@ export const MobileShiftCard = ({
 
   const handleStatusChange = (value: string) => {
     onUpdate(employee.id, dateKey, "statusCode", value);
-    if (value === "L") {
+    if (value === "D") {
       setIsCustomTime(false);
     }
   };
@@ -81,7 +81,7 @@ export const MobileShiftCard = ({
         <div className="space-y-2">
           <label className="text-sm font-medium">Estado del día</label>
           <Select
-            value={assignment?.statusCode || "L"}
+            value={assignment?.statusCode || "D"}
             onValueChange={handleStatusChange}
           >
             <SelectTrigger className="h-12 text-base">
@@ -107,7 +107,7 @@ export const MobileShiftCard = ({
         </div>
 
         {/* Horario (solo si el código lo requiere) */}
-        {codesRequiringTime.includes(assignment?.statusCode || "L") && (
+        {codesRequiringTime.includes(assignment?.statusCode || "D") && (
           <div className="space-y-2">
             <label className="text-sm font-medium">Hora de entrada</label>
             
@@ -160,9 +160,9 @@ export const MobileShiftCard = ({
           <div className="text-center">
             <div 
               className="w-6 h-6 rounded-full mx-auto mb-1"
-              style={{ backgroundColor: getStatusColor(assignment?.statusCode || "L") }}
+              style={{ backgroundColor: getStatusColor(assignment?.statusCode || "D") }}
             />
-            <p className="text-xs font-medium">{assignment?.statusCode || "L"}</p>
+            <p className="text-xs font-medium">{assignment?.statusCode || "D"}</p>
           </div>
           {assignment?.startTime && (
             <div className="text-center">

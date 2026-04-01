@@ -14,11 +14,11 @@ export interface ShiftType {
 }
 
 export const SHIFT_TYPES: Record<string, ShiftType> = {
-  L: {
-    code: 'L',
-    name: 'Libre',
-    description: 'Día libre',
-    color: '#94a3b8', // slate-400
+  D: {
+    code: 'D',
+    name: 'Descanso',
+    description: 'Día de descanso',
+    color: '#cbd5e1', // slate-300 pastel
     isWorkingDay: false,
     requiresTime: false,
     category: 'rest'
@@ -27,7 +27,7 @@ export const SHIFT_TYPES: Record<string, ShiftType> = {
     code: 'X',
     name: 'Presencial',
     description: 'Turno de trabajo presencial',
-    color: '#10b981', // green-500
+    color: '#86efac', // green-300 pastel
     isWorkingDay: true,
     requiresTime: true,
     category: 'work'
@@ -36,7 +36,7 @@ export const SHIFT_TYPES: Record<string, ShiftType> = {
     code: 'XB',
     name: 'Banquetes',
     description: 'Turno presencial en banquetes',
-    color: '#f59e0b', // amber-500
+    color: '#fcd34d', // amber-300 pastel
     isWorkingDay: true,
     requiresTime: true,
     category: 'work'
@@ -45,7 +45,7 @@ export const SHIFT_TYPES: Record<string, ShiftType> = {
     code: 'V',
     name: 'Vacaciones',
     description: 'De vacaciones',
-    color: '#3b82f6', // blue-500
+    color: '#93c5fd', // blue-300 pastel
     isWorkingDay: false,
     requiresTime: false,
     category: 'rest'
@@ -54,7 +54,7 @@ export const SHIFT_TYPES: Record<string, ShiftType> = {
     code: 'C',
     name: 'Curso',
     description: 'Realizando curso de formación',
-    color: '#8b5cf6', // violet-500
+    color: '#c4b5fd', // violet-300 pastel
     isWorkingDay: true,
     requiresTime: false,
     category: 'training'
@@ -63,7 +63,7 @@ export const SHIFT_TYPES: Record<string, ShiftType> = {
     code: 'E',
     name: 'Enfermo',
     description: 'Baja por enfermedad o accidente',
-    color: '#ef4444', // red-500
+    color: '#fca5a5', // red-300 pastel
     isWorkingDay: false,
     requiresTime: false,
     category: 'absence'
@@ -72,7 +72,7 @@ export const SHIFT_TYPES: Record<string, ShiftType> = {
     code: 'F',
     name: 'Falta',
     description: 'Falta injustificada',
-    color: '#dc2626', // red-600
+    color: '#f87171', // red-400 (slightly stronger for severity)
     isWorkingDay: false,
     requiresTime: false,
     category: 'absence'
@@ -81,7 +81,7 @@ export const SHIFT_TYPES: Record<string, ShiftType> = {
     code: 'P',
     name: 'Permiso',
     description: 'Permiso autorizado',
-    color: '#06b6d4', // cyan-500
+    color: '#67e8f9', // cyan-300 pastel
     isWorkingDay: false,
     requiresTime: false,
     category: 'absence'
@@ -90,7 +90,7 @@ export const SHIFT_TYPES: Record<string, ShiftType> = {
     code: 'H',
     name: 'Horas Sindicales',
     description: 'Horas sindicales',
-    color: '#ec4899', // pink-500
+    color: '#f9a8d4', // pink-300 pastel
     isWorkingDay: true,
     requiresTime: false,
     category: 'absence'
@@ -99,7 +99,7 @@ export const SHIFT_TYPES: Record<string, ShiftType> = {
     code: 'S',
     name: 'Sanción',
     description: 'Sancionado',
-    color: '#78716c', // stone-500
+    color: '#d6d3d1', // stone-300 pastel
     isWorkingDay: false,
     requiresTime: false,
     category: 'absence'

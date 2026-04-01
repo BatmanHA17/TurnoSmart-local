@@ -181,13 +181,13 @@ export function useShiftAnalytics(params: AnalyticsDateParams | number = { mode:
 
 function extractAbsenceCode(shiftName: string): string | null {
   const upperName = shiftName?.toUpperCase() || "";
-  const codes = ["V", "E", "P", "F", "H", "S", "C", "L", "X", "XB"];
+  const codes = ["V", "E", "P", "F", "H", "S", "C", "D", "X", "XB"];
   for (const code of codes) {
     if (upperName === code || upperName.startsWith(code + " ")) {
       return code;
     }
   }
-  if (upperName.includes("LIBRE") || upperName === "L") return "L";
+  if (upperName.includes("LIBRE") || upperName.includes("DESCANSO") || upperName === "D") return "D";
   if (upperName.includes("VACACION")) return "V";
   if (upperName.includes("ENFERM")) return "E";
   return null;

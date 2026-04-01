@@ -52,7 +52,7 @@ export const calculateMonthlyStats = (employees: Employee[]): MonthlyStats => {
         case 'XB':
           totalPresent++;
           break;
-        case 'L':
+        case 'D':
           totalFree++;
           break;
         case 'V':
@@ -103,7 +103,7 @@ export const checkComplianceViolations = (employees: Employee[]): ComplianceAler
       // Find free days in the week
       const freeDays: number[] = [];
       weekSchedule.forEach((status, index) => {
-        if (status === 'L') {
+        if (status === 'D') {
           freeDays.push(index);
         }
       });
@@ -178,7 +178,7 @@ export const getContractTypeDistribution = (employees: Employee[]) => {
 export const getStatusLegend = () => [
   { code: 'X', name: 'Presencial', color: 'bg-green-100 text-green-800' },
   { code: 'XB', name: 'Presencial Banquetes', color: 'bg-emerald-100 text-emerald-800' },
-  { code: 'L', name: 'Libre', color: 'bg-blue-100 text-blue-800' },
+  { code: 'D', name: 'Descanso', color: 'bg-blue-100 text-blue-800' },
   { code: 'V', name: 'Vacaciones', color: 'bg-yellow-100 text-yellow-800' },
   { code: 'E', name: 'Enfermedad', color: 'bg-purple-100 text-purple-800' },
   { code: 'F', name: 'Falta', color: 'bg-red-100 text-red-800' },

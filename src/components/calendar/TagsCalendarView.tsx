@@ -143,7 +143,7 @@ export function TagsCalendarView() {
 
       const savedShifts = await getSavedShifts();
       const ABSENCE_NAMES = [
-        "Libre", "Vacaciones", "Enfermo", "Falta", "Permiso",
+        "Descanso", "Libre", "Vacaciones", "Enfermo", "Falta", "Permiso",
         "Baja", "Curso", "Horas Sindicales", "Sancionado",
       ];
 

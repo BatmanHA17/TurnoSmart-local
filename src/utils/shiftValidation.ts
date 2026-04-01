@@ -26,7 +26,7 @@ export const rebalanceWeeklySchedule = (
   
   // Contar días de trabajo y libres
   const workDays = employeeAssignments.filter(a => ["X", "XB", "C"].includes(a.statusCode));
-  const freeDays = employeeAssignments.filter(a => a.statusCode === "L");
+  const freeDays = employeeAssignments.filter(a => a.statusCode === "D");
 
   // Si hay menos de 5 días de trabajo, buscar un horario existente para completar
   if (workDays.length < 5 && freeDays.length > 2) {

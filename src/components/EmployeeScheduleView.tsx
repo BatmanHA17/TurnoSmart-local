@@ -361,7 +361,7 @@ export function EmployeeScheduleView() {
       startTime: shift.start_time,
       endTime: shift.end_time,
       isAbsence: shift.display_range === 'Descanso' || !shift.start_time,
-      absenceCode: shift.shift_name === 'Libre' || shift.shift_name === 'L' ? 'L' :
+      absenceCode: shift.shift_name === 'Descanso' || shift.shift_name === 'D' ? 'D' :
                    shift.shift_name === 'Vacaciones' || shift.shift_name === 'V' ? 'V' :
                    shift.shift_name === 'Enfermedad' || shift.shift_name === 'E' ? 'E' : undefined,
       contractHours: getContractHours(shift.employee_id)

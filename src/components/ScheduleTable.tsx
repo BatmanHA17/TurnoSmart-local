@@ -172,8 +172,8 @@ export function ScheduleTable() {
         // Si hay un turno específico, mostrar 'X' (presencial)
         schedule.push('X');
       } else {
-        // Si no hay turno, asumir día libre 'L'
-        schedule.push('L');
+        // Si no hay turno, asumir día de descanso 'D'
+        schedule.push('D');
       }
     }
     

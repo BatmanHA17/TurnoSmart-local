@@ -54,7 +54,7 @@ export function CuadranteStats({ cuadrante, className }: CuadranteStatsProps) {
         case 'C': // Curso
           cursosAusentes += units;
           break;
-        case 'L': // Libre
+        case 'D': // Descanso
           libresTotales += units;
           break;
         case 'V': // Vacaciones

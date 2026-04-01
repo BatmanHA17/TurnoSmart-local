@@ -681,8 +681,70 @@ function Step5Summary({
       action: onOpenCriteria,
     });
 
+    // 5. Conflictos de peticiones duras (Tipo A) — mismos días para distintos empleados
+    if (petitions && petitions.length > 0) {
+      const hardPetitions = petitions.filter(p => p.type === 'A' && (p.status === 'approved' || p.status === 'pending'));
+      const dayEmployees: Record<number, string[]> = {};
+      for (const p of hardPetitions) {
+        for (const d of p.days) {
+          if (!dayEmployees[d]) dayEmployees[d] = [];
+          dayEmployees[d].push(p.employee_name || p.employee_id);
+        }
+      }
+      const conflictDays = Object.entries(dayEmployees).filter(([, emps]) => emps.length >= 2);
+      if (conflictDays.length > 0) {
+        const sample = conflictDays.slice(0, 2).map(([d, emps]) => `día ${d} (${emps.join(', ')})`).join('; ');
+        items.push({
+          ok: false,
+          label: `${conflictDays.length} día(s) con múltiples ausencias duras: ${sample}`,
+          detail: 'Verifica que la cobertura no se resienta. Revisa peticiones o ajusta manualmente.',
+          action: onOpenPetitions,
+        });
+      }
+    }
+
+    // 6. Cobertura nocturna — ¿hay suficientes FDA para cubrir noches del Night Agent?
+    if (employees && employees.length > 0) {
+      const nightAgents = employees.filter(e => e.role === 'NIGHT_SHIFT_AGENT');
+      const fdas = employees.filter(e => e.role === 'FRONT_DESK_AGENT');
+      if (nightAgents.length > 0 && fdas.length < 2) {
+        items.push({
+          ok: false,
+          label: `Solo ${fdas.length} FDA para cubrir noches del Night Agent`,
+          detail: 'Se recomienda al menos 2 Front Desk Agents para repartir coberturas nocturnas equitativamente.',
+        });
+      }
+    }
+
+    // 7. Equidad — desequilibrio previo grande
+    if (previousPeriod && previousPeriod.length > 0) {
+      const rotating = previousPeriod.filter(p => p.nightCount !== undefined);
+      if (rotating.length >= 2) {
+        const nightCounts = rotating.map(p => p.nightCount);
+        const maxN = Math.max(...nightCounts);
+        const minN = Math.min(...nightCounts);
+        if (maxN - minN > 5) {
+          const over = rotating.find(p => p.nightCount === maxN);
+          items.push({
+            ok: false,
+            label: `Desequilibrio de noches: diferencia de ${maxN - minN} entre empleados`,
+            detail: over ? `${over.employeeName} lleva ${maxN} noches. El motor intentará compensar.` : '',
+          });
+        }
+      }
+    }
+
+    // 8. Guardias FOM — máximo 2 por período
+    if (guardiaDays.length > 2) {
+      items.push({
+        ok: false,
+        label: `${guardiaDays.length} guardias FOM seleccionadas (máximo recomendado: 2)`,
+        detail: 'El convenio permite máximo 2 fines de semana con guardia por período.',
+      });
+    }
+
     return items;
-  }, [employees, pendingPetitions, petitions, hasOccupancy, onOpenPetitions, onOpenOccupancy, onOpenCriteria]);
+  }, [employees, pendingPetitions, petitions, hasOccupancy, guardiaDays, previousPeriod, onOpenPetitions, onOpenOccupancy, onOpenCriteria]);
 
   const allOk = checks.every(c => c.ok);
 

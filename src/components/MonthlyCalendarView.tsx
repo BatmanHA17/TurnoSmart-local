@@ -82,7 +82,7 @@ const getShiftCode = (shift: ShiftBlock): { letter: string; time?: string } => {
       const name = shift.name.toLowerCase();
       if (name.includes('descanso guardia')) return { letter: 'DG' };
       if (name.includes('guardia')) return { letter: 'G' };
-      if (name.includes('libre') || name.includes('descanso')) return { letter: 'L' };
+      if (name.includes('libre') || name.includes('descanso')) return { letter: 'D' };
       if (name.includes('vacacion')) return { letter: 'V' };
       if (name.includes('baja') || name.includes('enferm')) return { letter: 'E' };
       if (name.includes('permiso')) return { letter: 'P' };
@@ -90,7 +90,7 @@ const getShiftCode = (shift: ShiftBlock): { letter: string; time?: string } => {
       if (name.includes('festivo') || name.includes('falta')) return { letter: 'F' };
       return { letter: shift.name.charAt(0).toUpperCase() };
     }
-    return { letter: 'L' };
+    return { letter: 'D' };
   }
   
   // Para turnos con horario: M (Mañana), T (Tarde), P (Partido), N (Noche)
@@ -335,7 +335,7 @@ export function MonthlyCalendarView() {
           const savedShift = savedShifts.find(s => s.name === shift.shift_name);
           
           // Detectar ausencias
-          const ABSENCE_NAMES = ['Libre', 'Vacaciones', 'Enfermo', 'Falta', 'Permiso', 'Baja', 'Curso', 'Horas Sindicales', 'Sancionado', 'Banquetes'];
+          const ABSENCE_NAMES = ['Descanso', 'Libre', 'Vacaciones', 'Enfermo', 'Falta', 'Permiso', 'Baja', 'Curso', 'Horas Sindicales', 'Sancionado', 'Banquetes'];
           const isAbsenceByName = ABSENCE_NAMES.some(name => 
             shift.shift_name?.toLowerCase().includes(name.toLowerCase())
           );

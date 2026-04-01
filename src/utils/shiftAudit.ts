@@ -127,11 +127,10 @@ export function checkMinimumRestBetweenShifts(
 
 /**
  * 2. DETECTAR DÍAS LIBRES INSUFICIENTES EN LA SEMANA
- * CÓDIGOS válidos como descanso: L (Libre), V (Vacaciones), E (Enfermedad), 
+ * CÓDIGOS válidos como descanso: D (Descanso), V (Vacaciones), E (Enfermedad),
  * P (Permiso), F (Falta), H (Horas sindicales), S (Sanción), C (Curso)
  */
-// 'D' es el código oficial del motor SMART v2.0. 'L' se mantiene para compatibilidad con datos históricos.
-const VALID_REST_CODES = ['D', 'L', 'V', 'E', 'P', 'F', 'H', 'S', 'C'];
+const VALID_REST_CODES = ['D', 'V', 'E', 'P', 'F', 'H', 'S', 'C'];
 
 export function checkWeeklyFreeDays(
   shifts: ShiftForAudit[],
@@ -168,7 +167,7 @@ export function checkWeeklyFreeDays(
       const hasValidRestCode = dayShifts.some(s =>
         VALID_REST_CODES.includes(s.absenceCode || '') ||
         s.shiftName === 'Descanso' || s.shiftName === 'D' ||
-        s.shiftName === 'Libre' || s.shiftName === 'L' ||
+        s.shiftName === 'Descanso' || s.shiftName === 'D' ||
         s.shiftName === 'Vacaciones' || s.shiftName === 'V'
       );
       
@@ -200,9 +199,9 @@ export function checkWeeklyFreeDays(
       const dateStr = format(day, 'yyyy-MM-dd');
       const dayShifts = employeeShifts.filter(s => s.date === dateStr);
       return dayShifts.some(s =>
-        s.absenceCode === 'D' || s.absenceCode === 'L' ||
-        s.shiftName === 'Descanso' || s.shiftName === 'Libre' ||
-        s.shiftName === 'D' || s.shiftName === 'L'
+        s.absenceCode === 'D' ||
+        s.shiftName === 'Descanso' ||
+        s.shiftName === 'D'
       ) || dayShifts.length === 0;
     });
     
@@ -312,7 +311,7 @@ export function checkMinimumCoverage(
         s.isAbsence || VALID_REST_CODES.includes(s.absenceCode || '') ||
         s.shiftName === 'Descanso' || s.shiftName === 'D'
       );
-      const candidate = restingEmployees.find(s => s.absenceCode === 'D' || s.absenceCode === 'L' || s.shiftName === 'Descanso');
+      const candidate = restingEmployees.find(s => s.absenceCode === 'D' || s.shiftName === 'Descanso');
 
       // Determinar turno sugerido según franja
       const policyHour = parseInt(policy.startTime.split(':')[0]);
@@ -379,19 +378,19 @@ export function checkVacationFreeDays(
       for (let i = 1; i <= requiredFreeDays; i++) {
         const checkDate = format(addDays(startDate, -i), 'yyyy-MM-dd');
         const dayShift = sortedShifts.find(s => s.date === checkDate);
-        if (dayShift?.absenceCode === 'L' || dayShift?.shiftName === 'Libre') {
+        if (dayShift?.absenceCode === 'D' || dayShift?.shiftName === 'Descanso') {
           freeDaysBefore++;
         } else {
           break; // No consecutivos
         }
       }
-      
+
       // Verificar días libres DESPUÉS del período de vacaciones
       let freeDaysAfter = 0;
       for (let i = 1; i <= requiredFreeDays; i++) {
         const checkDate = format(addDays(endDate, i), 'yyyy-MM-dd');
         const dayShift = sortedShifts.find(s => s.date === checkDate);
-        if (dayShift?.absenceCode === 'L' || dayShift?.shiftName === 'Libre') {
+        if (dayShift?.absenceCode === 'D' || dayShift?.shiftName === 'Descanso') {
           freeDaysAfter++;
         } else {
           break; // No consecutivos
@@ -551,9 +550,15 @@ export function runFullAudit(
     allViolations.push(...checkEmployeeRestrictions(shifts, options.employeeRestrictions));
   }
   
+  // 6. Generate suggested fixes (Copilot Auditoría T2-1)
+  for (const v of allViolations) {
+    if (v.suggestedFix) continue; // already has one
+    v.suggestedFix = generateSuggestedFix(v);
+  }
+
   // Generar resumen
   const summary = generateSummary(allViolations);
-  
+
   return {
     violations: allViolations,
     summary,
@@ -563,6 +568,66 @@ export function runFullAudit(
     },
     timestamp: new Date().toISOString()
   };
+}
+
+/**
+ * Copilot Auditoría: genera una sugerencia de fix concreta para cada violación
+ */
+function generateSuggestedFix(violation: AuditViolation): SuggestedFix | undefined {
+  switch (violation.type) {
+    case 'INSUFFICIENT_REST':
+      // T→M violation: suggest 11x19 transition
+      return {
+        action: 'CHANGE_SHIFT',
+        label: `Cambiar a 11h a 19h (transición) para ${violation.employeeName}`,
+        employeeId: violation.employeeId,
+        date: violation.endDate || violation.date,
+        fromShift: 'M',
+        toShift: '11x19',
+        toShiftStartTime: '11:00',
+        toShiftEndTime: '19:00',
+        toShiftColor: '#fde047',
+      };
+
+    case 'MISSING_COVERAGE':
+      return {
+        action: 'CHANGE_SHIFT',
+        label: `Asignar empleado disponible al turno descubierto`,
+        employeeId: violation.employeeId || '_suggest_best',
+        date: violation.date,
+        fromShift: 'D',
+        toShift: 'M', // Default to M, handler will determine actual shift needed
+      };
+
+    case 'NON_CONSECUTIVE_FREE_DAYS':
+      return {
+        action: 'MOVE_REST_DAY',
+        label: `Mover libre para hacerlos consecutivos`,
+        employeeId: violation.employeeId,
+        date: violation.date,
+      };
+
+    case 'MISSING_FREE_DAYS':
+      return {
+        action: 'ADD_REST_DAY',
+        label: `Añadir día de descanso para ${violation.employeeName}`,
+        employeeId: violation.employeeId,
+        date: violation.date,
+        targetDate: violation.date,
+      };
+
+    case 'VACATION_NO_FREE_DAYS':
+      return {
+        action: 'ADD_REST_DAY',
+        label: `Añadir libre antes/después de vacaciones`,
+        employeeId: violation.employeeId,
+        date: violation.date,
+        targetDate: violation.date,
+      };
+
+    default:
+      return undefined;
+  }
 }
 
 /**

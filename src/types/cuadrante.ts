@@ -71,7 +71,7 @@ export const LABOR_CONTRACTS: LaborContract[] = [
 export const STATUS_CODES: StatusCode[] = [
   { code: 'X', name: 'Presencial', color: 'text-matcha', bgColor: 'bg-matcha-light border-matcha/20' },
   { code: 'XB', name: 'Presencial Banquetes', color: 'text-bamboo', bgColor: 'bg-bamboo-light border-bamboo/20' },
-  { code: 'L', name: 'Libre', color: 'text-sky', bgColor: 'bg-sky-light border-sky/20' },
+  { code: 'D', name: 'Descanso', color: 'text-sky', bgColor: 'bg-sky-light border-sky/20' },
   { code: 'V', name: 'Vacaciones', color: 'text-sunset', bgColor: 'bg-sunset-light border-sunset/20' },
   { code: 'E', name: 'Enfermedad', color: 'text-accent', bgColor: 'bg-accent/20 border-accent/20' },
   { code: 'F', name: 'Falta', color: 'text-destructive', bgColor: 'bg-destructive/20 border-destructive/20' },

@@ -77,7 +77,7 @@ export function usePetitions({
     try {
       let query = supabase
         .from("schedule_petitions" as any)
-        .select("*")
+        .select("*, colaboradores!employee_id(nombre, apellidos)")
         .eq("organization_id", organizationId)
         .order("created_at", { ascending: false });
 
@@ -86,7 +86,18 @@ export function usePetitions({
 
       const { data, error: dbError } = await query;
       if (dbError) throw dbError;
-      setPetitions((data as any[]) ?? []);
+      // Map joined colaboradores data → employee_name
+      const mapped = ((data as any[]) ?? []).map((row: any) => {
+        const colab = row.colaboradores;
+        const nombre = colab?.nombre ?? '';
+        const apellidos = colab?.apellidos ?? '';
+        return {
+          ...row,
+          employee_name: nombre ? `${nombre}${apellidos ? ' ' + apellidos : ''}` : undefined,
+          colaboradores: undefined, // clean up joined field
+        };
+      });
+      setPetitions(mapped);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error cargando peticiones";
       setError(msg);

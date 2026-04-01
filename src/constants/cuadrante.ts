@@ -13,7 +13,7 @@ export const YEARS = [
 
 export const STATUS_CODES = [
   { code: 'X',  label: 'X - Presencial',         color: 'bg-foreground/5 text-foreground border-foreground/10' },
-  { code: 'L',  label: 'L - Libre',               color: 'bg-muted text-muted-foreground border-border' },
+  { code: 'D',  label: 'D - Descanso',             color: 'bg-muted text-muted-foreground border-border' },
   { code: 'V',  label: 'V - Vacaciones',          color: 'bg-foreground/8 text-foreground border-foreground/15' },
   { code: 'E',  label: 'E - Enfermedad',          color: 'bg-foreground/10 text-foreground border-foreground/20' },
   { code: 'F',  label: 'F - Falta',               color: 'bg-foreground/7 text-foreground border-foreground/12' },

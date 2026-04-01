@@ -72,7 +72,7 @@ export const GoTurnoStep3ShiftAssignment = forwardRef<
         initialAssignments.push({
           employeeId: employee.id,
           date: format(day, "yyyy-MM-dd"),
-          statusCode: "L", // Día libre por defecto
+          statusCode: "D", // Día de descanso por defecto
           startTime: "" // Sin horario por defecto
         });
       });
@@ -93,7 +93,7 @@ export const GoTurnoStep3ShiftAssignment = forwardRef<
 
     // Contar días de trabajo y libres
     const workDays = employeeAssignments.filter(a => ["X", "XB", "C"].includes(a.statusCode));
-    const freeDaysAll = employeeAssignments.filter(a => a.statusCode === "L");
+    const freeDaysAll = employeeAssignments.filter(a => a.statusCode === "D");
 
     // Respetar los días libres marcados por el usuario (bloqueados)
     const candidateFreeDays = freeDaysAll.filter(day => !locksToUse[`${employeeId}-${day.date}`]);
@@ -136,7 +136,7 @@ export const GoTurnoStep3ShiftAssignment = forwardRef<
         if (assignment.employeeId === employeeId && assignment.date === date) {
           // Si se cambia el código de estado, resetear el horario si requiere tiempo
           if (field === "statusCode") {
-            const newStartTime = (value === "L" || codesRequiringTime.includes(value)) ? "" : assignment.startTime;
+            const newStartTime = (value === "D" || codesRequiringTime.includes(value)) ? "" : assignment.startTime;
             return { ...assignment, [field]: value, startTime: newStartTime };
           }
           // Si se selecciona "custom", activar el input personalizado
@@ -170,7 +170,7 @@ export const GoTurnoStep3ShiftAssignment = forwardRef<
             if (nextAssignmentIndex !== -1) {
               const nextAssignment = updatedWithNextDays[nextAssignmentIndex];
               // Solo preestablecer si es día libre (L) para convertirlo en trabajo
-              if (nextAssignment.statusCode === "L") {
+              if (nextAssignment.statusCode === "D") {
                 updatedWithNextDays[nextAssignmentIndex] = {
                   ...nextAssignment,
                   startTime: value,
@@ -181,27 +181,27 @@ export const GoTurnoStep3ShiftAssignment = forwardRef<
             }
           }
         }
-        
+
         // Aplicar reequilibrio automático después de preestablecer horarios
         const finalUpdated = rebalanceWeeklySchedule(updatedWithNextDays, employeeId);
-        
+
         // Notificar cambio de validación
         if (onValidationChange) {
-          const isValid = finalUpdated.every(assignment => 
-            !codesRequiringTime.includes(assignment.statusCode) || 
+          const isValid = finalUpdated.every(assignment =>
+            !codesRequiringTime.includes(assignment.statusCode) ||
             (codesRequiringTime.includes(assignment.statusCode) && assignment.startTime !== "")
           );
           onValidationChange(isValid);
         }
-        
+
         return finalUpdated;
       }
-      
-      // Aplicar reequilibrio automático para cambios de estado (como L - día libre)
+
+      // Aplicar reequilibrio automático para cambios de estado (como D - descanso)
       if (field === "statusCode") {
         // Preparar el nuevo estado de bloqueos de días libres
         const newLockedFreeDays = { ...lockedFreeDays };
-        if (value === "L") {
+        if (value === "D") {
           newLockedFreeDays[key] = true;
         } else {
           delete newLockedFreeDays[key];
@@ -268,7 +268,7 @@ export const GoTurnoStep3ShiftAssignment = forwardRef<
             if (nextAssignmentIndex !== -1) {
               const nextAssignment = updatedWithNextDays[nextAssignmentIndex];
               // Solo preestablecer si es día libre (L) para convertirlo en trabajo
-              if (nextAssignment.statusCode === "L") {
+              if (nextAssignment.statusCode === "D") {
                 updatedWithNextDays[nextAssignmentIndex] = {
                   ...nextAssignment,
                   startTime: value,
@@ -350,7 +350,7 @@ export const GoTurnoStep3ShiftAssignment = forwardRef<
     setAssignments(prev => 
       prev.map(assignment => 
         assignment.employeeId === employeeId
-          ? { ...assignment, statusCode: "L", startTime: "" }
+          ? { ...assignment, statusCode: "D", startTime: "" }
           : assignment
       )
     );
@@ -505,7 +505,7 @@ export const GoTurnoStep3ShiftAssignment = forwardRef<
                               <TableCell key={dateKey} className="p-2">
                                 <div className="space-y-2">
                                    <Select
-                                     value={assignment?.statusCode || "L"}
+                                     value={assignment?.statusCode || "D"}
                                      onValueChange={(value) => updateAssignment(employee.id, dateKey, "statusCode", value)}
                                    >
                                     <SelectTrigger className="h-8 text-xs">
@@ -526,7 +526,7 @@ export const GoTurnoStep3ShiftAssignment = forwardRef<
                                     </SelectContent>
                                   </Select>
 
-                                    {codesRequiringTime.includes(assignment?.statusCode || "L") && (
+                                    {codesRequiringTime.includes(assignment?.statusCode || "D") && (
                                       <>
                                         {customTimeInputs[`${employee.id}-${dateKey}`] ? (
                                            <Input
@@ -603,7 +603,7 @@ export const GoTurnoStep3ShiftAssignment = forwardRef<
               </div>
               <div>
                 <p className="text-2xl font-bold text-primary">
-                  {assignments.filter(a => a.statusCode === "L").length}
+                  {assignments.filter(a => a.statusCode === "D").length}
                 </p>
                 <p className="text-sm text-muted-foreground">Días Libres</p>
               </div>

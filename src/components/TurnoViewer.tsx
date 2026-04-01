@@ -151,14 +151,14 @@ export const TurnoViewer = ({
                           
                           return days.map((day, dayIndex) => {
                             const dateString = day.toISOString().split('T')[0];
-                            let displayText = "L"; // Default to libre
+                            let displayText = "D"; // Default to descanso
                             
                             // Buscar en schedule usando el índice del día
                             const daySchedule = employee.schedule && employee.schedule[dayIndex];
                             
                             if (daySchedule) {
-                              if (daySchedule.statusCode === "L") {
-                                displayText = "L";
+                              if (daySchedule.statusCode === "D") {
+                                displayText = "D";
                               } else if (daySchedule.statusCode === "X" && daySchedule.startTime) {
                                 displayText = daySchedule.startTime;
                               } else if (daySchedule.statusCode === "XB" && daySchedule.startTime) {
@@ -173,8 +173,8 @@ export const TurnoViewer = ({
                               );
                               
                               if (assignment) {
-                                if (assignment.statusCode === "L") {
-                                  displayText = "L";
+                                if (assignment.statusCode === "D") {
+                                  displayText = "D";
                                 } else if (assignment.statusCode === "X" && assignment.startTime) {
                                   displayText = assignment.startTime;
                                 } else if (assignment.statusCode === "XB" && assignment.startTime) {
@@ -227,11 +227,11 @@ export const TurnoViewer = ({
                               return days.map((day, dayIndex) => {
                                 const dateString = day.toISOString().split('T')[0];
                                 const assignment = assignments.find(a => a.date === dateString);
-                                let displayText = "L"; // Default to libre
+                                let displayText = "D"; // Default to descanso
                                 
                                 if (assignment) {
-                                  if (assignment.statusCode === "L") {
-                                    displayText = "L";
+                                  if (assignment.statusCode === "D") {
+                                    displayText = "D";
                                   } else if (assignment.statusCode === "X" && assignment.startTime) {
                                     displayText = assignment.startTime;
                                   } else if (assignment.statusCode === "XB" && assignment.startTime) {

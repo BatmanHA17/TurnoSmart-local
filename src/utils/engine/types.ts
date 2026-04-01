@@ -293,6 +293,8 @@ export interface EngineConstraints {
   occupancyBasedStaffing: boolean;
   /** Cobertura mínima por turno (M, T, N) — configurable por organización */
   minCoveragePerShift: { M: number; T: number; N: number };
+  /** Override cobertura por día de semana (1=Lun..7=Dom). Solo los días con override. */
+  coverageByDay?: Record<number, Partial<{ M: number; T: number; N: number }>>;
   /** Umbral de movimientos para proponer refuerzo (default 40) */
   reinforcementThreshold: number;
   /** FOM↔AFOM espejo activo */
@@ -357,6 +359,8 @@ export interface AuditViolation {
   overridable: boolean;
   /** Categoría del score afectada */
   category: keyof Omit<ScoreBreakdown, "overall" | "trafficLight">;
+  /** true if this violation requires FOM + employee double approval */
+  requiresApproval?: boolean;
 }
 
 // ---------------------------------------------------------------------------

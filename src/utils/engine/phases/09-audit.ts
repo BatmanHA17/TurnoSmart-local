@@ -107,10 +107,11 @@ export function audit(ctx: PipelineContext): PipelineContext {
               employeeId: emp.id,
               day: weekDays[0],
               rule: "CONSECUTIVE_REST",
-              severity: "info",
-              description: `Semana ${wi + 1}: libres no consecutivos`,
+              severity: "warning",
+              description: `Semana ${wi + 1}: libres no consecutivos — requiere aprobación FOM + empleado`,
               overridable: true,
               category: "ergonomics",
+              requiresApproval: true,
             });
           }
         }
@@ -180,18 +181,24 @@ export function audit(ctx: PipelineContext): PipelineContext {
   // --- COVERAGE CHECKS ---
 
   // CK-08: Cobertura mínima por turno (sin contar FOM — su turno fijo es adicional)
+  // 11x19 cuenta como cobertura M (cubre franja mañana 11:00-19:00)
   const fomIds = new Set(employees.filter((e) => e.role === "FOM").map((e) => e.id));
   const coverageShifts: ShiftCode[] = ["M", "T", "N"];
   for (let d = 1; d <= totalDays; d++) {
     for (const shift of coverageShifts) {
-      const count = countShiftOnDayExcluding(grid, d, shift, fomIds);
-      if (count < constraints.minCoveragePerShift) {
+      const minCoverage = constraints.minCoveragePerShift[shift as "M" | "T" | "N"] ?? 1;
+      // Count exact matches + equivalent shifts (11x19 counts as M coverage)
+      let count = countShiftOnDayExcluding(grid, d, shift, fomIds);
+      if (shift === "M") {
+        count += countShiftOnDayExcluding(grid, d, "11x19", fomIds);
+      }
+      if (count < minCoverage) {
         violations.push({
           employeeId: "_global",
           day: d,
           rule: "MIN_COVERAGE",
           severity: "critical",
-          description: `Día ${d} turno ${shift}: ${count} persona(s) sin contar FOM (mínimo ${constraints.minCoveragePerShift})`,
+          description: `Día ${d} turno ${shift}: ${count} persona(s) sin contar FOM (mínimo ${minCoverage})`,
           overridable: false,
           category: "coverage",
         });

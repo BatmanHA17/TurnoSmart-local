@@ -118,7 +118,7 @@ export function DayShiftBlock({ shift, dayOffset = 0, onUpdate, onDelete, readOn
           // Banner para días sin horario (descansos, vacaciones, ausencias) - mismo que ShiftCard
           <div className="px-2 py-1 h-full flex items-center justify-center">
             <div className="text-[9px] text-slate-600 font-medium truncate leading-none">
-              {shift.shift_name === 'L' ? 'Descanso semanal (1 día)' : shiftType?.name || shift.shift_name}
+              {shift.shift_name === 'D' ? 'Descanso semanal (1 día)' : shiftType?.name || shift.shift_name}
             </div>
           </div>
         ) : (

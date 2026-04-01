@@ -15,6 +15,7 @@ import {
   isWorkingShift,
   makeAssignment,
   violates12hRest,
+  periodDayOfWeekISO,
 } from "../helpers";
 
 const COVERAGE_SHIFTS: ShiftCode[] = ["M", "T", "N"];
@@ -30,10 +31,21 @@ export function ensureCoverage(ctx: PipelineContext): PipelineContext {
   const fomIds = new Set(employees.filter((e) => e.role === "FOM").map((e) => e.id));
 
   // ── PASADA 1: Cobertura mínima M/T/N ──────────────────────────────
+  // 11x19 cuenta como cobertura M (cubre franja mañana 11:00-19:00)
+  // Supports per-day-of-week overrides via constraints.coverageByDay
+  const coverageByDay = constraints.coverageByDay;
   for (let day = 1; day <= totalDays; day++) {
+    // Determine day-of-week for per-day overrides (1=Mon..7=Sun)
+    const dow = periodDayOfWeekISO(period.startDate, day) + 1; // ISO 0=Mon → 1=Mon for override keys
     for (const shift of COVERAGE_SHIFTS) {
-      const minCoverage = minCoveragePerShift[shift as "M" | "T" | "N"] ?? 1;
-      const count = countShiftOnDayExcluding(grid, day, shift, fomIds);
+      const shiftKey = shift as "M" | "T" | "N";
+      // Per-day override takes precedence over global minimum
+      const dayOverride = coverageByDay?.[dow]?.[shiftKey];
+      const minCoverage = dayOverride ?? minCoveragePerShift[shiftKey] ?? 1;
+      let count = countShiftOnDayExcluding(grid, day, shift, fomIds);
+      if (shift === "M") {
+        count += countShiftOnDayExcluding(grid, day, "11x19", fomIds);
+      }
       if (count >= minCoverage) continue;
 
       const deficit = minCoverage - count;

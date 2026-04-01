@@ -10,8 +10,8 @@ export const employees: Employee[] = [
     contractUnit: 1.0,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X',
-      'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X'
+      'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X',
+      'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X'
     ]
   },
   {
@@ -22,8 +22,8 @@ export const employees: Employee[] = [
     contractUnit: 1.0,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X',
-      'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X'
+      'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X',
+      'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X'
     ]
   },
   {
@@ -34,8 +34,8 @@ export const employees: Employee[] = [
     contractUnit: 1.0,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X',
-      'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L'
+      'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X',
+      'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D'
     ]
   },
   {
@@ -46,8 +46,8 @@ export const employees: Employee[] = [
     contractUnit: 1.0,
     department: "PROPIO",
     schedule: [
-      'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L',
-      'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X'
+      'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D',
+      'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X'
     ]
   },
   {
@@ -58,8 +58,8 @@ export const employees: Employee[] = [
     contractUnit: 1.0,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X',
-      'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L'
+      'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X',
+      'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D'
     ]
   },
   {
@@ -70,8 +70,8 @@ export const employees: Employee[] = [
     contractUnit: 1.0,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X',
-      'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X'
+      'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X',
+      'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X'
     ]
   },
 
@@ -84,8 +84,8 @@ export const employees: Employee[] = [
     contractUnit: 1.0,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X',
-      'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X'
+      'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X',
+      'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X'
     ]
   },
   {
@@ -96,8 +96,8 @@ export const employees: Employee[] = [
     contractUnit: 1.0,
     department: "PROPIO",
     schedule: [
-      'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L',
-      'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X'
+      'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D',
+      'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X'
     ]
   },
   {
@@ -108,8 +108,8 @@ export const employees: Employee[] = [
     contractUnit: 1.0,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X',
-      'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X'
+      'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X',
+      'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X'
     ]
   },
   {
@@ -120,8 +120,8 @@ export const employees: Employee[] = [
     contractUnit: 1.0,
     department: "PROPIO",
     schedule: [
-      'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L',
-      'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L'
+      'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D',
+      'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D'
     ]
   },
   {
@@ -132,8 +132,8 @@ export const employees: Employee[] = [
     contractUnit: 1.0,
     department: "PROPIO",
     schedule: [
-      'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L',
-      'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X'
+      'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D',
+      'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X'
     ]
   },
   {
@@ -144,8 +144,8 @@ export const employees: Employee[] = [
     contractUnit: 1.0,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X',
-      'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L'
+      'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X',
+      'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D'
     ]
   },
   {
@@ -168,8 +168,8 @@ export const employees: Employee[] = [
     contractUnit: 1.0,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X',
-      'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X'
+      'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X',
+      'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X'
     ]
   },
   {
@@ -180,8 +180,8 @@ export const employees: Employee[] = [
     contractUnit: 1.0,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X',
-      'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X'
+      'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X',
+      'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X'
     ]
   },
 
@@ -328,8 +328,8 @@ export const employees: Employee[] = [
     contractUnit: 0.75,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X',
-      'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X'
+      'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X',
+      'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X'
     ]
   },
   {
@@ -340,8 +340,8 @@ export const employees: Employee[] = [
     contractUnit: 0.75,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X',
-      'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X'
+      'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X',
+      'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X'
     ]
   },
   {
@@ -352,8 +352,8 @@ export const employees: Employee[] = [
     contractUnit: 0.75,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X',
-      'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X'
+      'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X',
+      'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X'
     ]
   },
   {
@@ -364,8 +364,8 @@ export const employees: Employee[] = [
     contractUnit: 0.75,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X',
-      'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X'
+      'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X',
+      'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X'
     ]
   },
   {
@@ -376,8 +376,8 @@ export const employees: Employee[] = [
     contractUnit: 0.75,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X',
-      'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X'
+      'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X',
+      'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X'
     ]
   },
   {
@@ -388,8 +388,8 @@ export const employees: Employee[] = [
     contractUnit: 0.75,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X',
-      'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X'
+      'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X',
+      'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X'
     ]
   },
   
@@ -402,8 +402,8 @@ export const employees: Employee[] = [
     contractUnit: 0.625,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X',
-      'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X'
+      'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X',
+      'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X'
     ]
   },
   {
@@ -414,8 +414,8 @@ export const employees: Employee[] = [
     contractUnit: 0.625,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X',
-      'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X'
+      'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X',
+      'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X'
     ]
   },
   {
@@ -426,8 +426,8 @@ export const employees: Employee[] = [
     contractUnit: 0.625,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X',
-      'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X'
+      'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X',
+      'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X'
     ]
   },
   {
@@ -438,8 +438,8 @@ export const employees: Employee[] = [
     contractUnit: 0.625,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X',
-      'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X'
+      'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X',
+      'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X'
     ]
   },
   {
@@ -450,8 +450,8 @@ export const employees: Employee[] = [
     contractUnit: 0.625,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X',
-      'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X'
+      'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X',
+      'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X'
     ]
   },
   {
@@ -462,8 +462,8 @@ export const employees: Employee[] = [
     contractUnit: 0.625,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X',
-      'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X'
+      'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X',
+      'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X'
     ]
   },
   {
@@ -474,8 +474,8 @@ export const employees: Employee[] = [
     contractUnit: 0.625,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X',
-      'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X'
+      'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X',
+      'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X'
     ]
   },
   {
@@ -486,8 +486,8 @@ export const employees: Employee[] = [
     contractUnit: 0.625,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X',
-      'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X'
+      'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X',
+      'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X'
     ]
   },
 
@@ -500,8 +500,8 @@ export const employees: Employee[] = [
     contractUnit: 0.5,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'L',
-      'L', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X'
+      'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'D',
+      'D', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X'
     ]
   },
   {
@@ -512,8 +512,8 @@ export const employees: Employee[] = [
     contractUnit: 0.5,
     department: "PROPIO",
     schedule: [
-      'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'L', 'L',
-      'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X'
+      'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'D', 'D',
+      'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X'
     ]
   },
   {
@@ -524,8 +524,8 @@ export const employees: Employee[] = [
     contractUnit: 0.5,
     department: "PROPIO",
     schedule: [
-      'X', 'L', 'L', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'L', 'L', 'X',
-      'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X'
+      'X', 'D', 'D', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'D', 'D', 'X',
+      'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X'
     ]
   },
 
@@ -538,8 +538,8 @@ export const employees: Employee[] = [
     contractUnit: 0.75,
     department: "ETT",
     schedule: [
-      'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X',
-      'L', 'L', 'X', 'X', 'X', 'X', 'X', 'L', 'L', 'X', 'X', 'X', 'X', 'X', 'X'
+      'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X',
+      'D', 'D', 'X', 'X', 'X', 'X', 'X', 'D', 'D', 'X', 'X', 'X', 'X', 'X', 'X'
     ]
   }
 ];

@@ -129,6 +129,8 @@ export function assignRotating(ctx: PipelineContext): PipelineContext {
 
           // Post-N mandatory rest: lock day after LAST N as D so PASS 2
           // can't assign a shift there (N ends 07:00, ALL shifts violate 12h).
+          // KEY RULE: post-N rest REPLACES one of the 2 Phase04 rests,
+          // NOT a 3rd extra. Employee keeps exactly 2 locked rests/week.
           const lastNDay = restDaysInWeek[restDaysInWeek.length - 1];
           const postNDay = lastNDay + 1;
           if (postNDay <= totalDays) {
@@ -144,33 +146,48 @@ export function assignRotating(ctx: PipelineContext): PipelineContext {
                 hours: 0,
               };
 
-              // Now we may have 3+ rest days. Count total locked rests this week
-              // (including the new post-N lock) and unlock one Phase04 rest if needed.
+              // Compensate: ensure exactly 2 locked rests per week.
+              // Check the week where postNDay falls.
               const postNWeekIdx = Math.floor((postNDay - 1) / 7);
-              const postNWeekDays = weeks[postNWeekIdx] ?? weekDays;
-              const allLockedRests = postNWeekDays.filter(d => {
+              const targetWeekDays = weeks[postNWeekIdx] ?? [];
+              const lockedRestsInWeek = targetWeekDays.filter(d => {
                 const cell = grid[candidate.id][d];
                 return cell?.locked && cell?.code === "D";
               });
-              // Also count locked rests in the N-week if different
-              const nWeekLockedRests = weekDays.filter(d => {
-                const cell = grid[candidate.id][d];
-                return cell?.locked && cell?.code === "D";
-              });
-              const totalLockedRests = new Set([...allLockedRests, ...nWeekLockedRests]).size;
 
-              if (totalLockedRests > 2) {
-                // Unlock one Phase04 rest (NOT the post-N one) to compensate
-                const phase04Rests = weekDays.filter(d => {
+              // Unlock excess Phase04 rests (keep exactly 2 locked per week)
+              const excess = [...lockedRestsInWeek];
+              while (excess.length > 2) {
+                // Prefer unlocking Phase04 rests (NOT the post-N day)
+                const toUnlockIdx = excess.findIndex(d => d !== postNDay);
+                if (toUnlockIdx === -1) break;
+                const toUnlock = excess[toUnlockIdx];
+                grid[candidate.id][toUnlock] = {
+                  ...grid[candidate.id][toUnlock],
+                  locked: false,
+                };
+                excess.splice(toUnlockIdx, 1);
+              }
+
+              // If N-week differs from post-N week (cross-week boundary),
+              // also ensure N-week doesn't have excess rests
+              const nWeekIdx = Math.floor((lastNDay - 1) / 7);
+              if (nWeekIdx !== postNWeekIdx) {
+                const nWeekDaysArr = weeks[nWeekIdx] ?? [];
+                const nWeekLocked = nWeekDaysArr.filter(d => {
                   const cell = grid[candidate.id][d];
-                  return cell?.locked && cell?.code === "D" && d !== postNDay;
+                  return cell?.locked && cell?.code === "D";
                 });
-                if (phase04Rests.length > 0) {
-                  const dayToUnlock = phase04Rests[phase04Rests.length - 1];
-                  grid[candidate.id][dayToUnlock] = {
-                    ...grid[candidate.id][dayToUnlock],
+                const nExcess = [...nWeekLocked];
+                while (nExcess.length > 2) {
+                  const toUnlockIdx = nExcess.findIndex(d => d !== postNDay);
+                  if (toUnlockIdx === -1) break;
+                  const toUnlock = nExcess[toUnlockIdx];
+                  grid[candidate.id][toUnlock] = {
+                    ...grid[candidate.id][toUnlock],
                     locked: false,
                   };
+                  nExcess.splice(toUnlockIdx, 1);
                 }
               }
             }

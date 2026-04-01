@@ -453,3 +453,18 @@ export function countWorkingOnDay(
   }
   return count;
 }
+
+// ---------------------------------------------------------------------------
+// DISPLAY HELPERS
+// ---------------------------------------------------------------------------
+
+/** Converts an engine shift code to a human-readable display name.
+ *  "11x19" → "11h a 19h", "9x17" → "9h a 17h", "M" → "Mañana", etc. */
+export function formatShiftDisplay(code: string): string {
+  const shift = SHIFT_TIMES[code];
+  if (shift) return shift.label;
+  // Ad-hoc: "14x22" → "14h a 22h"
+  const match = code.match(/^(\d{1,2})x(\d{1,2})$/);
+  if (match) return `${match[1]}h a ${match[2]}h`;
+  return code;
+}

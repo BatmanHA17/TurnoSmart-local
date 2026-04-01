@@ -64,8 +64,7 @@ const ABSENCE_CODES = {
   H: { label: "Horas sindicales", color: "hsl(269, 27%, 54%)" },
   S: { label: "Sanción", color: "hsl(42, 49%, 51%)" },
   C: { label: "Curso", color: "hsl(323, 36%, 51%)" },
-  L: { label: "Libre", color: "hsl(42, 8%, 47%)" },     // legacy
-  D: { label: "Descanso", color: "hsl(215, 14%, 65%)" }, // motor SMART v2.0
+  D: { label: "Descanso", color: "hsl(215, 14%, 65%)" },
 };
 
 const WEEKDAY_NAMES = ["domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado"];
@@ -83,7 +82,7 @@ export function classifyShiftTime(startTime: string | null | undefined): "manana
 export function isWorkShift(shift: ShiftForAnalytics): boolean {
   const absenceCode = shift.absenceCode?.toUpperCase();
   if (!absenceCode) return true;
-  return !["L", "V", "E", "P", "F", "H", "S", "C"].includes(absenceCode);
+  return !["D", "V", "E", "P", "F", "H", "S", "C"].includes(absenceCode);
 }
 
 export function calculateWeekdayDistribution(shifts: ShiftForAnalytics[]): WeekdayDistribution[] {
@@ -207,7 +206,7 @@ export function calculateEmployeeAbsences(shifts: ShiftForAnalytics[]): Map<stri
 
   shifts.forEach((shift) => {
     const code = shift.absenceCode?.toUpperCase();
-    if (code && ABSENCE_CODES[code as keyof typeof ABSENCE_CODES] && code !== "L") {
+    if (code && ABSENCE_CODES[code as keyof typeof ABSENCE_CODES] && code !== "D") {
       if (!employeeAbsences.has(shift.employeeId)) {
         employeeAbsences.set(shift.employeeId, new Map());
       }

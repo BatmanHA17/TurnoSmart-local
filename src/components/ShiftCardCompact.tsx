@@ -23,7 +23,7 @@ const getShiftCode = (shift: ShiftCardCompactProps['shift']): string => {
     if (shift.absenceCode) return shift.absenceCode.slice(0, 2).toUpperCase();
     if (shift.name) {
       const name = shift.name.toLowerCase();
-      if (name.includes('libre') || name.includes('descanso')) return 'L';
+      if (name.includes('libre') || name.includes('descanso')) return 'D';
       if (name.includes('vacacion')) return 'V';
       if (name.includes('baja') || name.includes('enferm')) return 'E';
       if (name.includes('permiso')) return 'P';

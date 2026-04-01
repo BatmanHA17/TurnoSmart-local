@@ -105,8 +105,7 @@ export const shouldCountHours = (shiftData: ShiftBlock): boolean => {
     }
     return false;
   }
-  // 'D' es el código oficial del motor SMART. 'L' se mantiene para compatibilidad con datos históricos.
-  const absenceCodes = ['D', 'V', 'L', 'E', 'F', 'P', 'H', 'S', 'Vacaciones', 'Libre', 'Descanso', 'Día Libre', 'Descanso Semanal', 'Enfermo', 'Falta', 'Permiso', 'Horas Sindicales', 'Sancionado', 'Baja IT'];
+  const absenceCodes = ['D', 'V', 'E', 'F', 'P', 'H', 'S', 'Vacaciones', 'Descanso', 'Día Libre', 'Descanso Semanal', 'Enfermo', 'Falta', 'Permiso', 'Horas Sindicales', 'Sancionado', 'Baja IT'];
   const shiftName = shiftData.name?.trim() || '';
   if (shiftName === 'Curso' || shiftName === 'C') {
     return true;

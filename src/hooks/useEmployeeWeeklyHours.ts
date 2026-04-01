@@ -92,7 +92,7 @@ export const useEmployeeWeeklyHours = (selectedDate?: Date) => {
           } else {
             dayShifts.forEach(shift => {
               // Detectar días libres por shift_name
-              if (shift.shift_name === 'L' || shift.shift_name === 'Libre') {
+              if (shift.shift_name === 'D' || shift.shift_name === 'Descanso') {
                 isLibre = true;
               } 
               // O si el turno existe pero no tiene horarios (también es día libre)

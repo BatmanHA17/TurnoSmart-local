@@ -15,7 +15,7 @@ export function SingleDayTimeAxis({ selectedDate, shifts }: SingleDayTimeAxisPro
     const dayKey = format(selectedDate, "yyyy-MM-dd");
     const dayShifts = shifts.filter(s => s.date === dayKey);
     
-    // Contar EMPLEADOS ÚNICOS trabajando por día (excluyendo ausencias tipo 'L', 'rest', etc)
+    // Contar EMPLEADOS ÚNICOS trabajando por día (excluyendo ausencias tipo 'D', 'rest', etc)
     const workingShifts = dayShifts.filter(shift => {
       // Excluir ausencias (nombre "Descanso Semanal" en shift_name)
       if (shift.shift_name === "Descanso Semanal") {

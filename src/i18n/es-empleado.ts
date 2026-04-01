@@ -17,7 +17,7 @@ export const esEmpleado = {
     friday: "Viernes",
     saturday: "Sábado",
     sunday: "Domingo",
-    free: "Libre",
+    free: "Descanso",
   },
   absences: {
     title: "Solicitar ausencia",

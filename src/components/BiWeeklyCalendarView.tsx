@@ -514,7 +514,7 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
         
         const mappedShifts: ShiftBlock[] = shifts.map(shift => {
           const savedShift = savedShifts.find(s => s.name === shift.shift_name);
-          const ABSENCE_NAMES = ['Libre', 'Vacaciones', 'Enfermo', 'Falta', 'Permiso', 'Baja', 'Curso', 'Horas Sindicales', 'Sancionado'];
+          const ABSENCE_NAMES = ['Descanso', 'Libre', 'Vacaciones', 'Enfermo', 'Falta', 'Permiso', 'Baja', 'Curso', 'Horas Sindicales', 'Sancionado'];
           const isAbsenceByName = ABSENCE_NAMES.some(name => 
             shift.shift_name.toLowerCase().includes(name.toLowerCase())
           );

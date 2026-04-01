@@ -430,6 +430,38 @@ export function useSmartGenerateV2({
           });
       }
 
+      // ── Persist DG accumulated (T2-6) ──────────────────────────
+      if (orgId && alt.output.dgAccumulated) {
+        const periodEnd = format(
+          addDays(periodStartDate, totalDays - 1),
+          "yyyy-MM-dd"
+        );
+        for (const [empId, dgCount] of Object.entries(alt.output.dgAccumulated)) {
+          if (dgCount > 0) {
+            supabase.rpc("increment_dg_balance", {
+              _employee_id: empId,
+              _org_id: orgId,
+              _period_end: periodEnd,
+              _dg_delta: dgCount,
+            }).then(({ error }) => {
+              if (error) {
+                // Fallback: upsert directly
+                supabase
+                  .from("employee_equity")
+                  .upsert({
+                    employee_id: empId,
+                    organization_id: orgId,
+                    period_start: format(periodStartDate, "yyyy-MM-dd"),
+                    period_end: periodEnd,
+                    dg_balance: dgCount,
+                  }, { onConflict: "employee_id,organization_id,period_start" })
+                  .then(() => {});
+              }
+            });
+          }
+        }
+      }
+
       setScoreResult(alt.output.score);
       onResult(blocks);
 

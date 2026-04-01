@@ -543,6 +543,16 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     month: currentWeek.getMonth() + 1,
   });
 
+  // Average movements/day for header tooltip (NEW-02)
+  const avgMovementsPerDay = useMemo(() => {
+    if (!occupancyRecords || occupancyRecords.length === 0) return 0;
+    const total = occupancyRecords.reduce(
+      (sum, r) => sum + (r.check_ins ?? 0) + (r.check_outs ?? 0),
+      0
+    );
+    return total / occupancyRecords.length;
+  }, [occupancyRecords]);
+
   // Auto-save function
   const saveCalendarState = async (shiftBlocksToSave: ShiftBlock[]) => {
     try {
@@ -806,7 +816,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           const savedShift = savedShifts.find(s => s.name === shift.shift_name);
           
           // Detectar ausencias por nombre O por horarios nulos
-          const ABSENCE_NAMES = ['Libre', 'Vacaciones', 'Enfermo', 'Falta', 'Permiso', 'Baja', 'Curso', 'Horas Sindicales', 'Sancionado'];
+          const ABSENCE_NAMES = ['Descanso', 'Libre', 'Vacaciones', 'Enfermo', 'Falta', 'Permiso', 'Baja', 'Curso', 'Horas Sindicales', 'Sancionado'];
           const isAbsenceByName = ABSENCE_NAMES.some(name => 
             shift.shift_name.toLowerCase().includes(name.toLowerCase())
           );
@@ -1087,7 +1097,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     }
 
     // Si es un turno de ausencia (libre), no adaptarlo
-    if (shift.type === 'absence' || shift.name === 'Descanso Semanal' || shift.name?.includes('Libre')) {
+    if (shift.type === 'absence' || shift.name === 'Descanso Semanal' || shift.name?.includes('Descanso') || shift.name?.includes('Libre')) {
       return {
         startTime: shift.startTime,
         endTime: shift.endTime,
@@ -1888,14 +1898,15 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     if (!orgId) return;
 
     // C10: Paleta progresiva CLARO→OSCURO
+    // Paleta pastel progresiva: claro (mañana) → medio (tarde) → oscuro (noche)
     const KIT_SHIFTS = [
-      { name: "Mañana",      start_time: "07:00", end_time: "15:00", color: "#fbbf24", has_break: true,  total_break_time: 30 },
-      { name: "Tarde",       start_time: "15:00", end_time: "23:00", color: "#f97316", has_break: true,  total_break_time: 30 },
-      { name: "Noche",       start_time: "23:00", end_time: "07:00", color: "#6366f1", has_break: true,  total_break_time: 30 },
-      { name: "Transición",  start_time: "11:00", end_time: "19:00", color: "#fb923c", has_break: true,  total_break_time: 30 },
-      { name: "GEX Mañana",  start_time: "09:00", end_time: "17:00", color: "#fcd34d", has_break: true,  total_break_time: 30 },
-      { name: "GEX Tarde",   start_time: "12:00", end_time: "20:00", color: "#fdba74", has_break: true,  total_break_time: 30 },
-      { name: "Guardia",     start_time: "09:00", end_time: "21:00", color: "#f87171", has_break: false, total_break_time: 0  },
+      { name: "Mañana",      start_time: "07:00", end_time: "15:00", color: "#fde68a", has_break: true,  total_break_time: 30 }, // amber-200 (claro)
+      { name: "Tarde",       start_time: "15:00", end_time: "23:00", color: "#fdba74", has_break: true,  total_break_time: 30 }, // orange-300 (medio)
+      { name: "Noche",       start_time: "23:00", end_time: "07:00", color: "#a5b4fc", has_break: true,  total_break_time: 30 }, // indigo-300 (oscuro pastel)
+      { name: "Transición",  start_time: "11:00", end_time: "19:00", color: "#fcd34d", has_break: true,  total_break_time: 30 }, // amber-300 (entre M y T)
+      { name: "GEX Mañana",  start_time: "09:00", end_time: "17:00", color: "#d9f99d", has_break: true,  total_break_time: 30 }, // lime-200 (claro)
+      { name: "GEX Tarde",   start_time: "12:00", end_time: "20:00", color: "#bef264", has_break: true,  total_break_time: 30 }, // lime-300 (medio)
+      { name: "Guardia",     start_time: "09:00", end_time: "21:00", color: "#fca5a5", has_break: false, total_break_time: 0  }, // red-300 (pastel)
     ];
 
     const { data: existing, error: fetchError } = await supabase
@@ -3126,9 +3137,23 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           isAuditing={isAuditing}
           onRefreshAudit={runAudit}
           onApplyAuditFix={handleApplyAuditFix}
+          onViolationClick={(violation) => {
+            // Navigate to the cell referenced by the violation
+            const cellId = `cell-${violation.employeeId}-${violation.date}`;
+            const cellEl = document.getElementById(cellId);
+            if (cellEl) {
+              cellEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+              // Highlight the cell temporarily
+              cellEl.classList.add('ring-2', 'ring-destructive', 'ring-offset-2');
+              setTimeout(() => {
+                cellEl.classList.remove('ring-2', 'ring-destructive', 'ring-offset-2');
+              }, 3000);
+            }
+          }}
           onClean={() => setShowCleanDialog(true)}
           employeeCount={sortedEmployees.length}
           dayCount={7}
+          avgMovementsPerDay={avgMovementsPerDay}
         />
 
       {/* Área de Favoritos */}
@@ -3155,7 +3180,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
               
               // Verificar si es "Descanso Semanal" - no permitir duplicados
               if (dragData.shift.name === "Descanso Semanal" || 
-                  dragData.shift.absenceCode === 'L' ||
+                  dragData.shift.absenceCode === 'D' ||
                   dragData.shift.type === 'absence') {
                 // toast({
                 //   title: "Descanso Semanal ya disponible",
@@ -3596,9 +3621,10 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
                       const cellSeverity = getMaxSeverityForCell(employee.id, dayKey);
                       
                       return (
-                           <td 
-                            key={dayIndex} 
-                            className={`p-0.5 sm:p-1 text-center cursor-pointer hover:bg-muted/30 relative h-14 sm:h-16 md:h-20 ${isSelected ? "bg-muted/40" : ""} ${hasAbsenceToday ? "bg-green-100" : ""} ${
+                           <td
+                            key={dayIndex}
+                            id={`cell-${employee.id}-${dayKey}`}
+                            className={`p-0.5 sm:p-1 text-center cursor-pointer hover:bg-muted/30 relative h-14 sm:h-16 md:h-20 transition-all ${isSelected ? "bg-muted/40" : ""} ${hasAbsenceToday ? "bg-green-100" : ""} ${
                               dragOverCell === `${employee.id}-${format(day, 'yyyy-MM-dd')}` ? 'bg-blue-100' : ''
                             }`}
                            onClick={(e) => {
