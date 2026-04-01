@@ -78,24 +78,9 @@ export function assignRotating(ctx: PipelineContext): PipelineContext {
       if (candidate) {
         grid[candidate.id][restDay] = makeAssignment("N", "engine");
         updateEquity(currentEquity, candidate.id, "N");
-        // Only lock next day if it's NOT another Night Agent rest day
-        // N→N is valid (16h rest), so the same FDA can cover consecutive nights
-        const nextDay = restDay + 1;
-        if (nextDay <= totalDays && !nightRestSet.has(nextDay)) {
-          const nextCell = grid[candidate.id][nextDay];
-          if (nextCell && !nextCell.locked) {
-            // Don't add a 3rd rest day — count ALL rest/absence days in the week
-            // (locked or not) to avoid employees with 3+ rest = only 32h
-            const candidateWeek = weeks.find((w) => w.includes(nextDay)) ?? [];
-            const totalRests = candidateWeek.filter(
-              (d) => isRestOrAbsence(grid[candidate.id][d]?.code)
-            ).length;
-            if (totalRests < 2) {
-              grid[candidate.id][nextDay] = makeAssignment("D", "engine");
-              grid[candidate.id][nextDay].locked = true;
-            }
-          }
-        }
+        // Post-N rest: NO lockear. La regla 12h en resolveFinalShift/pickBestShiftForDay
+        // ya bloquea M (07:00) tras N (termina 07:00), pero permite T (15:00).
+        // Lockear un D extra aquí causaba 3 rest/semana = solo 32h para el FDA.
       }
     }
   }
