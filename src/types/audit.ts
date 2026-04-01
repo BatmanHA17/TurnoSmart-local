@@ -10,6 +10,30 @@ export type ViolationType =
 
 export type ViolationSeverity = 'error' | 'warning' | 'info';
 
+export type SuggestedFixAction =
+  | 'CHANGE_SHIFT'      // Cambiar turno de un empleado en un día
+  | 'SWAP_SHIFTS'       // Intercambiar turnos entre 2 empleados
+  | 'ADD_REST_DAY'      // Añadir día de descanso
+  | 'MOVE_REST_DAY';    // Mover día de descanso a otra posición
+
+export interface SuggestedFix {
+  action: SuggestedFixAction;
+  label: string;              // "Cambiar T→11×19 para FDA#2 el día 15"
+  employeeId: string;
+  date: string;               // YYYY-MM-DD del cambio principal
+  /** Para CHANGE_SHIFT */
+  fromShift?: string;         // Turno actual (ej: "M")
+  toShift?: string;           // Turno propuesto (ej: "11×19")
+  toShiftStartTime?: string;  // HH:mm
+  toShiftEndTime?: string;    // HH:mm
+  toShiftColor?: string;      // Hex color
+  /** Para SWAP_SHIFTS */
+  swapWithEmployeeId?: string;
+  swapWithDate?: string;
+  /** Para MOVE_REST_DAY / ADD_REST_DAY */
+  targetDate?: string;
+}
+
 export interface AuditViolation {
   id: string;
   type: ViolationType;
@@ -21,6 +45,7 @@ export interface AuditViolation {
   message: string;
   details: string;
   suggestion?: string;
+  suggestedFix?: SuggestedFix;
   relatedShiftIds?: string[];
 }
 

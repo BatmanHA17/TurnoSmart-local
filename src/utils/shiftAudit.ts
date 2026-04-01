@@ -1,11 +1,12 @@
 // Motor de auditoría de turnos
-import { 
-  AuditViolation, 
-  AuditResult, 
+import {
+  AuditViolation,
+  AuditResult,
   ViolationType,
   CoveragePolicy,
   EmployeeRestriction,
-  ViolationsByEmployeeDate
+  ViolationsByEmployeeDate,
+  SuggestedFix
 } from '@/types/audit';
 import { format, parseISO, differenceInMinutes, addDays, getDay, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -66,6 +67,42 @@ export function checkMinimumRestBetweenShifts(
       const restHours = restMinutes / 60;
       
       if (restHours < minRestHours && restHours >= 0) {
+        // Generar suggestedFix inteligente
+        const isAfternoonToMorning = (currentShift.endTime || '') >= '22:00' && (nextShift.startTime || '') <= '08:00';
+        let suggestedFix: SuggestedFix | undefined;
+
+        if (isAfternoonToMorning) {
+          // T→M clásico: proponer 11×19 como transición
+          suggestedFix = {
+            action: 'CHANGE_SHIFT',
+            label: `Cambiar a 11×19 (Transición) el ${formatDateShort(nextShift.date)}`,
+            employeeId,
+            date: nextShift.date,
+            fromShift: nextShift.shiftName,
+            toShift: 'Transición',
+            toShiftStartTime: '11:00',
+            toShiftEndTime: '19:00',
+            toShiftColor: '#06b6d4',
+          };
+        } else {
+          // Otro caso de descanso insuficiente: proponer retrasar entrada
+          const neededStart = currentShift.endTime
+            ? `${String(Math.min(23, parseInt(currentShift.endTime.split(':')[0]) + minRestHours)).padStart(2, '0')}:00`
+            : undefined;
+          if (neededStart) {
+            suggestedFix = {
+              action: 'CHANGE_SHIFT',
+              label: `Retrasar entrada a ${neededStart} el ${formatDateShort(nextShift.date)}`,
+              employeeId,
+              date: nextShift.date,
+              fromShift: nextShift.shiftName,
+              toShift: nextShift.shiftName,
+              toShiftStartTime: neededStart,
+              toShiftEndTime: nextShift.endTime || undefined,
+            };
+          }
+        }
+
         violations.push({
           id: generateViolationId(),
           type: 'INSUFFICIENT_REST',
@@ -75,7 +112,10 @@ export function checkMinimumRestBetweenShifts(
           date: nextShift.date,
           message: `Solo ${restHours.toFixed(1)}h de descanso entre turnos`,
           details: `El turno del ${formatDateShort(currentShift.date)} termina a las ${currentShift.endTime} y el siguiente comienza a las ${nextShift.startTime} el ${formatDateShort(nextShift.date)}. Esto da solo ${restHours.toFixed(1)} horas de descanso, menos de las ${minRestHours}h requeridas por ley.`,
-          suggestion: `Ajustar el horario para garantizar al menos ${minRestHours} horas de descanso.`,
+          suggestion: isAfternoonToMorning
+            ? `Cambiar ${nextShift.shiftName} por turno 11×19 (Transición) para cumplir 12h de descanso.`
+            : `Ajustar el horario para garantizar al menos ${minRestHours} horas de descanso.`,
+          suggestedFix,
           relatedShiftIds: [currentShift.id, nextShift.id]
         });
       }
@@ -175,6 +215,11 @@ export function checkWeeklyFreeDays(
         continue;
       }
       
+      // Encontrar el día con menos impacto para convertir en descanso
+      const workDays = weekDays.filter(d => !restDays.some(r => format(r, 'yyyy-MM-dd') === format(d, 'yyyy-MM-dd')));
+      const bestCandidate = workDays.length > 0 ? workDays[workDays.length - 1] : undefined;
+      const bestCandidateDate = bestCandidate ? format(bestCandidate, 'yyyy-MM-dd') : undefined;
+
       violations.push({
         id: generateViolationId(),
         type: 'MISSING_FREE_DAYS',
@@ -185,7 +230,15 @@ export function checkWeeklyFreeDays(
         endDate: format(weekEnd, 'yyyy-MM-dd'),
         message: `Solo ${freeDays.length} día(s) libre(s) esta semana`,
         details: `El empleado tiene solo ${freeDays.length} día(s) libre(s) en la semana del ${formatDateShort(format(weekStart, 'yyyy-MM-dd'))}. Según su contrato de ${contractHours}h, debería tener mínimo ${minFreeDays} días libres.`,
-        suggestion: `Asignar ${minFreeDays - freeDays.length} día(s) libre(s) adicional(es).`
+        suggestion: `Asignar ${minFreeDays - freeDays.length} día(s) libre(s) adicional(es).`,
+        suggestedFix: bestCandidateDate ? {
+          action: 'ADD_REST_DAY',
+          label: `Asignar Descanso (D) el ${formatDateShort(bestCandidateDate)}`,
+          employeeId,
+          date: bestCandidateDate,
+          toShift: 'Descanso',
+          toShiftColor: '#94a3b8',
+        } : undefined,
       });
     }
     
@@ -253,16 +306,42 @@ export function checkMinimumCoverage(
     const count = employeesInSlot.size;
     
     if (count < policy.minEmployees) {
+      // Encontrar empleados que están libres ese día como candidatos
+      const allEmployeesThisDay = shifts.filter(s => s.date === dateStr);
+      const restingEmployees = allEmployeesThisDay.filter(s =>
+        s.isAbsence || VALID_REST_CODES.includes(s.absenceCode || '') ||
+        s.shiftName === 'Descanso' || s.shiftName === 'D'
+      );
+      const candidate = restingEmployees.find(s => s.absenceCode === 'D' || s.absenceCode === 'L' || s.shiftName === 'Descanso');
+
+      // Determinar turno sugerido según franja
+      const policyHour = parseInt(policy.startTime.split(':')[0]);
+      const suggestedShiftName = policyHour < 12 ? 'Mañana' : policyHour < 20 ? 'Tarde' : 'Noche';
+      const suggestedColor = policyHour < 12 ? '#3b82f6' : policyHour < 20 ? '#f59e0b' : '#8b5cf6';
+
       violations.push({
         id: generateViolationId(),
         type: 'MISSING_COVERAGE',
         severity: count === 0 ? 'error' : 'warning',
-        employeeId: '', // No aplica a un empleado específico
-        employeeName: '',
+        employeeId: candidate?.employeeId || '',
+        employeeName: candidate?.employeeName || '',
         date: dateStr,
         message: `Cobertura insuficiente: ${policy.name}`,
         details: `Solo hay ${count} empleado(s) cubriendo la franja "${policy.name}" (${policy.startTime}-${policy.endTime}) el ${formatDateShort(dateStr)}. Se requieren mínimo ${policy.minEmployees}.`,
-        suggestion: `Asignar ${policy.minEmployees - count} empleado(s) adicional(es) a esta franja.`
+        suggestion: candidate
+          ? `Mover el libre de ${candidate.employeeName} y asignar turno ${suggestedShiftName}.`
+          : `Asignar ${policy.minEmployees - count} empleado(s) adicional(es) a esta franja.`,
+        suggestedFix: candidate ? {
+          action: 'CHANGE_SHIFT',
+          label: `Asignar ${suggestedShiftName} a ${candidate.employeeName}`,
+          employeeId: candidate.employeeId,
+          date: dateStr,
+          fromShift: 'Descanso',
+          toShift: suggestedShiftName,
+          toShiftStartTime: policy.startTime,
+          toShiftEndTime: policy.endTime,
+          toShiftColor: suggestedColor,
+        } : undefined,
       });
     }
   }

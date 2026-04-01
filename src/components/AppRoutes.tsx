@@ -34,6 +34,7 @@ const RegisterInvite = React.lazy(() => import("@/pages/RegisterInvite"));
 const LinkAccount = React.lazy(() => import("@/pages/LinkAccount"));
 const EstablishmentDetail = React.lazy(() => import("@/pages/EstablishmentDetail"));
 const DashboardEmpleado = React.lazy(() => import("@/pages/DashboardEmpleado"));
+const EmployeePetitionsPage = React.lazy(() => import("@/pages/EmployeePetitions"));
 const DashboardManager = React.lazy(() => import("@/pages/DashboardManager"));
 const DashboardDirector = React.lazy(() => import("@/pages/DashboardDirector"));
 const DashboardAdministrator = React.lazy(() => import("@/pages/DashboardAdministrator"));
@@ -453,7 +454,7 @@ export const AppRoutes = () => {
           <Route path="/admin/settings" element={<ProtectedRoute><AdminRoute><AdminSettings /></AdminRoute></ProtectedRoute>} />
 
           {/* Peticiones del empleado (todos los roles) */}
-          <Route path="/turnosmart/peticiones" element={<ProtectedRoute><SectionErrorBoundary label="peticiones"><MainLayout><DashboardEmpleado /></MainLayout></SectionErrorBoundary></ProtectedRoute>} />
+          <Route path="/turnosmart/peticiones" element={<ProtectedRoute><SectionErrorBoundary label="peticiones"><MainLayout><EmployeePetitionsPage /></MainLayout></SectionErrorBoundary></ProtectedRoute>} />
 
           {/* Nóminas — solo FOM+ */}
           <Route path="/turnosmart/nominas" element={<ProtectedRoute><RoleGuard minRole="fom"><Nominas /></RoleGuard></ProtectedRoute>} />

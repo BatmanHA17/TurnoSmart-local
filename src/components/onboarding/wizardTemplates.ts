@@ -88,23 +88,71 @@ export const INDUSTRIES: Record<string, IndustryTemplate> = {
       { id: 'job-tecnico-farmacia', title: 'Técnico/a de Farmacia', departmentId: 'dept-farmacia', departmentName: 'Farmacia', hours: 8, headcount: 2, selected: true },
     ],
   },
+  restaurant: {
+    label: 'Restaurante independiente',
+    hasTemplates: true,
+    departments: [
+      { id: 'dept-sala', name: 'Sala', selected: true },
+      { id: 'dept-cocina', name: 'Cocina', selected: true },
+      { id: 'dept-barra', name: 'Barra', selected: false },
+    ],
+    jobs: [
+      // Sala
+      { id: 'job-r-jefe-sala', title: 'Jefe/a de Sala', departmentId: 'dept-sala', departmentName: 'Sala', hours: 8, headcount: 1, selected: true },
+      { id: 'job-r-segundo-sala', title: '2ndo/a de Sala', departmentId: 'dept-sala', departmentName: 'Sala', hours: 8, headcount: 1, selected: true },
+      { id: 'job-r-camarero', title: 'Camarero/a', departmentId: 'dept-sala', departmentName: 'Sala', hours: 8, headcount: 4, selected: true },
+      { id: 'job-r-ayudante-sala', title: 'Ayudante de Sala', departmentId: 'dept-sala', departmentName: 'Sala', hours: 6, headcount: 2, selected: true },
+      // Cocina
+      { id: 'job-r-jefe-cocina', title: 'Jefe/a de Cocina', departmentId: 'dept-cocina', departmentName: 'Cocina', hours: 8, headcount: 1, selected: true },
+      { id: 'job-r-cocinero', title: 'Cocinero/a', departmentId: 'dept-cocina', departmentName: 'Cocina', hours: 8, headcount: 3, selected: true },
+      { id: 'job-r-ayudante-cocina', title: 'Ayudante de Cocina', departmentId: 'dept-cocina', departmentName: 'Cocina', hours: 6, headcount: 2, selected: true },
+      // Barra
+      { id: 'job-r-barman', title: 'Barman / Barmaid', departmentId: 'dept-barra', departmentName: 'Barra', hours: 8, headcount: 2, selected: false },
+    ],
+  },
   services: {
     label: 'Servicios',
-    hasTemplates: false,
-    departments: [],
-    jobs: [],
+    hasTemplates: true,
+    departments: [
+      { id: 'dept-operaciones', name: 'Operaciones', selected: true },
+      { id: 'dept-admin', name: 'Administración', selected: true },
+      { id: 'dept-soporte', name: 'Soporte / Atención', selected: false },
+    ],
+    jobs: [
+      { id: 'job-s-responsable', title: 'Responsable de Operaciones', departmentId: 'dept-operaciones', departmentName: 'Operaciones', hours: 8, headcount: 1, selected: true },
+      { id: 'job-s-tecnico', title: 'Técnico/a', departmentId: 'dept-operaciones', departmentName: 'Operaciones', hours: 8, headcount: 3, selected: true },
+      { id: 'job-s-auxiliar', title: 'Auxiliar', departmentId: 'dept-operaciones', departmentName: 'Operaciones', hours: 6, headcount: 2, selected: true },
+      { id: 'job-s-admin', title: 'Administrativo/a', departmentId: 'dept-admin', departmentName: 'Administración', hours: 8, headcount: 2, selected: true },
+      { id: 'job-s-soporte', title: 'Agente de Soporte', departmentId: 'dept-soporte', departmentName: 'Soporte / Atención', hours: 8, headcount: 3, selected: false },
+    ],
   },
   manufacturing: {
     label: 'Manufactura / Industria',
-    hasTemplates: false,
-    departments: [],
-    jobs: [],
+    hasTemplates: true,
+    departments: [
+      { id: 'dept-produccion', name: 'Producción', selected: true },
+      { id: 'dept-calidad', name: 'Calidad', selected: true },
+      { id: 'dept-logistica', name: 'Logística', selected: false },
+    ],
+    jobs: [
+      { id: 'job-m-jefe-prod', title: 'Jefe/a de Producción', departmentId: 'dept-produccion', departmentName: 'Producción', hours: 8, headcount: 1, selected: true },
+      { id: 'job-m-supervisor', title: 'Supervisor/a de Turno', departmentId: 'dept-produccion', departmentName: 'Producción', hours: 8, headcount: 2, selected: true },
+      { id: 'job-m-operario', title: 'Operario/a', departmentId: 'dept-produccion', departmentName: 'Producción', hours: 8, headcount: 6, selected: true },
+      { id: 'job-m-calidad', title: 'Inspector/a de Calidad', departmentId: 'dept-calidad', departmentName: 'Calidad', hours: 8, headcount: 2, selected: true },
+      { id: 'job-m-logistica', title: 'Mozo/a de Almacén', departmentId: 'dept-logistica', departmentName: 'Logística', hours: 8, headcount: 3, selected: false },
+    ],
   },
-  other: {
-    label: 'Otro',
-    hasTemplates: false,
-    departments: [],
-    jobs: [],
+  generic: {
+    label: 'Genérico (cualquier sector)',
+    hasTemplates: true,
+    departments: [
+      { id: 'dept-general', name: 'Departamento General', selected: true },
+    ],
+    jobs: [
+      { id: 'job-g-jefe', title: 'Jefe/a de Departamento', departmentId: 'dept-general', departmentName: 'Departamento General', hours: 8, headcount: 1, selected: true },
+      { id: 'job-g-supervisor', title: 'Supervisor/a', departmentId: 'dept-general', departmentName: 'Departamento General', hours: 8, headcount: 1, selected: true },
+      { id: 'job-g-agente', title: 'Agente / Empleado', departmentId: 'dept-general', departmentName: 'Departamento General', hours: 8, headcount: 4, selected: true },
+    ],
   },
 };
 

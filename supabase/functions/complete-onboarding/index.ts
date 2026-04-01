@@ -82,6 +82,7 @@ serve(async (req) => {
         name: organization.name,
         slug: slug,
         country: organization.country,
+        sector: organization.industry || 'generic',
       })
       .select()
       .single();

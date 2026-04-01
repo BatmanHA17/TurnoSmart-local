@@ -22,7 +22,9 @@ import { ViewModeSelector } from "./ViewModeSelector";
 import { CalendarPublishButton } from "@/components/CalendarPublishButton";
 import { UndoRedoToolbar } from "./UndoRedoToolbar";
 import { AuditPanelSheet } from "@/components/audit/AuditPanel";
+import { PlantillaCalculator } from "./PlantillaCalculator";
 import { cn } from "@/lib/utils";
+import { Calculator } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -87,6 +89,7 @@ interface UnifiedCalendarHeaderProps {
   auditResult?: AuditResult | null;
   isAuditing?: boolean;
   onRefreshAudit?: () => void;
+  onApplyAuditFix?: (fix: import('@/types/audit').SuggestedFix, violation: import('@/types/audit').AuditViolation) => void;
   
   // Generate SMART schedule
   onGenerate?: () => void;
@@ -148,6 +151,7 @@ export function UnifiedCalendarHeader({
   auditResult,
   isAuditing = false,
   onRefreshAudit,
+  onApplyAuditFix,
   onGenerate,
   isGenerating = false,
   currentDate,
@@ -239,6 +243,7 @@ export function UnifiedCalendarHeader({
 
           {canEdit && onGenerate && (
             <Button
+              data-tour="generate-button"
               variant="ghost"
               size="sm"
               onClick={onGenerate}
@@ -336,7 +341,7 @@ export function UnifiedCalendarHeader({
           {canEdit && onOpenSettings && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                <Button data-tour="petitions-button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
                   <Settings className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -441,15 +446,33 @@ export function UnifiedCalendarHeader({
 
           <div className="flex-1" />
           
-          {/* Auditoría - ahora a la izquierda de badges */}
+          {/* Plantilla RRHH */}
+          {employeeCount !== undefined && employeeCount > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5">
+                  <Calculator className="h-3.5 w-3.5" />
+                  Plantilla
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0" align="end">
+                <PlantillaCalculator employeeCount={employeeCount} />
+              </PopoverContent>
+            </Popover>
+          )}
+
+          {/* Auditoría */}
           {onRefreshAudit && (
+            <span data-tour="audit-button">
             <AuditPanelSheet
               auditResult={auditResult || null}
               isAuditing={isAuditing}
               onRefresh={onRefreshAudit}
+              onApplyFix={onApplyAuditFix}
             />
+            </span>
           )}
-          
+
           {/* Limpiar - al lado de auditoría */}
           {onClean && (
             <Button variant="outline" size="sm" onClick={onClean} className="h-8 gap-1.5">

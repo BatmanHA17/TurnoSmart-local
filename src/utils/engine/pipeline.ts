@@ -70,6 +70,7 @@ export function runPipeline(input: EngineInput): EngineOutput {
     violations: [],
     currentEquity: {},
     coverageGaps: [],
+    dgAccumulated: {},
     _startTime: startTime,
   };
 
@@ -117,5 +118,6 @@ export function runPipeline(input: EngineInput): EngineOutput {
       totalEmployees: input.employees.length,
       totalDays: input.period.totalDays,
     },
+    dgAccumulated: Object.keys(ctx.dgAccumulated).length > 0 ? ctx.dgAccumulated : undefined,
   };
 }

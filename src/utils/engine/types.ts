@@ -397,6 +397,8 @@ export interface EngineOutput {
   violations: AuditViolation[];
   score: ScoreBreakdown;
   meta: EngineMeta;
+  /** DG acumulados en este período: employeeId → días de guardia trabajados */
+  dgAccumulated?: Record<string, number>;
 }
 
 /** Metadata de la generación */
@@ -448,6 +450,8 @@ export interface PipelineContext {
   currentEquity: Record<string, EquityBalance>;
   /** Días que necesitan cobertura extra (Phase 07) */
   coverageGaps: Array<{ day: number; shift: ShiftCode; needed: number; assigned: number }>;
+  /** Acumulador DG por empleado: +1 por cada día de guardia trabajado (S o D) */
+  dgAccumulated: Record<string, number>;
   /** Metadata temporal */
   _startTime: number;
 }

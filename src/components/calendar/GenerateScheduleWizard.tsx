@@ -16,10 +16,11 @@
  * Pasos 7-9 se gestionan fuera del wizard (en el calendario).
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { format, startOfMonth, addDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { buildGenerationPeriod } from "@/utils/engine/helpers";
+import { PlantillaCalculator } from "./PlantillaCalculator";
 import {
   Sheet,
   SheetContent,
@@ -46,6 +47,9 @@ import {
   FileWarning,
   Sparkles,
   Shield,
+  CircleCheck,
+  CircleAlert,
+  Info,
 } from "lucide-react";
 import { ScoreDisplay } from "./ScoreDisplay";
 import type { GenerationResult, ExistingShiftsPolicy, DailyOccupancy } from "@/utils/engine";
@@ -54,6 +58,23 @@ import type { PetitionRecord } from "@/hooks/usePetitions";
 // ---------------------------------------------------------------------------
 // TYPES
 // ---------------------------------------------------------------------------
+
+interface WizardEmployee {
+  id: string;
+  name: string;
+  role?: string;
+  workingHours?: string;
+}
+
+/** Resumen del período anterior por empleado */
+export interface PreviousPeriodSummary {
+  employeeId: string;
+  employeeName: string;
+  lastShift: string;        // Último turno trabajado (M, T, N, etc.)
+  morningCount: number;     // Mañanas acumuladas
+  afternoonCount: number;   // Tardes acumuladas
+  nightCount: number;       // Noches acumuladas
+}
 
 interface WizardProps {
   open: boolean;
@@ -69,10 +90,16 @@ interface WizardProps {
   petitions?: PetitionRecord[];
   /** Datos de ocupación procesados */
   occupancyData?: DailyOccupancy[];
+  /** Empleados del calendario para checklist pre-generación */
+  employees?: WizardEmployee[];
+  /** Resumen del período anterior para continuidad */
+  previousPeriod?: PreviousPeriodSummary[];
   /** Abrir panel de peticiones */
   onOpenPetitions?: () => void;
   /** Abrir diálogo de ocupación */
   onOpenOccupancy?: () => void;
+  /** Abrir configuración de criterios */
+  onOpenCriteria?: () => void;
   /** Llamado al generar */
   onGenerate: (config: WizardConfig) => void;
   /** Resultado de la generación (llega async) */
@@ -117,8 +144,11 @@ export function GenerateScheduleWizard({
   hasOccupancyData,
   petitions,
   occupancyData,
+  employees: wizardEmployees,
+  previousPeriod,
   onOpenPetitions,
   onOpenOccupancy,
+  onOpenCriteria,
   onGenerate,
   generation,
   isGenerating,
@@ -217,8 +247,11 @@ export function GenerateScheduleWizard({
               guardiaDays={fomGuardiaDays}
               petitions={petitions}
               occupancyData={occupancyData}
+              employees={wizardEmployees}
+              previousPeriod={previousPeriod}
               onOpenPetitions={onOpenPetitions}
               onOpenOccupancy={onOpenOccupancy}
+              onOpenCriteria={onOpenCriteria}
             />
           )}
           {step === 6 && <Step6Generate isGenerating={isGenerating} generation={generation} />}
@@ -565,8 +598,10 @@ function Step5Summary({
   guardiaDays,
   petitions,
   occupancyData,
+  employees,
   onOpenPetitions,
   onOpenOccupancy,
+  onOpenCriteria,
 }: {
   weeks: number;
   policy: ExistingShiftsPolicy;
@@ -575,8 +610,11 @@ function Step5Summary({
   guardiaDays: number[];
   petitions?: PetitionRecord[];
   occupancyData?: DailyOccupancy[];
+  employees?: WizardEmployee[];
+  previousPeriod?: PreviousPeriodSummary[];
   onOpenPetitions?: () => void;
   onOpenOccupancy?: () => void;
+  onOpenCriteria?: () => void;
 }) {
   const policyLabels: Record<ExistingShiftsPolicy, string> = {
     overwrite: "Sobreescribir todo",
@@ -584,9 +622,138 @@ function Step5Summary({
     fill_gaps: "Solo huecos",
   };
 
+  // ────────────────────────────────────────────────────────────
+  // Checklist Copilot Pre-Generación
+  // ────────────────────────────────────────────────────────────
+  const checks = useMemo(() => {
+    const items: { ok: boolean; label: string; detail: string; action?: () => void }[] = [];
+
+    // 1. Empleados con horas configuradas
+    const empCount = employees?.length ?? 0;
+    const missingHours = employees?.filter(e => !e.workingHours || e.workingHours === '0h/40h' && !e.workingHours.includes('/')) ?? [];
+    const missingHoursNames = missingHours.slice(0, 3).map(e => e.name).join(', ');
+    items.push({
+      ok: empCount > 0 && missingHours.length === 0,
+      label: empCount === 0
+        ? 'Sin empleados en el calendario'
+        : missingHours.length > 0
+          ? `${missingHours.length} empleado(s) sin horas: ${missingHoursNames}${missingHours.length > 3 ? '...' : ''}`
+          : `${empCount} empleados configurados correctamente`,
+      detail: empCount === 0
+        ? 'Añade empleados al calendario antes de generar.'
+        : missingHours.length > 0
+          ? 'Corrige las horas semanales en la ficha del empleado.'
+          : '',
+    });
+
+    // 2. Peticiones
+    items.push({
+      ok: pendingPetitions > 0 || (petitions?.length ?? 0) > 0,
+      label: pendingPetitions > 0
+        ? `${pendingPetitions} petición(es) pendiente(s) — serán consideradas`
+        : (petitions?.length ?? 0) > 0
+          ? `${petitions!.length} petición(es) procesada(s)`
+          : 'Sin peticiones registradas',
+      detail: pendingPetitions === 0 && (petitions?.length ?? 0) === 0
+        ? '¿Quieres añadir peticiones de vacaciones o preferencias antes de generar?'
+        : '',
+      action: onOpenPetitions,
+    });
+
+    // 3. Ocupación
+    items.push({
+      ok: hasOccupancy,
+      label: hasOccupancy
+        ? 'Datos de ocupación cargados'
+        : 'Sin datos de ocupación',
+      detail: !hasOccupancy
+        ? 'La alternativa Cobertura no podrá optimizar picos sin datos de check-in/check-out.'
+        : '',
+      action: onOpenOccupancy,
+    });
+
+    // 4. Criterios
+    items.push({
+      ok: true, // Siempre ok — criterios tienen defaults
+      label: 'Criterios SMART configurados',
+      detail: 'Puedes ajustar cobertura mínima y otros criterios antes de generar.',
+      action: onOpenCriteria,
+    });
+
+    return items;
+  }, [employees, pendingPetitions, petitions, hasOccupancy, onOpenPetitions, onOpenOccupancy, onOpenCriteria]);
+
+  const allOk = checks.every(c => c.ok);
+
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-medium">Resumen antes de generar</h3>
+
+      {/* Checklist Copilot */}
+      <Card className={allOk ? 'border-green-200 bg-green-50/30' : 'border-amber-200 bg-amber-50/30'}>
+        <CardContent className="pt-3 pb-2 space-y-1.5">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+            {allOk ? <CircleCheck className="h-3.5 w-3.5 text-green-600" /> : <CircleAlert className="h-3.5 w-3.5 text-amber-600" />}
+            {allOk ? 'Listo para generar' : 'Revisa antes de generar'}
+          </h4>
+          {checks.map((c, i) => (
+            <div key={i} className="flex items-start gap-2 text-xs">
+              {c.ok
+                ? <CircleCheck className="h-3.5 w-3.5 text-green-600 mt-0.5 flex-shrink-0" />
+                : <CircleAlert className="h-3.5 w-3.5 text-amber-600 mt-0.5 flex-shrink-0" />
+              }
+              <div className="flex-1 min-w-0">
+                <span className={c.ok ? 'text-green-800' : 'text-amber-800'}>{c.label}</span>
+                {!c.ok && c.detail && (
+                  <p className="text-muted-foreground text-[10px] mt-0.5">{c.detail}</p>
+                )}
+              </div>
+              {c.action && !c.ok && (
+                <Button variant="link" size="sm" className="h-auto p-0 text-[10px]" onClick={c.action}>
+                  Corregir
+                </Button>
+              )}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Plantilla RRHH compacta */}
+      {(employees?.length ?? 0) > 0 && (
+        <Card>
+          <CardContent className="pt-3 pb-2">
+            <PlantillaCalculator employeeCount={employees!.length} compact />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Período anterior */}
+      {previousPeriod && previousPeriod.length > 0 && (
+        <Card>
+          <CardContent className="pt-3 pb-2 space-y-2">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+              <Info className="h-3.5 w-3.5" />
+              Período anterior
+            </h4>
+            <div className="text-[10px] grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-3 gap-y-0.5">
+              <span className="font-medium text-muted-foreground">Empleado</span>
+              <span className="font-medium text-muted-foreground text-center">Último</span>
+              <span className="font-medium text-muted-foreground text-center">M</span>
+              <span className="font-medium text-muted-foreground text-center">T</span>
+              <span className="font-medium text-muted-foreground text-center">N</span>
+              {previousPeriod.map((p) => (
+                <Fragment key={p.employeeId}>
+                  <span className="truncate">{p.employeeName}</span>
+                  <span className="text-center font-mono font-medium">{p.lastShift}</span>
+                  <span className="text-center">{p.morningCount}</span>
+                  <span className="text-center">{p.afternoonCount}</span>
+                  <span className="text-center">{p.nightCount}</span>
+                </Fragment>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="pt-4 space-y-3">

@@ -76,6 +76,8 @@ import { CleanShiftsDialog } from "./CleanShiftsDialog";
 import { useWeekAudit } from "@/hooks/useShiftAudit";
 import { ShiftForAudit } from "@/utils/shiftAudit";
 import { AuditCellHighlight, EmployeeViolationBadge } from "@/components/audit";
+import { SuggestedFix, AuditViolation } from "@/types/audit";
+import { OnboardingTour, useOnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { AuditViolationTooltip } from "@/components/audit/AuditViolationTooltip";
 import { useSmartGenerate } from "@/hooks/useSmartGenerate";
 import { useSmartGenerateV2 } from "@/hooks/useSmartGenerateV2";
@@ -84,7 +86,7 @@ import { SmartSuggestionsPanel } from "./calendar/SmartSuggestionsPanel";
 import { GenerateScheduleSheet, GenerateConfig } from "@/components/calendar/GenerateScheduleSheet";
 import { AlternativesResultSheet } from "@/components/calendar/AlternativesResultSheet";
 import { GenerateScheduleWizard } from "@/components/calendar/GenerateScheduleWizard";
-import type { WizardConfig } from "@/components/calendar/GenerateScheduleWizard";
+import type { WizardConfig, PreviousPeriodSummary } from "@/components/calendar/GenerateScheduleWizard";
 import {
   ShiftBlock,
   absenceTypes,
@@ -1936,6 +1938,66 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     toast({ title: "Kit restaurado", description: msg });
   };
 
+  const handleApplyAuditFix = (fix: SuggestedFix, violation: AuditViolation) => {
+    if (fix.action === 'CHANGE_SHIFT' || fix.action === 'ADD_REST_DAY') {
+      const fixDate = new Date(fix.date + 'T00:00:00');
+      const isRestDay = fix.action === 'ADD_REST_DAY';
+
+      // Buscar shift existente del empleado en esa fecha
+      const existingShift = shiftBlocks.find(
+        (s) => s.employeeId === fix.employeeId && format(s.date, 'yyyy-MM-dd') === fix.date
+      );
+
+      const newShift: ShiftBlock = {
+        id: existingShift?.id || `fix-${Date.now()}`,
+        employeeId: fix.employeeId,
+        employeeName: violation.employeeName || fix.employeeId,
+        date: fixDate,
+        shiftName: fix.toShift || 'Descanso',
+        startTime: fix.toShiftStartTime || null,
+        endTime: fix.toShiftEndTime || null,
+        color: fix.toShiftColor || (isRestDay ? '#94a3b8' : '#3b82f6'),
+        isAbsence: isRestDay,
+        absenceCode: isRestDay ? 'D' : undefined,
+        locked: false,
+      };
+
+      setShiftBlocksWithHistory((prev) => {
+        if (existingShift) {
+          return prev.map((s) => (s.id === existingShift.id ? newShift : s));
+        }
+        return [...prev, newShift];
+      });
+
+      // Persistir en DB
+      const orgId = org?.id;
+      if (orgId && existingShift?.id && !existingShift.id.startsWith('fix-')) {
+        supabase
+          .from('calendar_shifts')
+          .update({
+            shift_name: newShift.shiftName,
+            start_time: newShift.startTime,
+            end_time: newShift.endTime,
+            color: newShift.color,
+            is_absence: newShift.isAbsence || false,
+            absence_code: newShift.absenceCode || null,
+          } as any)
+          .eq('id', existingShift.id)
+          .then(({ error }) => {
+            if (error) console.error('Error aplicando fix:', error);
+          });
+      }
+
+      toast({
+        title: '🔧 Fix aplicado',
+        description: fix.label,
+      });
+
+      // Re-ejecutar auditoría tras aplicar fix
+      setTimeout(() => runAudit(), 500);
+    }
+  };
+
   const handleCellClick = (employee: Employee, date: Date, event?: React.MouseEvent) => {
     // 🔒 BLOQUEO: Si es EMPLOYEE, no permitir crear turnos
     if (isEmployee) {
@@ -2833,6 +2895,9 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   // Esto garantiza que si cambias de Week a Month a Day, el orden sea IDÉNTICO
   const { sortedEmployees, sortBy, setSortBy } = useEmployeeSortOrder(activeEmployees, org?.id);
 
+  // Tour de onboarding (solo primera vez)
+  const { shouldShow: showTour, completeTour } = useOnboardingTour(org?.id);
+
   // SMART Schedule Generator (v1 — legacy)
   const [showGenerateSheet, setShowGenerateSheet] = useState(false);
   const { generate: runSmartGenerate, isGenerating } = useSmartGenerate({
@@ -2954,6 +3019,36 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     // Persistencia automática: setShiftBlocks updater ya llama persistShiftsBatch
   };
 
+  // C9: Calcular resumen del período anterior para Wizard Step 5
+  const previousPeriodSummary: PreviousPeriodSummary[] = useMemo(() => {
+    if (shiftBlocks.length === 0 || employees.length === 0) return [];
+    const summaryMap = new Map<string, PreviousPeriodSummary>();
+    for (const emp of employees) {
+      summaryMap.set(emp.id, {
+        employeeId: emp.id,
+        employeeName: emp.name,
+        lastShift: '-',
+        morningCount: 0,
+        afternoonCount: 0,
+        nightCount: 0,
+      });
+    }
+    // Sort shifts by date to find last shift per employee
+    const sorted = [...shiftBlocks]
+      .filter(s => !s.isAbsence)
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+    for (const shift of sorted) {
+      const s = summaryMap.get(shift.employeeId);
+      if (!s) continue;
+      s.lastShift = shift.shiftName || '-';
+      const code = (shift.shiftName || '').charAt(0).toUpperCase();
+      if (code === 'M' || shift.shiftName === 'Mañana') s.morningCount++;
+      else if (code === 'T' || shift.shiftName === 'Tarde') s.afternoonCount++;
+      else if (code === 'N' || shift.shiftName === 'Noche') s.nightCount++;
+    }
+    return Array.from(summaryMap.values()).filter(s => s.lastShift !== '-');
+  }, [shiftBlocks, employees]);
+
   // Transformar shiftBlocks a formato de auditoría
   const shiftsForAudit: ShiftForAudit[] = useMemo(() => {
     return shiftBlocks.map(shift => {
@@ -3029,12 +3124,14 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           auditResult={auditResult}
           isAuditing={isAuditing}
           onRefreshAudit={runAudit}
+          onApplyAuditFix={handleApplyAuditFix}
           onClean={() => setShowCleanDialog(true)}
           employeeCount={sortedEmployees.length}
           dayCount={7}
         />
 
       {/* Área de Favoritos */}
+      <div data-tour="favorites-area">
       <FavoritesArea
         isVisible={showFavorites}
         favoriteShifts={favoriteShifts}
@@ -3097,6 +3194,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         onRemoveFavorite={removeFromFavorites}
         onRestoreKit={handleRestoreKit}
       />
+      </div>
 
       {/* Main Calendar Table */}
       {(() => {
@@ -3129,7 +3227,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
               </div>
             )}
             <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-              <table className="w-full min-w-[580px] md:min-w-[700px] lg:min-w-full">
+              <table data-tour="calendar-table" className="w-full min-w-[580px] md:min-w-[700px] lg:min-w-full">
             {/* Header Row - Sticky */}
             <thead className="sticky top-0 z-10 bg-background">
               <tr className="border-b bg-muted/30">
@@ -3903,6 +4001,9 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       />
 
       {/* SMART v2 Wizard (9 pasos) */}
+      {/* Tour de onboarding */}
+      <OnboardingTour isActive={showTour} onComplete={completeTour} />
+
       <GenerateScheduleWizard
         open={showWizard}
         onOpenChange={setShowWizard}
@@ -3912,8 +4013,11 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         hasOccupancyData={occupancyRecords.length > 0}
         petitions={petitions}
         occupancyData={occupancyForWizard}
+        employees={sortedEmployees}
+        previousPeriod={previousPeriodSummary}
         onOpenPetitions={() => setShowPetitions(true)}
         onOpenOccupancy={() => setShowOccupancyImport(true)}
+        onOpenCriteria={() => setShowCriteriaConfig(true)}
         onGenerate={handleWizardGenerate}
         generation={smartGeneration}
         isGenerating={isGeneratingV2}

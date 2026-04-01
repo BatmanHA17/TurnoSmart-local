@@ -63,8 +63,9 @@ export function anchorFixed(ctx: PipelineContext): PipelineContext {
         if (guardiaDays.has(d)) {
           // FOM tiene guardia este día → siempre G (tanto sábado como domingo)
           grid[fom.id][d] = makeAssignment("G", "engine");
-          // NO locked: Phase 04 necesita saber que FOM trabaja este fds
-          // y asignará 2 libres entre semana
+          // C7: Acumular DG en lugar de auto-asignar libre entre semana
+          // El FOM colocará los DG manualmente cuando quiera
+          ctx.dgAccumulated[fom.id] = (ctx.dgAccumulated[fom.id] ?? 0) + 1;
         } else {
           // FOM libra este S/D — D locked
           grid[fom.id][d] = makeAssignment("D", "engine");

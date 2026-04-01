@@ -1,11 +1,12 @@
 // Panel resumen de auditoría
 import { useState } from 'react';
-import { 
-  AuditResult, 
-  AuditViolation, 
+import {
+  AuditResult,
+  AuditViolation,
+  SuggestedFix,
   VIOLATION_TYPE_LABELS,
   ViolationType,
-  ViolationSeverity 
+  ViolationSeverity
 } from '@/types/audit';
 import { ViolationIcon } from './AuditViolationBadge';
 import { DetailedViolationTooltip } from './AuditViolationTooltip';
@@ -24,14 +25,15 @@ import {
   CollapsibleContent,
   CollapsibleTrigger 
 } from '@/components/ui/collapsible';
-import { 
-  AlertTriangle, 
-  CheckCircle, 
-  ChevronDown, 
+import {
+  AlertTriangle,
+  CheckCircle,
+  ChevronDown,
   ChevronRight,
   RefreshCw,
   Filter,
-  X
+  X,
+  Wrench
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -42,13 +44,15 @@ interface AuditPanelProps {
   isAuditing: boolean;
   onRefresh: () => void;
   onViolationClick?: (violation: AuditViolation) => void;
+  onApplyFix?: (fix: SuggestedFix, violation: AuditViolation) => void;
 }
 
-export function AuditPanel({ 
-  auditResult, 
-  isAuditing, 
+export function AuditPanel({
+  auditResult,
+  isAuditing,
   onRefresh,
-  onViolationClick 
+  onViolationClick,
+  onApplyFix,
 }: AuditPanelProps) {
   const [filterType, setFilterType] = useState<ViolationType | 'all'>('all');
   const [filterSeverity, setFilterSeverity] = useState<ViolationSeverity | 'all'>('all');
@@ -225,10 +229,11 @@ export function AuditPanel({
                   <CollapsibleContent>
                     <div className="ml-5 pl-2 border-l border-border/50 space-y-1 py-1">
                       {data.violations.map((violation) => (
-                        <ViolationListItem 
-                          key={violation.id} 
+                        <ViolationListItem
+                          key={violation.id}
                           violation={violation}
                           onClick={() => onViolationClick?.(violation)}
+                          onApplyFix={onApplyFix ? (fix) => onApplyFix(fix, violation) : undefined}
                         />
                       ))}
                     </div>
@@ -247,33 +252,48 @@ export function AuditPanel({
 interface ViolationListItemProps {
   violation: AuditViolation;
   onClick?: () => void;
+  onApplyFix?: (fix: SuggestedFix) => void;
 }
 
-function ViolationListItem({ violation, onClick }: ViolationListItemProps) {
+function ViolationListItem({ violation, onClick, onApplyFix }: ViolationListItemProps) {
   return (
     <DetailedViolationTooltip violation={violation}>
-      <button
-        onClick={onClick}
+      <div
         className={cn(
           "w-full text-left px-2 py-1.5 rounded text-xs transition-colors",
-          "hover:bg-muted/50 flex items-start gap-2",
+          "hover:bg-muted/50",
           violation.severity === 'error' && "bg-destructive/5",
           violation.severity === 'warning' && "bg-amber-500/5"
         )}
       >
-        <ViolationIcon 
-          type={violation.type} 
-          severity={violation.severity} 
-          size={12}
-          className="mt-0.5 flex-shrink-0" 
-        />
-        <div className="flex-1 min-w-0">
-          <p className="font-medium truncate">{violation.message}</p>
-          <p className="text-[10px] text-muted-foreground">
-            {format(new Date(violation.date), "d MMM", { locale: es })}
-          </p>
-        </div>
-      </button>
+        <button onClick={onClick} className="flex items-start gap-2 w-full text-left">
+          <ViolationIcon
+            type={violation.type}
+            severity={violation.severity}
+            size={12}
+            className="mt-0.5 flex-shrink-0"
+          />
+          <div className="flex-1 min-w-0">
+            <p className="font-medium truncate">{violation.message}</p>
+            <p className="text-[10px] text-muted-foreground">
+              {format(new Date(violation.date), "d MMM", { locale: es })}
+            </p>
+          </div>
+        </button>
+        {violation.suggestedFix && onApplyFix && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onApplyFix(violation.suggestedFix!);
+            }}
+            className="mt-1 ml-5 flex items-center gap-1 text-[10px] font-medium text-primary hover:text-primary/80 transition-colors bg-primary/5 hover:bg-primary/10 rounded px-2 py-1"
+            title={violation.suggestedFix.label}
+          >
+            <Wrench className="h-3 w-3" />
+            <span className="truncate">{violation.suggestedFix.label}</span>
+          </button>
+        )}
+      </div>
     </DetailedViolationTooltip>
   );
 }
@@ -284,6 +304,7 @@ interface AuditPanelTriggerProps {
   isAuditing: boolean;
   onRefresh: () => void;
   onViolationClick?: (violation: AuditViolation) => void;
+  onApplyFix?: (fix: SuggestedFix, violation: AuditViolation) => void;
 }
 
 export function AuditPanelSheet(props: AuditPanelTriggerProps) {
