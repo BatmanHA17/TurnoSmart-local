@@ -1887,14 +1887,15 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     const orgId = org?.id;
     if (!orgId) return;
 
+    // C10: Paleta progresiva CLARO→OSCURO
     const KIT_SHIFTS = [
-      { name: "Mañana",      start_time: "07:00", end_time: "15:00", color: "#3b82f6", has_break: true,  total_break_time: 30 },
-      { name: "Tarde",       start_time: "15:00", end_time: "23:00", color: "#f59e0b", has_break: true,  total_break_time: 30 },
-      { name: "Noche",       start_time: "23:00", end_time: "07:00", color: "#8b5cf6", has_break: true,  total_break_time: 30 },
-      { name: "Transición",  start_time: "11:00", end_time: "19:00", color: "#06b6d4", has_break: true,  total_break_time: 30 },
-      { name: "GEX Mañana",  start_time: "09:00", end_time: "17:00", color: "#0ea5e9", has_break: true,  total_break_time: 30 },
-      { name: "GEX Tarde",   start_time: "12:00", end_time: "20:00", color: "#14b8a6", has_break: true,  total_break_time: 30 },
-      { name: "Guardia",     start_time: "09:00", end_time: "21:00", color: "#ef4444", has_break: false, total_break_time: 0  },
+      { name: "Mañana",      start_time: "07:00", end_time: "15:00", color: "#fbbf24", has_break: true,  total_break_time: 30 },
+      { name: "Tarde",       start_time: "15:00", end_time: "23:00", color: "#f97316", has_break: true,  total_break_time: 30 },
+      { name: "Noche",       start_time: "23:00", end_time: "07:00", color: "#6366f1", has_break: true,  total_break_time: 30 },
+      { name: "Transición",  start_time: "11:00", end_time: "19:00", color: "#fb923c", has_break: true,  total_break_time: 30 },
+      { name: "GEX Mañana",  start_time: "09:00", end_time: "17:00", color: "#fcd34d", has_break: true,  total_break_time: 30 },
+      { name: "GEX Tarde",   start_time: "12:00", end_time: "20:00", color: "#fdba74", has_break: true,  total_break_time: 30 },
+      { name: "Guardia",     start_time: "09:00", end_time: "21:00", color: "#f87171", has_break: false, total_break_time: 0  },
     ];
 
     const { data: existing, error: fetchError } = await supabase

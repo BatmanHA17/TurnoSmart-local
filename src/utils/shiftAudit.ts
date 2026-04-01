@@ -82,7 +82,7 @@ export function checkMinimumRestBetweenShifts(
             toShift: 'Transición',
             toShiftStartTime: '11:00',
             toShiftEndTime: '19:00',
-            toShiftColor: '#06b6d4',
+            toShiftColor: '#fb923c',
           };
         } else {
           // Otro caso de descanso insuficiente: proponer retrasar entrada
@@ -317,7 +317,7 @@ export function checkMinimumCoverage(
       // Determinar turno sugerido según franja
       const policyHour = parseInt(policy.startTime.split(':')[0]);
       const suggestedShiftName = policyHour < 12 ? 'Mañana' : policyHour < 20 ? 'Tarde' : 'Noche';
-      const suggestedColor = policyHour < 12 ? '#3b82f6' : policyHour < 20 ? '#f59e0b' : '#8b5cf6';
+      const suggestedColor = policyHour < 12 ? '#fbbf24' : policyHour < 20 ? '#f97316' : '#6366f1';
 
       violations.push({
         id: generateViolationId(),

@@ -230,13 +230,13 @@ END;
 -- ----------------------------------------------------------------
 INSERT INTO saved_shifts (name, start_time, end_time, color, access_type, break_type, break_duration, has_break, total_break_time, org_id, is_additional_time)
 VALUES
-  ('Mañana',     '07:00', '15:00', '#3b82f6', 'company', 'meal', '30', true,  30, v_org_id, false),
-  ('Tarde',      '15:00', '23:00', '#f59e0b', 'company', 'meal', '30', true,  30, v_org_id, false),
-  ('Noche',      '23:00', '07:00', '#8b5cf6', 'company', 'meal', '30', true,  30, v_org_id, false),
-  ('Transición', '11:00', '19:00', '#06b6d4', 'company', 'meal', '30', true,  30, v_org_id, false),
-  ('GEX Mañana', '09:00', '17:00', '#0ea5e9', 'company', 'meal', '30', true,  30, v_org_id, false),
-  ('GEX Tarde',  '12:00', '20:00', '#14b8a6', 'company', 'meal', '30', true,  30, v_org_id, false),
-  ('Guardia',    '09:00', '21:00', '#ef4444', 'company', null,   '0',  false, 0,  v_org_id, false)
+  ('Mañana',     '07:00', '15:00', '#fbbf24', 'company', 'meal', '30', true,  30, v_org_id, false),
+  ('Tarde',      '15:00', '23:00', '#f97316', 'company', 'meal', '30', true,  30, v_org_id, false),
+  ('Noche',      '23:00', '07:00', '#6366f1', 'company', 'meal', '30', true,  30, v_org_id, false),
+  ('Transición', '11:00', '19:00', '#fb923c', 'company', 'meal', '30', true,  30, v_org_id, false),
+  ('GEX Mañana', '09:00', '17:00', '#fcd34d', 'company', 'meal', '30', true,  30, v_org_id, false),
+  ('GEX Tarde',  '12:00', '20:00', '#fdba74', 'company', 'meal', '30', true,  30, v_org_id, false),
+  ('Guardia',    '09:00', '21:00', '#f87171', 'company', null,   '0',  false, 0,  v_org_id, false)
 ON CONFLICT DO NOTHING;
 
 RAISE NOTICE '✅ Seed completado: 7 empleados + RBAC + 7 horarios por defecto, equity feb-2026, 3 peticiones, 31 días ocupación';

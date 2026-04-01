@@ -33,7 +33,8 @@ export type SuggestionType =
   | "viz_preference"        // SM-07: recordar capas activas
   | "absence_save"          // SM-08: código ausencia repetido → guardar
   | "vacation_alert"        // SM-09: 80% vacaciones consumidas
-  | "transition_proposal";  // SM-10: proponer 11×19
+  | "transition_proposal"   // SM-10: proponer 11×19
+  | "vacation_suggestion";  // SM-11: sugerir vacaciones en baja operativa
 
 export interface SmartSuggestion {
   id: string;
@@ -196,6 +197,63 @@ export function detectTransitionNeeds(
           dismissed: false,
         });
       }
+    }
+  }
+
+  return suggestions;
+}
+
+/**
+ * SM-11: Sugerir vacaciones en períodos de baja operativa.
+ *
+ * Si estamos en Q4 (Oct-Dic) y el empleado tiene >50% de vacaciones pendientes
+ * Y hay semanas con ocupación <50% promedio → sugerir.
+ */
+export function detectVacationOpportunities(
+  employees: Array<{ id: string; name: string; vacationDaysUsed?: number; vacationDaysTotal?: number }>,
+  occupancy: Array<{ day: number; totalMovements: number }>,
+  currentMonth: number, // 1-12
+): SmartSuggestion[] {
+  const suggestions: SmartSuggestion[] = [];
+  if (currentMonth < 10) return suggestions; // Solo Q4
+
+  const VACATION_TOTAL = 48; // Hostelería España
+  const avgOccupancy = occupancy.length > 0
+    ? occupancy.reduce((sum, o) => sum + o.totalMovements, 0) / occupancy.length
+    : Infinity;
+
+  // Encontrar semanas de baja operativa (< 50% del promedio)
+  const lowOccWeeks: number[] = [];
+  for (let w = 0; w < 4; w++) {
+    const weekDays = occupancy.filter((o) => o.day >= w * 7 + 1 && o.day <= (w + 1) * 7);
+    if (weekDays.length === 0) continue;
+    const weekAvg = weekDays.reduce((s, o) => s + o.totalMovements, 0) / weekDays.length;
+    if (weekAvg < avgOccupancy * 0.5) lowOccWeeks.push(w + 1);
+  }
+
+  if (lowOccWeeks.length === 0) return suggestions;
+
+  for (const emp of employees) {
+    const used = emp.vacationDaysUsed ?? 0;
+    const total = emp.vacationDaysTotal ?? VACATION_TOTAL;
+    const remaining = total - used;
+    const ratio = used / total;
+
+    if (ratio < 0.5 && remaining > 5) {
+      suggestions.push({
+        id: `sm11-${emp.id}-${currentMonth}`,
+        type: "vacation_suggestion",
+        title: `${emp.name} tiene ${remaining} días de vacaciones pendientes`,
+        description: `La semana ${lowOccWeeks.join(", ")} tiene baja ocupación. Ideal para planificar ${Math.min(remaining, 10)} días de vacaciones.`,
+        actionLabel: "Crear petición vacaciones",
+        data: {
+          employeeId: emp.id,
+          remainingDays: remaining,
+          suggestedWeeks: lowOccWeeks,
+        },
+        createdAt: new Date().toISOString(),
+        dismissed: false,
+      });
     }
   }
 

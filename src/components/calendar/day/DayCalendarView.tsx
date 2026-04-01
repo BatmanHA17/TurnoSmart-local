@@ -57,6 +57,31 @@ export function DayCalendarView({
     unpublishCalendar
   } = useCalendarPublishState(selectedDate);
 
+  // C13: Auto-scroll al primer turno del día
+  const firstShiftHour = useMemo(() => {
+    if (!shifts || shifts.length === 0) return 7; // default 07:00
+    let minHour = 24;
+    for (const s of shifts) {
+      const st = (s as any).start_time || (s as any).startTime;
+      if (st && typeof st === 'string') {
+        const h = parseInt(st.split(':')[0], 10);
+        if (!isNaN(h) && h < minHour) minHour = h;
+      }
+    }
+    return Math.max(0, minHour - 1); // 1 hora antes del primer turno
+  }, [shifts]);
+
+  useEffect(() => {
+    if (shifts && shifts.length > 0) {
+      // Scroll horizontal al primer turno
+      const gridContainer = document.querySelector('.flex-1.overflow-x-auto');
+      if (gridContainer) {
+        const hourWidth = gridContainer.scrollWidth / 24;
+        gridContainer.scrollLeft = firstShiftHour * hourWidth;
+      }
+    }
+  }, [shifts, firstShiftHour]);
+
   // Sync scroll between employee list and grid
   useEffect(() => {
     const employeeScroll = document.getElementById('employee-scroll');

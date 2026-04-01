@@ -77,6 +77,32 @@ export function OccupancyImportDialog({
     );
   };
 
+  // B4-1: Parsing mejorado — soporta día (1-31), fecha ISO (2026-04-05), fecha EU (05/04/2026)
+  const parseDayFromColumn = (value: string): number | null => {
+    const trimmed = value.trim().replace(/^["']|["']$/g, '');
+
+    // Intento 1: número directo (día del mes)
+    const asNum = parseInt(trimmed, 10);
+    if (!isNaN(asNum) && asNum >= 1 && asNum <= 31 && trimmed.length <= 2) return asNum;
+
+    // Intento 2: fecha ISO (2026-04-05 o 2026/04/05)
+    const isoMatch = trimmed.match(/^\d{4}[-/]\d{2}[-/](\d{2})/);
+    if (isoMatch) return parseInt(isoMatch[1], 10);
+
+    // Intento 3: fecha EU (05/04/2026 o 05-04-2026)
+    const euMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/]\d{2,4}/);
+    if (euMatch) return parseInt(euMatch[1], 10);
+
+    // Intento 4: nombre del día eliminado, extraer número
+    const dayNum = trimmed.replace(/[^\d]/g, '');
+    if (dayNum.length >= 1 && dayNum.length <= 2) {
+      const n = parseInt(dayNum, 10);
+      if (n >= 1 && n <= 31) return n;
+    }
+
+    return null;
+  };
+
   const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -89,23 +115,27 @@ export function OccupancyImportDialog({
       const entries: OccupancyEntry[] = [];
 
       // Skip header if present
-      const startIdx = lines[0]?.match(/day|día|fecha|date/i) ? 1 : 0;
+      const startIdx = lines[0]?.match(/day|día|fecha|date|check|llegada|salida/i) ? 1 : 0;
 
       for (let i = startIdx; i < lines.length; i++) {
         const cols = lines[i].split(/[,;\t]/).map((c) => c.trim());
         if (cols.length < 3) continue;
 
-        const day = parseInt(cols[0], 10);
+        const day = parseDayFromColumn(cols[0]);
         const checkIns = parseInt(cols[1], 10);
         const checkOuts = parseInt(cols[2], 10);
 
-        if (!isNaN(day) && day >= 1 && day <= totalDays && !isNaN(checkIns) && !isNaN(checkOuts)) {
+        if (day !== null && day >= 1 && day <= totalDays && !isNaN(checkIns) && !isNaN(checkOuts)) {
           entries.push({ day, checkIns, checkOuts });
         }
       }
 
       if (entries.length === 0) {
-        toast({ title: "Error", description: "No se pudieron parsear datos del CSV", variant: "destructive" });
+        toast({
+          title: "Error de formato",
+          description: "No se pudieron parsear datos. Formato esperado: día/fecha, check-ins, check-outs (CSV, TSV o punto y coma).",
+          variant: "destructive",
+        });
         return;
       }
       setCsvPreview(entries);

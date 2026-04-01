@@ -69,23 +69,24 @@ interface GenerateV2Result {
 // SHIFT COLORS (for ShiftBlock mapping)
 // ---------------------------------------------------------------------------
 
+// C10: Paleta progresiva CLARO→OSCURO (amanecer → atardecer → noche)
 const SHIFT_COLORS: Record<string, string> = {
-  M:      "#3b82f6",
-  T:      "#f59e0b",
-  N:      "#8b5cf6",
-  D:      "#6b7280",
-  V:      "#10b981",
-  G:      "#ef4444",
-  GT:     "#f97316",
-  E:      "#94a3b8",
-  F:      "#ec4899",
-  DB:     "#14b8a6",
-  DG:     "#14b8a6",
-  PM:     "#a78bfa",
-  PC:     "#a78bfa",
-  "11x19": "#06b6d4",
-  "9x17":  "#0ea5e9",
-  "12x20": "#0ea5e9",
+  M:      "#fbbf24",  // amber-400 (sunrise)
+  T:      "#f97316",  // orange-500 (sunset)
+  N:      "#6366f1",  // indigo-500 (night)
+  D:      "#6b7280",  // gray-500
+  V:      "#10b981",  // green-500
+  G:      "#f87171",  // red-400 (alert)
+  GT:     "#f87171",  // red-400
+  E:      "#94a3b8",  // slate-400
+  F:      "#ec4899",  // pink-500
+  DB:     "#14b8a6",  // teal-500
+  DG:     "#14b8a6",  // teal-500
+  PM:     "#a78bfa",  // violet-400
+  PC:     "#a78bfa",  // violet-400
+  "11x19": "#fb923c", // orange-400 (transition)
+  "9x17":  "#fcd34d", // amber-300 (GEX morning)
+  "12x20": "#fdba74", // orange-300 (GEX afternoon)
 };
 
 const SHIFT_TYPE_MAP: Record<string, ShiftBlock["type"]> = {
