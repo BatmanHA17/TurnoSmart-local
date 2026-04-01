@@ -15,32 +15,46 @@ interface Employee {
   [key: string]: any;
 }
 
-const SORT_KEY = 'calendar-employee-sort-criteria';
-const MANUAL_ORDER_KEY = 'manual-employee-order';
 const DEFAULT_SORT = 'name-asc';
 
-export function useEmployeeSortOrder(employees: Employee[]) {
+export function getSortKey(orgId?: string) {
+  return orgId ? `employeeOrder_${orgId}_sort` : 'calendar-employee-sort-criteria';
+}
+
+export function getManualOrderKey(orgId?: string) {
+  return orgId ? `employeeOrder_${orgId}_manual` : 'manual-employee-order';
+}
+
+export function useEmployeeSortOrder(employees: Employee[], orgId?: string) {
+  const sortKey = getSortKey(orgId);
+  const manualOrderKey = getManualOrderKey(orgId);
+
   // Estado global del sortBy - se sincroniza con localStorage
   const [sortBy, setSortByState] = useState<string>(() => {
-    return localStorage.getItem(SORT_KEY) || DEFAULT_SORT;
+    return localStorage.getItem(sortKey) || DEFAULT_SORT;
   });
+
+  // Cuando cambia el orgId (cambio de org) recargar desde localStorage
+  useEffect(() => {
+    setSortByState(localStorage.getItem(sortKey) || DEFAULT_SORT);
+  }, [sortKey]);
 
   // Persiste el cambio de sortBy a localStorage
   const setSortBy = useCallback((newSortBy: string) => {
     setSortByState(newSortBy);
-    localStorage.setItem(SORT_KEY, newSortBy);
-  }, []);
+    localStorage.setItem(sortKey, newSortBy);
+  }, [sortKey]);
 
   // Resetear al orden por defecto (nombre ascendente)
   const resetSort = useCallback(() => {
     setSortBy(DEFAULT_SORT);
-    localStorage.removeItem(MANUAL_ORDER_KEY);
-  }, [setSortBy]);
+    localStorage.removeItem(manualOrderKey);
+  }, [setSortBy, manualOrderKey]);
 
   // Función para aplicar el ordenamiento
   const sortEmployees = useCallback((emps: Employee[], sortType: string): Employee[] => {
     // Verificar si hay un orden manual guardado
-    const savedManualOrder = localStorage.getItem(MANUAL_ORDER_KEY);
+    const savedManualOrder = localStorage.getItem(manualOrderKey);
     if (savedManualOrder) {
       try {
         const manualOrder = JSON.parse(savedManualOrder);
@@ -63,12 +77,12 @@ export function useEmployeeSortOrder(employees: Employee[]) {
         });
       } catch (error) {
         console.error('Error parsing manual order:', error);
-        localStorage.removeItem(MANUAL_ORDER_KEY);
+        localStorage.removeItem(manualOrderKey);
       }
     }
 
     return [...emps].sort((a, b) => applySortLogic(a, b, sortType));
-  }, []);
+  }, [manualOrderKey]);
 
   // Empleados ya ordenados según el sortBy actual
   const sortedEmployees = useMemo(

@@ -20,7 +20,7 @@ export default function CalendarDay() {
   const { filteredEmployees } = useCalendarEmployeeFilter(employees, selectedOrgId);
 
   // 🆕 Hook para sincronizar ordenamiento consistente entre todas las vistas
-  const { sortedEmployees } = useEmployeeSortOrder(filteredEmployees);
+  const { sortedEmployees } = useEmployeeSortOrder(filteredEmployees, currentOrg?.org_id);
 
   useEffect(() => {
     document.title = "Calendario Día – TurnoSmart";

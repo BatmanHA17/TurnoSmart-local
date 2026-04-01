@@ -89,6 +89,9 @@ Equity feb-2026, 3 peticiones (tipos A/B), 31 días ocupación marzo-2026.
 - Migraciones: `supabase/migrations/` (24+ archivos, orden cronológico)
 - Ruta calendario: `/turnosmart/create-shift` (renderiza GoogleCalendarStyle)
 - Memoria proyecto: @~/.claude/projects/-Users-josegalvan-Library-Mobile-Documents-iCloud-md-obsidian-Documents/memory/project_turnosmart_smart_algorithm.md
+- Plan maestro: `docs/PLAN_MAESTRO_EVOLUCION_TURNOSMART.md` (Tier 1-3, validado PO 2026-03-31)
+- Guía usuario: `docs/GUIA_USUARIO_GENERACION_TURNOS.md` (v1.0, 20 secciones)
+- Guía con notas PO: `docs/GUIA_USUARIO_GENERACION_TURNOS_CON_MIS_NOTAS.md` (anotaciones José)
 - Excel criterios: `/Users/josegalvan/Desktop/TurnoSmart_Criterios_SMART.xlsx` (4 hojas, 92 criterios)
 
 ## RBAC (2026-03-31)
@@ -100,11 +103,58 @@ Equity feb-2026, 3 peticiones (tipos A/B), 31 días ocupación marzo-2026.
 - Rutas protegidas: Colaboradores, HR, Settings, Nóminas requieren `fom`
 - RLS endurecido: empleados solo ven/crean sus peticiones, FOM gestiona todo
 
-## Pendiente (próximas iteraciones)
-- **Continuidad cross-período** — Phase 02 carga equity + día virtual 0, falta cargar `lastWeek` de la generación anterior
-- **Dashboard Empleado** — Conectar con datos reales (horario, peticiones propias)
+## Plan Maestro de Evolución (Validado 2026-03-31)
+Documento completo: `docs/PLAN_MAESTRO_EVOLUCION_TURNOSMART.md`
+Guía usuario con notas PO: `docs/GUIA_USUARIO_GENERACION_TURNOS_CON_MIS_NOTAS.md`
+
+### Tier 1 — Quick Wins (8-10 días) 🚀 EN CURSO
+1. **T1-1** Cobertura mínima configurable por UI (M:2, T:2, N:1) → CriteriaConfigDialog + Phase 07
+2. **T1-2** Kit horarios precargados en onboarding (M/T/N/11x19/9x17/12x20/G con pausas 30min)
+3. **T1-3** Umbral noches consecutivas 3→4 en constants.ts
+4. **T1-4** Bloquear celdas con candado (clic derecho → lock → motor respeta)
+5. **T1-5** UX botón Generar contextualizado ("Generar Abril 2026") + date picker Step 1
+6. **T1-6** Unificar L→D en todo el codebase (eliminar duplicidad Libre/Descanso)
+7. **T1-7** Botón restaurar kit por defecto en favoritos + toast anti-duplicado
+8. **T1-8** Orden empleados persistente cross-vista (localStorage compartido)
+9. **T1-9** Emails invitación personalizados (branding TurnoSmart español)
+
+### Tier 2 — Medio Plazo (25-33 días) 🎯
+1. **T2-1** Copilot Auditoría (botón "Resolver" con sugerencia automática por alerta)
+2. **T2-2** Copilot Pre-Generación (checklist criterios en Wizard Step 5)
+3. **T2-3** Calculadora plantilla bruta/activa/presencial (widget + alertas RRHH)
+4. **T2-4** Peticiones desde vista empleado (/mi-espacio autoservicio)
+5. **T2-5** Templates de organización (onboarding inteligente por sector)
+6. **T2-6** Días debidos guardia → acumulación en dg_balance (no auto-asignar)
+7. **T2-7** Tour onboarding (5 tooltips react-joyride)
+8. **T2-8** Auto-refuerzo inteligente por ocupación (Phase 07 + daily_occupancy)
+9. **T2-9** Visualizar período anterior (panel resumen Wizard Step 5)
+10. **T2-10** Modo edición delegable FOM→AFOM (toggle + fechas)
+
+### Tier 3 — Post-Lanzamiento 🔮
+CSV/Excel parsing mejorado, Tablet Mode, Paleta colores pastel progresiva, Vista diaria optimizada,
+Landing bienvenida empleado, Sugerir vacaciones en baja ocupación, Analítica peticiones, SMART tags en notas, OCR foto PMS
+
+### Descartado ❌
+Copilot chat NLP completo, NLP en notas, Unificar roles/seniority, Eliminar exportación, Eliminar campos RRHH
+
+## Pendiente técnico (deuda anterior)
+- **Continuidad cross-período** — Phase 02 falta `lastWeek` (absorbido por T2-9)
+- **Dashboard Empleado** — Conectar con datos reales (absorbido por T2-4 peticiones empleado)
 - **Escalonar libres** — evitar que todos libren el mismo día
 - **Scores bajos** — fórmula scoring necesita ajuste fino
+- **Notificaciones publicación** — in-app por empleado al publicar (Step 8 plan anterior)
+- **Version History detallado** — pestaña Generaciones SMART (Step 9 plan anterior)
+
+## Bugs y QA Pendientes (detectados en revisión guía usuario 2026-03-31)
+- Favoritos desaparecen al navegar (verificar persistencia saved_shifts)
+- Clic en alerta auditoría no navega a celda (bug UI)
+- Cobertura insuficiente noche 23 marzo (verificar lógica vs bug)
+- Botón Guardar manual (verificar funcionalidad)
+- Botón Generar presente en TODAS las vistas del calendario
+- Peticiones "?" nombres de empleado (bug pendiente)
+- Audit "Exceso horas 152h/40h" (bug pendiente)
+- Notificaciones in-app al publicar cuadrante (Step 8 plan anterior, parcial)
+- Version History pestaña "Generaciones SMART" (Step 9 plan anterior, parcial)
 
 ## Gotchas
 - `apellidos` puede ser NULL → usar `${nombre}${apellidos ? ' ' + apellidos : ''}` no template literal directo

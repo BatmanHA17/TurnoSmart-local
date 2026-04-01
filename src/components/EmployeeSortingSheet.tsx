@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { getManualOrderKey } from "@/hooks/useEmployeeSortOrder";
 
 interface Employee {
   id: string;
@@ -32,6 +33,7 @@ interface EmployeeSortingSheetProps {
   employees: Employee[];
   onApplySort: (sortedEmployees: Employee[]) => void;
   currentSortCriteria: string;
+  orgId?: string;
 }
 
 interface SortOption {
@@ -85,8 +87,10 @@ export function EmployeeSortingSheet({
   onClose,
   employees,
   onApplySort,
-  currentSortCriteria
+  currentSortCriteria,
+  orgId,
 }: EmployeeSortingSheetProps) {
+  const manualOrderKey = getManualOrderKey(orgId);
   const [selectedSort, setSelectedSort] = useState<string>(currentSortCriteria);
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set(['Datos Personales']));
   const [manualOrderEmployees, setManualOrderEmployees] = useState<Employee[]>([]);
@@ -166,14 +170,14 @@ export function EmployeeSortingSheet({
       
       // Solo cargar orden guardado si el usuario no ha hecho cambios recientes
       // y explícitamente vuelve al modo manual
-      const savedManualOrder = localStorage.getItem('manual-employee-order');
+      const savedManualOrder = localStorage.getItem(manualOrderKey);
       if (savedManualOrder && currentSortCriteria === 'manual') {
         try {
           const parsedOrder = JSON.parse(savedManualOrder);
           // No aplicar automáticamente, solo mantener disponible
         } catch (error) {
           console.error('Error parsing saved manual order:', error);
-          localStorage.removeItem('manual-employee-order'); // Clean up corrupted data
+          localStorage.removeItem(manualOrderKey); // Clean up corrupted data
         }
       }
     }
@@ -184,7 +188,7 @@ export function EmployeeSortingSheet({
     if (!isManualMode && !isOpen) {
       setManualOrderEmployees([...employees]);
       // Clear saved manual order when switching to automatic
-      localStorage.removeItem('manual-employee-order');
+      localStorage.removeItem(manualOrderKey);
     }
   }, [employees, isManualMode, isOpen]);
 
@@ -203,7 +207,7 @@ export function EmployeeSortingSheet({
     setSelectedSort('manual');
     
     // Try to load saved manual order
-    const savedManualOrder = localStorage.getItem('manual-employee-order');
+    const savedManualOrder = localStorage.getItem(manualOrderKey);
     if (savedManualOrder) {
       try {
         const parsedOrder = JSON.parse(savedManualOrder);
@@ -270,7 +274,7 @@ export function EmployeeSortingSheet({
     setManualOrderEmployees(newOrder);
     
     // Save manual order to localStorage for persistence
-    localStorage.setItem('manual-employee-order', JSON.stringify(newOrder));
+    localStorage.setItem(manualOrderKey, JSON.stringify(newOrder));
 
     // Apply to calendar (filtered first, then in manual order)
     const filtered = applyFilters(newOrder, activeFilters);

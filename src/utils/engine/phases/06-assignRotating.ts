@@ -64,10 +64,13 @@ export function assignRotating(ctx: PipelineContext): PipelineContext {
   // PASS 0 — NIGHT AGENT REST COVERAGE
   // When Night Agent rests, FDAs cover N equitably. This runs FIRST so
   // the FDA assigned to N is excluded from M/T rotation that day.
-  // The FDA also needs rest (locked D) the day after (12h rule: N→M = 0h).
+  // N→N consecutive is VALID (16h rest: N ends 07:00, next N starts 23:00).
+  // Only lock post-N rest when next day is NOT another Night Agent rest day.
+  // This allows the same FDA to cover consecutive N shifts (e.g., Sat+Sun).
   // ===================================================================
   if (hasNightAgent) {
     const nightAgentRestDays = findNightAgentRestDays(grid, roleGroups, totalDays);
+    const nightRestSet = new Set(nightAgentRestDays);
     for (const restDay of nightAgentRestDays) {
       const candidate = pickBestNightCandidate(
         rotatingEmployees, grid, restDay, currentEquity, weeks, totalDays
@@ -75,13 +78,22 @@ export function assignRotating(ctx: PipelineContext): PipelineContext {
       if (candidate) {
         grid[candidate.id][restDay] = makeAssignment("N", "engine");
         updateEquity(currentEquity, candidate.id, "N");
-        // FDA needs rest after N (N ends 07:00, M starts 07:00 = 0h rest)
+        // Only lock next day if it's NOT another Night Agent rest day
+        // N→N is valid (16h rest), so the same FDA can cover consecutive nights
         const nextDay = restDay + 1;
-        if (nextDay <= totalDays) {
+        if (nextDay <= totalDays && !nightRestSet.has(nextDay)) {
           const nextCell = grid[candidate.id][nextDay];
           if (nextCell && !nextCell.locked) {
-            grid[candidate.id][nextDay] = makeAssignment("D", "engine");
-            grid[candidate.id][nextDay].locked = true;
+            // Don't add a 3rd rest day if the employee already has 2 locked rest
+            // days in the same week — the 12h rule will block any bad shift anyway
+            const candidateWeek = weeks.find((w) => w.includes(nextDay)) ?? [];
+            const lockedRests = candidateWeek.filter(
+              (d) => grid[candidate.id][d]?.locked && isRestOrAbsence(grid[candidate.id][d]?.code)
+            ).length;
+            if (lockedRests < 2) {
+              grid[candidate.id][nextDay] = makeAssignment("D", "engine");
+              grid[candidate.id][nextDay].locked = true;
+            }
           }
         }
       }
@@ -183,10 +195,10 @@ function resolveFinalShift(
   if (day > 1) {
     const prevCode = grid[candidate.id][day - 1]?.code;
     if (prevCode && isWorkingShift(prevCode) && violates12hRest(prevCode, shift)) {
-      if (shift === "M") {
-        return TRANSITION_SHIFT; // 11×19 en vez de M
+      if (shift === "M" && !violates12hRest(prevCode, TRANSITION_SHIFT)) {
+        return TRANSITION_SHIFT; // 11×19 en vez de M — solo si respeta 12h
       }
-      return null; // no se puede asignar
+      return null; // no se puede asignar (viola 12h incluso con transición)
     }
   }
   return shift;
@@ -219,8 +231,8 @@ function pickBestShiftForDay(
     if (day > 1) {
       const prevCode = grid[emp.id][day - 1]?.code;
       if (prevCode && isWorkingShift(prevCode) && violates12hRest(prevCode, shift)) {
-        if (shift === "M") {
-          // Evaluar 11×19 como alternativa
+        if (shift === "M" && !violates12hRest(prevCode, TRANSITION_SHIFT)) {
+          // Evaluar 11×19 como alternativa — solo si no viola 12h tampoco
           const transScore = scoreShift(
             emp, grid, day, TRANSITION_SHIFT as ShiftCode, equity, weights, ergonomic
           );

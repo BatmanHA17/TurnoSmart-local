@@ -91,6 +91,10 @@ interface UnifiedCalendarHeaderProps {
   // Generate SMART schedule
   onGenerate?: () => void;
   isGenerating?: boolean;
+  /** Fecha actual del calendario — para mostrar "Generar Abril 2026" */
+  currentDate?: Date;
+  /** true si el mes visible ya tiene turnos generados */
+  hasExistingShifts?: boolean;
 
   // SMART+IA suggestions
   onOpenSmartIA?: () => void;
@@ -146,6 +150,8 @@ export function UnifiedCalendarHeader({
   onRefreshAudit,
   onGenerate,
   isGenerating = false,
+  currentDate,
+  hasExistingShifts = false,
   onOpenSmartIA,
   smartPendingCount = 0,
   onDuplicateWeek,
@@ -153,6 +159,15 @@ export function UnifiedCalendarHeader({
   employeeCount,
   dayCount,
 }: UnifiedCalendarHeaderProps) {
+  const generateLabel = (() => {
+    if (isGenerating) return "Generando…";
+    if (currentDate) {
+      const monthLabel = format(currentDate, "MMMM yyyy", { locale: es });
+      const capitalizedMonth = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1);
+      return `Generar ${capitalizedMonth}`;
+    }
+    return "Generar";
+  })();
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   // Navigation handlers
@@ -228,10 +243,16 @@ export function UnifiedCalendarHeader({
               size="sm"
               onClick={onGenerate}
               disabled={isGenerating}
-              className="gap-1.5 h-8 text-violet-600 hover:text-violet-700 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950"
+              title={hasExistingShifts ? "Este período ya tiene turnos generados. Se sobreescribirán." : undefined}
+              className={cn(
+                "gap-1.5 h-8",
+                hasExistingShifts
+                  ? "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  : "text-violet-600 hover:text-violet-700 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950"
+              )}
             >
               <Wand2 className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{isGenerating ? "Generando…" : "Generar"}</span>
+              <span className="hidden sm:inline">{generateLabel}</span>
             </Button>
           )}
 

@@ -291,8 +291,8 @@ export interface EngineConstraints {
   fairWeekendDistribution: boolean;
   /** Usar datos de ocupación para refuerzos */
   occupancyBasedStaffing: boolean;
-  /** Cobertura mínima por turno (M, T, N) */
-  minCoveragePerShift: number;
+  /** Cobertura mínima por turno (M, T, N) — configurable por organización */
+  minCoveragePerShift: { M: number; T: number; N: number };
   /** Umbral de movimientos para proponer refuerzo (default 40) */
   reinforcementThreshold: number;
   /** FOM↔AFOM espejo activo */

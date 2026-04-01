@@ -27,7 +27,7 @@ import { UnifiedCalendarHeader } from "./calendar/UnifiedCalendarHeader";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRoleCanonical } from "@/hooks/useUserRoleCanonical";
 import { useCalendarEmployeeFilter } from "@/hooks/useCalendarEmployeeFilter";
-import { useEmployeeSortOrder } from "@/hooks/useEmployeeSortOrder";
+import { useEmployeeSortOrder, getManualOrderKey } from "@/hooks/useEmployeeSortOrder";
 
 import { cn } from "@/lib/utils";
 import { getSavedShifts } from "@/store/savedShiftsStore";
@@ -140,7 +140,7 @@ export function MonthlyCalendarView() {
   const { filteredEmployees } = useCalendarEmployeeFilter(employees, currentOrg?.org_id || null);
 
   // 🆕 Hook para sincronizar ordenamiento entre TODAS las vistas
-  const { sortedEmployees } = useEmployeeSortOrder(filteredEmployees);
+  const { sortedEmployees } = useEmployeeSortOrder(filteredEmployees, currentOrg?.org_id);
 
   const [shiftBlocks, setShiftBlocks] = useState<ShiftBlock[]>([]);
   const [loading, setLoading] = useState(true);
@@ -250,19 +250,19 @@ export function MonthlyCalendarView() {
           startDate: colaborador.fecha_inicio_contrato || undefined
         }));
         
-        // Recuperar orden manual si existe
-        const savedManualOrder = localStorage.getItem('manual-employee-order');
+        // Recuperar orden manual si existe (scoped por org)
+        const savedManualOrder = localStorage.getItem(getManualOrderKey(currentOrg?.org_id));
         let finalEmployees = mappedEmployees;
-        
+
         if (savedManualOrder) {
           try {
             const savedOrder = JSON.parse(savedManualOrder);
             const orderMap = new Map<string, number>(savedOrder.map((emp: any, index: number) => [emp.id, index]));
-            
+
             finalEmployees = [...mappedEmployees].sort((a, b) => {
               const posA = orderMap.get(a.id) ?? -1;
               const posB = orderMap.get(b.id) ?? -1;
-              
+
               if (posA >= 0 && posB >= 0) return posA - posB;
               if (posA >= 0) return -1;
               if (posB >= 0) return 1;
@@ -293,7 +293,7 @@ export function MonthlyCalendarView() {
   // 🔄 Escuchar cambios en el orden manual de empleados desde localStorage
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'manual-employee-order' && currentOrg?.org_id) {
+      if (e.key === getManualOrderKey(currentOrg?.org_id) && currentOrg?.org_id) {
         loadColaboradores();
       }
     };

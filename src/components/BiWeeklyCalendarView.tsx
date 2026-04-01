@@ -44,7 +44,7 @@ import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useBeforeUnload } from "@/hooks/useBeforeUnload";
 import { useCalendarEmployeeFilter } from "@/hooks/useCalendarEmployeeFilter";
-import { useEmployeeSortOrder } from "@/hooks/useEmployeeSortOrder";
+import { useEmployeeSortOrder, getManualOrderKey } from "@/hooks/useEmployeeSortOrder";
 
 import { VersionHistoryDialog } from "./calendar/VersionHistoryDialog";
 import { OperationBackupsDialog } from "./calendar/OperationBackupsDialog";
@@ -253,7 +253,7 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
   const { filteredEmployees } = useCalendarEmployeeFilter(employees, currentOrg?.org_id || null);
 
   // 🆕 Hook para sincronizar ordenamiento entre TODAS las vistas
-  const { sortedEmployees, sortBy, setSortBy, resetSort, sortEmployees } = useEmployeeSortOrder(filteredEmployees);
+  const { sortedEmployees, sortBy, setSortBy, resetSort, sortEmployees } = useEmployeeSortOrder(filteredEmployees, currentOrg?.org_id);
 
   // BI-WEEKLY: Navegación por bloques de 2 semanas
   const goToPreviousBiWeek = () => setCurrentWeek(subWeeks(currentWeek, 1));
@@ -445,30 +445,30 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
           startDate: colaborador.fecha_inicio_contrato || undefined
         }));
         
-        // Recuperar orden manual si existe
-        const savedManualOrder = localStorage.getItem('manual-employee-order');
+        // Recuperar orden manual si existe (scoped por org)
+        const manualOrderKey = getManualOrderKey(currentOrg?.org_id);
+        const savedManualOrder = localStorage.getItem(manualOrderKey);
         let finalEmployees = mappedEmployees;
-        
+
         if (savedManualOrder) {
           try {
             const savedOrder = JSON.parse(savedManualOrder);
             const orderMap = new Map<string, number>(savedOrder.map((emp: any, index: number) => [emp.id, index]));
-            
+
             finalEmployees = [...mappedEmployees].sort((a, b) => {
               const posA = orderMap.get(a.id) ?? -1;
               const posB = orderMap.get(b.id) ?? -1;
-              
+
               if (posA >= 0 && posB >= 0) return posA - posB;
               if (posA >= 0) return -1;
               if (posB >= 0) return 1;
               return a.name.localeCompare(b.name);
             });
-            
+
             setSortBy('manual');
-            localStorage.setItem('calendar-sort-criteria', 'manual');
           } catch (error) {
             console.error('Error parsing manual order:', error);
-            localStorage.removeItem('manual-employee-order');
+            localStorage.removeItem(manualOrderKey);
           }
         }
         
@@ -1830,8 +1830,8 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
               startDate: emp.fecha_inicio_contrato || undefined
             }));
             setEmployees(mapped);
-            // ✅ Save the manual order to global state (hook will sync across all views)
-            localStorage.setItem('manual-employee-order', JSON.stringify(mapped));
+            // ✅ Save the manual order to global state (scoped por org, hook sincroniza entre vistas)
+            localStorage.setItem(getManualOrderKey(currentOrg?.org_id), JSON.stringify(mapped));
             setSortBy('manual');
             setShowEmployeeSortingSheet(false);
           }}
@@ -1844,6 +1844,7 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
             tiempo_trabajo_semanal: c.tiempo_trabajo_semanal,
             fecha_inicio_contrato: c.fecha_inicio_contrato,
           }))}
+          orgId={currentOrg?.org_id}
         />
         
         {/* Clean Dialog */}

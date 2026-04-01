@@ -194,8 +194,11 @@ export const SHIFT_UNDESIRABILITY: Record<string, number> = {
 // DEFAULTS
 // ---------------------------------------------------------------------------
 
-/** Cobertura mínima por defecto (1 persona por turno M/T/N) */
+/** Cobertura mínima por defecto (fallback si no hay criterios en DB) */
 export const DEFAULT_MIN_COVERAGE = 1;
+
+/** Cobertura mínima por turno por defecto: M:2, T:2, N:1 */
+export const DEFAULT_MIN_COVERAGE_PER_SHIFT = { M: 2, T: 2, N: 1 } as const;
 
 /** Umbral de refuerzo por defecto (40 movimientos check-in + check-out) */
 export const DEFAULT_REINFORCEMENT_THRESHOLD = 40;
@@ -204,7 +207,7 @@ export const DEFAULT_REINFORCEMENT_THRESHOLD = 40;
 export const LONG_WEEKEND_PER_MONTH = 1;
 
 /** Noches consecutivas máximas para FDA antes de alerta (configurable, no aplica a Night Agent) */
-export const MAX_CONSECUTIVE_NIGHTS = 3;
+export const MAX_CONSECUTIVE_NIGHTS = 4;
 
 /** Versión del motor */
 export const ENGINE_VERSION = "2.0";

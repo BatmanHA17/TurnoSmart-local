@@ -15,7 +15,6 @@ import {
   buildGenerationPeriod,
   SPAIN_LABOR_LAW,
   ROLE_CONFIGS,
-  DEFAULT_MIN_COVERAGE,
   DEFAULT_REINFORCEMENT_THRESHOLD,
 } from "@/utils/engine";
 import type {
@@ -118,6 +117,8 @@ function mapRole(calEmp: CalendarEmployee): EmployeeRoleV2 {
   const nm = calEmp.name?.toUpperCase() ?? "";
   const combined = `${jt} ${nm}`;
 
+  // AFOM must be checked BEFORE FOM (because "AFOM" contains "FOM")
+  if (combined.includes("AFOM") || combined.includes("ASSISTANT FRONT OFFICE")) return "AFOM";
   if (combined.includes("FOM") || combined.includes("FRONT OFFICE MANAGER")) return "FOM";
   if (combined.includes("NIGHT") || combined.includes("NOCTURNO")) return "NIGHT_SHIFT_AGENT";
   if (combined.includes("GEX") || combined.includes("GUEST EXPERIENCE")) return "GEX";
@@ -254,11 +255,20 @@ export function useSmartGenerateV2({
 
         // --- Cargar criterios BOOST desde DB ---
         let optionalCriteria: OptionalCriteria[] = [];
+        let minCoverageM = 2;
+        let minCoverageT = 2;
+        let minCoverageN = 1;
         if (orgId) {
           const { data: dbCriteria } = await supabase
             .from("schedule_criteria")
             .select("*")
             .eq("organization_id", orgId);
+
+          // Extraer cobertura mínima por turno de los criterios (boost = nº personas)
+          const criteriaByKey = new Map((dbCriteria ?? []).map((c: any) => [c.criteria_key, c]));
+          minCoverageM = criteriaByKey.get("MIN_COVERAGE_M")?.boost ?? 2;
+          minCoverageT = criteriaByKey.get("MIN_COVERAGE_T")?.boost ?? 2;
+          minCoverageN = criteriaByKey.get("MIN_COVERAGE_N")?.boost ?? 1;
 
           optionalCriteria = (dbCriteria ?? [])
             .filter((c: any) => c.category === "optional" && c.enabled)
@@ -318,7 +328,7 @@ export function useSmartGenerateV2({
           ergonomicRotation: true,
           fairWeekendDistribution: true,
           occupancyBasedStaffing: occupancy.length > 0,
-          minCoveragePerShift: DEFAULT_MIN_COVERAGE,
+          minCoveragePerShift: { M: minCoverageM, T: minCoverageT, N: minCoverageN },
           reinforcementThreshold: DEFAULT_REINFORCEMENT_THRESHOLD,
           fomAfomMirror: true,
           optionalCriteria,
@@ -375,6 +385,49 @@ export function useSmartGenerateV2({
         totalDays,
         orgId
       );
+
+      // ---------------------------------------------------------------
+      // Limpiar turnos viejos del período en DB que no tendrán reemplazo.
+      // El engine no genera bloques para días de descanso (D), así que
+      // los shifts viejos de esos días quedarían en DB como fantasmas.
+      // Hacemos fire-and-forget ANTES de setear state + persist.
+      // ---------------------------------------------------------------
+      if (orgId) {
+        const periodEndDate = addDays(periodStartDate, totalDays - 1);
+        const startStr = format(periodStartDate, "yyyy-MM-dd");
+        const endStr = format(periodEndDate, "yyyy-MM-dd");
+        const empIds = calEmployees.map((e) => e.id);
+
+        // Calcular qué (employee_id, date) tienen bloque nuevo
+        const coveredKeys = new Set(
+          blocks.map((b) => `${b.employeeId}|${format(b.date, "yyyy-MM-dd")}`)
+        );
+
+        // Solo borrar los que NO tendrán reemplazo (días de descanso)
+        // Los que SÍ tienen bloque se actualizarán via upsert
+        supabase
+          .from("calendar_shifts")
+          .select("id, employee_id, date")
+          .eq("org_id", orgId)
+          .gte("date", startStr)
+          .lte("date", endStr)
+          .in("employee_id", empIds)
+          .then(({ data: existing }) => {
+            if (!existing) return;
+            const idsToDelete = existing
+              .filter((row) => !coveredKeys.has(`${row.employee_id}|${row.date}`))
+              .map((row) => row.id);
+            if (idsToDelete.length > 0) {
+              supabase
+                .from("calendar_shifts")
+                .delete()
+                .in("id", idsToDelete)
+                .then(({ error }) => {
+                  if (error) console.error("Error borrando turnos fantasma:", error);
+                });
+            }
+          });
+      }
 
       setScoreResult(alt.output.score);
       onResult(blocks);

@@ -23,7 +23,7 @@ export function ensureCoverage(ctx: PipelineContext): PipelineContext {
   const { grid, input, currentEquity } = ctx;
   const { period, constraints, employees, occupancy } = input;
   const totalDays = period.totalDays;
-  const minCoverage = constraints.minCoveragePerShift;
+  const minCoveragePerShift = constraints.minCoveragePerShift;
   const coverageGaps: PipelineContext["coverageGaps"] = [];
 
   // FOM no cuenta para cobertura mínima — su turno fijo es adicional
@@ -32,6 +32,7 @@ export function ensureCoverage(ctx: PipelineContext): PipelineContext {
   // ── PASADA 1: Cobertura mínima M/T/N ──────────────────────────────
   for (let day = 1; day <= totalDays; day++) {
     for (const shift of COVERAGE_SHIFTS) {
+      const minCoverage = minCoveragePerShift[shift as "M" | "T" | "N"] ?? 1;
       const count = countShiftOnDayExcluding(grid, day, shift, fomIds);
       if (count >= minCoverage) continue;
 

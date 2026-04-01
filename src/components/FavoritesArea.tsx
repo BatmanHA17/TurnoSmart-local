@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { SavedShift } from "@/store/savedShiftsStore";
-import { Coffee, Plus, X, Pencil } from "lucide-react";
+import { Coffee, Plus, X, Pencil, RotateCcw } from "lucide-react";
 import { CreateAbsenceDialog, CustomAbsence } from './CreateAbsenceDialog';
 
 export const CUSTOM_ABSENCES_KEY = 'turnosmart-custom-absences';
@@ -20,7 +20,7 @@ export const saveCustomAbsences = (absences: CustomAbsence[]) => {
 };
 
 export const defaultAbsenceShifts: SavedShift[] = [
-  { id: 'L-default', name: 'Libre', startTime: '', endTime: '', color: '#10b981', accessType: 'absence', isSystemDefault: true, description: 'Día libre', createdAt: new Date(), updatedAt: new Date() },
+  { id: 'D-default', name: 'Descanso', startTime: '', endTime: '', color: '#94a3b8', accessType: 'absence', isSystemDefault: true, description: 'Día de descanso semanal', createdAt: new Date(), updatedAt: new Date() },
   { id: 'V-default', name: 'Vacaciones', startTime: '', endTime: '', color: '#3b82f6', accessType: 'absence', isSystemDefault: true, description: 'Vacaciones', createdAt: new Date(), updatedAt: new Date() },
   { id: 'E-default', name: 'Enfermo', startTime: '', endTime: '', color: '#ef4444', accessType: 'absence', isSystemDefault: true, description: 'Baja por enfermedad', createdAt: new Date(), updatedAt: new Date() },
   { id: 'P-default', name: 'Permiso', startTime: '', endTime: '', color: '#f59e0b', accessType: 'absence', isSystemDefault: true, description: 'Permiso autorizado', createdAt: new Date(), updatedAt: new Date() },
@@ -37,6 +37,7 @@ interface FavoritesAreaProps {
   onDrop: (e: React.DragEvent) => void;
   onDragOver: (e: React.DragEvent) => void;
   onRemoveFavorite: (shiftId: string) => void;
+  onRestoreKit?: () => Promise<void>;
 }
 
 export const FavoritesArea: React.FC<FavoritesAreaProps> = ({
@@ -45,8 +46,10 @@ export const FavoritesArea: React.FC<FavoritesAreaProps> = ({
   onDragStart,
   onDrop,
   onDragOver,
-  onRemoveFavorite
+  onRemoveFavorite,
+  onRestoreKit,
 }) => {
+  const [isRestoring, setIsRestoring] = useState(false);
   const [customAbsences, setCustomAbsences] = useState<CustomAbsence[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAbsence, setEditingAbsence] = useState<CustomAbsence | null>(null);
@@ -267,6 +270,27 @@ export const FavoritesArea: React.FC<FavoritesAreaProps> = ({
                 <span className="text-xs mr-1">⭐</span>
                 Arrastra turnos aquí para guardarlos
               </div>
+            </div>
+          )}
+
+          {onRestoreKit && (
+            <div className="w-full mt-1 flex justify-end">
+              <button
+                onClick={async () => {
+                  setIsRestoring(true);
+                  try {
+                    await onRestoreKit();
+                  } finally {
+                    setIsRestoring(false);
+                  }
+                }}
+                disabled={isRestoring}
+                className="flex items-center gap-0.5 text-[8px] text-muted-foreground/60 hover:text-muted-foreground transition-colors disabled:opacity-50"
+                title="Restaurar horarios base (M, T, N, 11x19, 9x17, 12x20, Guardia)"
+              >
+                <RotateCcw className={`w-2 h-2 ${isRestoring ? 'animate-spin' : ''}`} />
+                <span>Restaurar kit base</span>
+              </button>
             </div>
           )}
         </div>

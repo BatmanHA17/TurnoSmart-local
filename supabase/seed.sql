@@ -81,7 +81,7 @@ INSERT INTO colaboradores (id, org_id, nombre, apellidos, email, department, sta
   (v_fom_id,   v_org_id, 'FOM',              NULL, 'fom@hotel.com',          'Recepción', 'activo', 'Indefinido', 40, '2023-01-15'),
   (v_fda4_id,  v_org_id, 'Front Desk',       '4',  'fda4@hotel.com',         'Recepción', 'activo', 'Indefinido', 40, '2023-03-01'),
   (v_night_id, v_org_id, 'Night Agent',      NULL, 'night@hotel.com',        'Recepción', 'activo', 'Indefinido', 40, '2022-09-01'),
-  (v_gex_id,   v_org_id, 'GEX',              NULL, 'gex@hotel.com',          'Recepción', 'activo', 'Parcial',    20, '2024-02-01'),
+  (v_gex_id,   v_org_id, 'GEX',              NULL, 'gex@hotel.com',          'Recepción', 'activo', 'Indefinido', 40, '2024-02-01'),
   (v_fda1_id,  v_org_id, 'Front Desk',       '1',  'fda1@hotel.com',         'Recepción', 'activo', 'Indefinido', 40, '2023-06-15'),
   (v_fda2_id,  v_org_id, 'Front Desk',       '2',  'fda2@hotel.com',         'Recepción', 'activo', 'Indefinido', 40, '2024-01-10'),
   (v_fda3_id,  v_org_id, 'Front Desk',       '3',  'fda3@hotel.com',         'Recepción', 'activo', 'Indefinido', 40, '2023-11-01')
@@ -225,5 +225,19 @@ BEGIN
   END LOOP;
 END;
 
-RAISE NOTICE '✅ Seed completado: 7 empleados + RBAC, equity feb-2026, 3 peticiones, 31 días ocupación';
+-- ----------------------------------------------------------------
+-- 6. KIT DE HORARIOS POR DEFECTO (M/T/N/11x19/9x17/12x20/G)
+-- ----------------------------------------------------------------
+INSERT INTO saved_shifts (name, start_time, end_time, color, access_type, break_type, break_duration, has_break, total_break_time, org_id, is_additional_time)
+VALUES
+  ('Mañana',     '07:00', '15:00', '#3b82f6', 'company', 'meal', '30', true,  30, v_org_id, false),
+  ('Tarde',      '15:00', '23:00', '#f59e0b', 'company', 'meal', '30', true,  30, v_org_id, false),
+  ('Noche',      '23:00', '07:00', '#8b5cf6', 'company', 'meal', '30', true,  30, v_org_id, false),
+  ('Transición', '11:00', '19:00', '#06b6d4', 'company', 'meal', '30', true,  30, v_org_id, false),
+  ('GEX Mañana', '09:00', '17:00', '#0ea5e9', 'company', 'meal', '30', true,  30, v_org_id, false),
+  ('GEX Tarde',  '12:00', '20:00', '#14b8a6', 'company', 'meal', '30', true,  30, v_org_id, false),
+  ('Guardia',    '09:00', '21:00', '#ef4444', 'company', null,   '0',  false, 0,  v_org_id, false)
+ON CONFLICT DO NOTHING;
+
+RAISE NOTICE '✅ Seed completado: 7 empleados + RBAC + 7 horarios por defecto, equity feb-2026, 3 peticiones, 31 días ocupación';
 END $$;

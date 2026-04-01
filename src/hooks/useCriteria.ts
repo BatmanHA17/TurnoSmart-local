@@ -53,10 +53,12 @@ const DEFAULT_CRITERIA: Array<{
   // Optional
   { key: "ERGONOMIC_ROTATION", name: "Rotación ergonómica", description: "M→T→N progresiva (nunca al revés)", category: "optional", defaultEnabled: true },
   { key: "CONSECUTIVE_REST", name: "Libres consecutivos", description: "Los 2 libres deben ser seguidos", category: "optional", defaultEnabled: true },
-  { key: "MIN_COVERAGE", name: "Cobertura mínima", description: "Al menos 1 persona por turno M/T/N", category: "optional", defaultEnabled: true },
+  { key: "MIN_COVERAGE_M", name: "Cobertura mínima Mañana", description: "Personas mínimas en turno Mañana (M)", category: "mandatory", defaultEnabled: true },
+  { key: "MIN_COVERAGE_T", name: "Cobertura mínima Tarde", description: "Personas mínimas en turno Tarde (T)", category: "mandatory", defaultEnabled: true },
+  { key: "MIN_COVERAGE_N", name: "Cobertura mínima Noche", description: "Personas mínimas en turno Noche (N)", category: "mandatory", defaultEnabled: true },
   { key: "FOM_AFOM_SAME_SHIFT", name: "FOM↔AFOM espejo", description: "FOM y AFOM no deben coincidir en turno", category: "optional", defaultEnabled: true },
   { key: "EQUITY_DEVIATION", name: "Equidad M/T/N", description: "Distribución equilibrada de turnos", category: "optional", defaultEnabled: true },
-  { key: "MAX_CONSECUTIVE_NIGHTS", name: "Noches consecutivas", description: "Alerta a partir de 3 noches seguidas (FDA)", category: "optional", defaultEnabled: true },
+  { key: "MAX_CONSECUTIVE_NIGHTS", name: "Noches consecutivas", description: "Alerta a partir de 4 noches seguidas (FDA)", category: "optional", defaultEnabled: true },
   { key: "WEEKEND_EQUITY", name: "Equidad FDS", description: "Distribución equilibrada de fines de semana", category: "optional", defaultEnabled: true },
   { key: "OCCUPANCY_UNDERSTAFFING", name: "Refuerzo ocupación", description: "Alerta cuando alta ocupación sin refuerzo", category: "optional", defaultEnabled: true },
   { key: "PETITION_NOT_SATISFIED", name: "Peticiones blandas", description: "Tracking de peticiones no satisfechas", category: "optional", defaultEnabled: true },
@@ -120,13 +122,18 @@ export function useCriteria({ organizationId }: UseCriteriaProps): UseCriteriaRe
   const seedDefaults = useCallback(async () => {
     if (!organizationId) return;
     try {
+      const COVERAGE_DEFAULTS: Record<string, number> = {
+        MIN_COVERAGE_M: 2,
+        MIN_COVERAGE_T: 2,
+        MIN_COVERAGE_N: 1,
+      };
       const rows = DEFAULT_CRITERIA.map((c) => ({
         organization_id: organizationId,
         criteria_key: c.key,
         criteria_name: c.name,
         description: c.description,
         enabled: c.defaultEnabled,
-        boost: 1,
+        boost: COVERAGE_DEFAULTS[c.key] ?? 1,
         boost_note: null,
         category: c.category,
       }));

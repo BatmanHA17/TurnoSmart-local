@@ -120,7 +120,7 @@ export function TagsCalendarView() {
     employees,
     currentOrg?.org_id || null
   );
-  const { sortedEmployees } = useEmployeeSortOrder(filteredEmployees);
+  const { sortedEmployees } = useEmployeeSortOrder(filteredEmployees, currentOrg?.org_id);
 
   const goToPreviousBiWeek = () => setCurrentWeek(subWeeks(currentWeek, 1));
   const goToNextBiWeek = () => setCurrentWeek(addWeeks(currentWeek, 1));

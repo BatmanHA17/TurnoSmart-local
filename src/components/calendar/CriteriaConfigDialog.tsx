@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Shield, Sliders, RotateCcw } from "lucide-react";
+import { Shield, Sliders, RotateCcw, Users } from "lucide-react";
 import type { CriteriaRecord } from "@/hooks/useCriteria";
 
 interface CriteriaConfigDialogProps {
@@ -49,9 +49,17 @@ export function CriteriaConfigDialog({
   onToggle,
   onSeedDefaults,
 }: CriteriaConfigDialogProps) {
-  const mandatory = criteria.filter((c) => c.category === "mandatory");
+  const COVERAGE_KEYS = ["MIN_COVERAGE_M", "MIN_COVERAGE_T", "MIN_COVERAGE_N"];
+  const coverageCriteria = criteria.filter((c) => COVERAGE_KEYS.includes(c.criteria_key));
+  const mandatory = criteria.filter((c) => c.category === "mandatory" && !COVERAGE_KEYS.includes(c.criteria_key));
   const optional = criteria.filter((c) => c.category === "optional");
   const custom = criteria.filter((c) => c.category === "custom");
+
+  const COVERAGE_LABELS: Record<string, { label: string; short: string }> = {
+    MIN_COVERAGE_M: { label: "Mañana (M)", short: "M" },
+    MIN_COVERAGE_T: { label: "Tarde (T)", short: "T" },
+    MIN_COVERAGE_N: { label: "Noche (N)", short: "N" },
+  };
 
   // Local state for boost edits
   const [localBoosts, setLocalBoosts] = useState<Record<string, { boost: number; note: string }>>({});
@@ -88,6 +96,63 @@ export function CriteriaConfigDialog({
       ...prev,
       [key]: { ...prev[key], note },
     }));
+  };
+
+  const handleCoverageChange = async (key: string, delta: number) => {
+    const c = coverageCriteria.find((cr) => cr.criteria_key === key);
+    if (!c) return;
+    const current = localBoosts[key]?.boost ?? c.boost;
+    const next = Math.max(1, Math.min(5, current + delta));
+    setLocalBoosts((prev) => ({ ...prev, [key]: { ...prev[key], boost: next } }));
+    await onToggle(key, true, next, "");
+  };
+
+  const renderCoverageSection = () => {
+    if (coverageCriteria.length === 0) return null;
+    return (
+      <div className="mb-3 rounded-md border border-border bg-muted/30 p-3 space-y-3">
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-violet-500" />
+          <h3 className="text-sm font-semibold">Cobertura mínima por turno</h3>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {COVERAGE_KEYS.map((key) => {
+            const c = coverageCriteria.find((cr) => cr.criteria_key === key);
+            if (!c) return null;
+            const value = localBoosts[key]?.boost ?? c.boost;
+            const meta = COVERAGE_LABELS[key];
+            return (
+              <div key={key} className="flex flex-col items-center gap-1">
+                <span className="text-xs text-muted-foreground">{meta?.label}</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    className="h-6 w-6 rounded border text-sm font-bold hover:bg-accent"
+                    onClick={() => handleCoverageChange(key, -1)}
+                    disabled={value <= 1}
+                  >
+                    −
+                  </button>
+                  <span className="w-6 text-center text-sm font-semibold">{value}</span>
+                  <button
+                    className="h-6 w-6 rounded border text-sm font-bold hover:bg-accent"
+                    onClick={() => handleCoverageChange(key, 1)}
+                    disabled={value >= 5}
+                  >
+                    +
+                  </button>
+                </div>
+                <span className="text-[10px] text-muted-foreground">
+                  {value === 1 ? "persona" : "personas"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-[10px] text-muted-foreground">
+          💡 El motor alertará si no puede cubrir estos mínimos con el equipo disponible.
+        </p>
+      </div>
+    );
   };
 
   const renderCriterion = (c: CriteriaRecord, isMandatory: boolean) => {
@@ -166,6 +231,9 @@ export function CriteriaConfigDialog({
           </div>
         ) : (
           <ScrollArea className="h-[450px] pr-3">
+            {/* Cobertura mínima por turno */}
+            {renderCoverageSection()}
+
             {/* Obligatorios */}
             <div className="space-y-1">
               <div className="flex items-center gap-2 mb-2">

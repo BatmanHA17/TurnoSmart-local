@@ -64,7 +64,8 @@ const ABSENCE_CODES = {
   H: { label: "Horas sindicales", color: "hsl(269, 27%, 54%)" },
   S: { label: "Sanción", color: "hsl(42, 49%, 51%)" },
   C: { label: "Curso", color: "hsl(323, 36%, 51%)" },
-  L: { label: "Libre", color: "hsl(42, 8%, 47%)" },
+  L: { label: "Libre", color: "hsl(42, 8%, 47%)" },     // legacy
+  D: { label: "Descanso", color: "hsl(215, 14%, 65%)" }, // motor SMART v2.0
 };
 
 const WEEKDAY_NAMES = ["domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado"];

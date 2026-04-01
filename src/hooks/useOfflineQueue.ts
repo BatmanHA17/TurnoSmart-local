@@ -90,7 +90,7 @@ export function useOfflineQueue(options: UseOfflineQueueOptions = {}) {
         case 'upsert':
           const { error: upsertError } = await supabase
             .from('calendar_shifts')
-            .upsert(data, { onConflict: 'id', ignoreDuplicates: false });
+            .upsert(data, { onConflict: 'employee_id,date,org_id', ignoreDuplicates: false });
           if (upsertError) throw upsertError;
           break;
 

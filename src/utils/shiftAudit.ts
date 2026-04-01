@@ -90,7 +90,8 @@ export function checkMinimumRestBetweenShifts(
  * CÓDIGOS válidos como descanso: L (Libre), V (Vacaciones), E (Enfermedad), 
  * P (Permiso), F (Falta), H (Horas sindicales), S (Sanción), C (Curso)
  */
-const VALID_REST_CODES = ['L', 'V', 'E', 'P', 'F', 'H', 'S', 'C'];
+// 'D' es el código oficial del motor SMART v2.0. 'L' se mantiene para compatibilidad con datos históricos.
+const VALID_REST_CODES = ['D', 'L', 'V', 'E', 'P', 'F', 'H', 'S', 'C'];
 
 export function checkWeeklyFreeDays(
   shifts: ShiftForAudit[],
@@ -124,8 +125,9 @@ export function checkWeeklyFreeDays(
       const dayShifts = employeeShifts.filter(s => s.date === dateStr);
       
       // Verificar si es día de descanso válido (L, V, E, P, F, H, S, C)
-      const hasValidRestCode = dayShifts.some(s => 
+      const hasValidRestCode = dayShifts.some(s =>
         VALID_REST_CODES.includes(s.absenceCode || '') ||
+        s.shiftName === 'Descanso' || s.shiftName === 'D' ||
         s.shiftName === 'Libre' || s.shiftName === 'L' ||
         s.shiftName === 'Vacaciones' || s.shiftName === 'V'
       );
@@ -153,14 +155,14 @@ export function checkWeeklyFreeDays(
       continue;
     }
     
-    // Solo contar días L (Libre) como días libres reales para la verificación
+    // Contar días D (Descanso) y L (Libre, legacy) como días libres reales
     const freeDays = restDays.filter(day => {
       const dateStr = format(day, 'yyyy-MM-dd');
       const dayShifts = employeeShifts.filter(s => s.date === dateStr);
-      return dayShifts.some(s => 
-        s.absenceCode === 'L' || 
-        s.shiftName === 'Libre' || 
-        s.shiftName === 'L'
+      return dayShifts.some(s =>
+        s.absenceCode === 'D' || s.absenceCode === 'L' ||
+        s.shiftName === 'Descanso' || s.shiftName === 'Libre' ||
+        s.shiftName === 'D' || s.shiftName === 'L'
       ) || dayShifts.length === 0;
     });
     

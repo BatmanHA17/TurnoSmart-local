@@ -112,9 +112,18 @@ export function anchorFixed(ctx: PipelineContext): PipelineContext {
   }
 
   // --- 5. Night Shift Agent ---
-  // N assignment is intentionally deferred: Phase 04 will assign 2 consecutive
-  // rest days (locked D), then Phase 07 fills N on remaining unlocked D days.
-  // This avoids N coverage gaps caused by Phase 04 overwriting Phase 03's N slots.
+  // Assign N to ALL days (not locked). Phase 04 will overwrite 2 of them
+  // with locked D (rest). lockSurvivingFixedShifts then locks the remaining N.
+  // This ensures Night Agent's N shifts are explicit in the grid from the start,
+  // rather than relying on Phase 07's coverage mechanism to fill them retroactively.
+  for (const na of roleGroups.FIJO_NO_ROTA.filter((e) => e.role === "NIGHT_SHIFT_AGENT")) {
+    for (let d = 1; d <= totalDays; d++) {
+      if (grid[na.id][d].locked) continue; // ausencia/petición A ya anclada
+      if (na.isNewHire && na.startDay && d < na.startDay) continue;
+      grid[na.id][d] = makeAssignment("N", "engine");
+      // NOT locked: Phase 04 needs to be able to pick 2 days as rest
+    }
+  }
 
   return { ...ctx, grid };
 }

@@ -18,6 +18,8 @@ export interface ShiftBlock {
   breakType?: string;
   breakDuration?: string;
   notes?: string;
+  /** true si el FOM ha bloqueado este turno — el motor no lo sobreescribe al regenerar */
+  locked?: boolean;
 }
 
 // Tipos de ausencias disponibles
@@ -103,7 +105,8 @@ export const shouldCountHours = (shiftData: ShiftBlock): boolean => {
     }
     return false;
   }
-  const absenceCodes = ['V', 'L', 'E', 'F', 'P', 'H', 'S', 'Vacaciones', 'Libre', 'Día Libre', 'Descanso Semanal', 'Descanso', 'Enfermo', 'Falta', 'Permiso', 'Horas Sindicales', 'Sancionado', 'Baja IT'];
+  // 'D' es el código oficial del motor SMART. 'L' se mantiene para compatibilidad con datos históricos.
+  const absenceCodes = ['D', 'V', 'L', 'E', 'F', 'P', 'H', 'S', 'Vacaciones', 'Libre', 'Descanso', 'Día Libre', 'Descanso Semanal', 'Enfermo', 'Falta', 'Permiso', 'Horas Sindicales', 'Sancionado', 'Baja IT'];
   const shiftName = shiftData.name?.trim() || '';
   if (shiftName === 'Curso' || shiftName === 'C') {
     return true;

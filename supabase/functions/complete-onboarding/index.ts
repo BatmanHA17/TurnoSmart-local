@@ -293,7 +293,52 @@ serve(async (req) => {
 
     console.log(`Created ${colaboradoresCreated} placeholder colaboradores`);
 
-    // 8. Log activity
+    // 8. Crear kit de horarios por defecto (M/T/N/11x19/9x17/12x20/G)
+    const DEFAULT_SHIFTS = [
+      { name: "Mañana",      start_time: "07:00", end_time: "15:00", color: "#3b82f6", has_break: true,  total_break_time: 30 },
+      { name: "Tarde",       start_time: "15:00", end_time: "23:00", color: "#f59e0b", has_break: true,  total_break_time: 30 },
+      { name: "Noche",       start_time: "23:00", end_time: "07:00", color: "#8b5cf6", has_break: true,  total_break_time: 30 },
+      { name: "Transición",  start_time: "11:00", end_time: "19:00", color: "#06b6d4", has_break: true,  total_break_time: 30 },
+      { name: "GEX Mañana",  start_time: "09:00", end_time: "17:00", color: "#0ea5e9", has_break: true,  total_break_time: 30 },
+      { name: "GEX Tarde",   start_time: "12:00", end_time: "20:00", color: "#14b8a6", has_break: true,  total_break_time: 30 },
+      { name: "Guardia",     start_time: "09:00", end_time: "21:00", color: "#ef4444", has_break: false, total_break_time: 0  },
+    ];
+
+    try {
+      const shiftRows = DEFAULT_SHIFTS.map((s) => ({
+        name: s.name,
+        start_time: s.start_time,
+        end_time: s.end_time,
+        color: s.color,
+        access_type: "company",
+        break_type: s.has_break ? "meal" : null,
+        break_duration: s.has_break ? "30" : "0",
+        has_break: s.has_break,
+        total_break_time: s.total_break_time,
+        org_id: orgId,
+        is_additional_time: false,
+      }));
+
+      // Solo insertar si la org no tiene horarios previos
+      const { count: existingCount } = await supabase
+        .from("saved_shifts")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId);
+
+      const { error: shiftsError } = existingCount === 0
+        ? await supabase.from("saved_shifts").insert(shiftRows)
+        : { error: null };
+
+      if (shiftsError) {
+        console.error("Error creating default shifts (non-critical):", shiftsError);
+      } else {
+        console.log(`Created ${shiftRows.length} default shift templates`);
+      }
+    } catch (shiftsErr) {
+      console.error("Error creating default shifts (non-critical):", shiftsErr);
+    }
+
+    // 9. Log activity
     try {
       await supabase.rpc("log_activity", {
         _user_name: user.email || "Usuario",

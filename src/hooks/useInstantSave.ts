@@ -161,9 +161,9 @@ export function useInstantSave({ orgId, onOfflineQueue, isOnline = true }: UseIn
 
       const { error: upsertError } = await supabase
         .from('calendar_shifts')
-        .upsert(shiftData, { 
-          onConflict: 'id',
-          ignoreDuplicates: false 
+        .upsert(shiftData, {
+          onConflict: 'employee_id,date,org_id',
+          ignoreDuplicates: false
         });
 
       if (upsertError) {
@@ -304,9 +304,9 @@ export function useInstantSave({ orgId, onOfflineQueue, isOnline = true }: UseIn
       if (shiftDataArray.length > 0) {
         const { error: batchError } = await supabase
           .from('calendar_shifts')
-          .upsert(shiftDataArray, { 
-            onConflict: 'id',
-            ignoreDuplicates: false 
+          .upsert(shiftDataArray, {
+            onConflict: 'employee_id,date,org_id',
+            ignoreDuplicates: false
           });
 
         if (batchError) {

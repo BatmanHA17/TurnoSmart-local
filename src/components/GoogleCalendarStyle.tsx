@@ -44,7 +44,7 @@ import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useBeforeUnload } from "@/hooks/useBeforeUnload";
 import { useCalendarEmployeeFilter } from "@/hooks/useCalendarEmployeeFilter";
-import { useEmployeeSortOrder } from "@/hooks/useEmployeeSortOrder";
+import { useEmployeeSortOrder, getManualOrderKey } from "@/hooks/useEmployeeSortOrder";
 
 import { VersionHistoryDialog } from "./calendar/VersionHistoryDialog";
 import { OperationBackupsDialog } from "./calendar/OperationBackupsDialog";
@@ -151,7 +151,11 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
 
   // Estado para manejar los turnos asignados - declarar temprano
   const [shiftBlocks, setShiftBlocks] = useState<ShiftBlock[]>([]);
-  
+
+  // Flag para evitar que loadShiftsFromSupabase sobrescriba el state
+  // después de que onResult (SMART generate) acaba de setear los bloques del mes.
+  const skipDbReloadRef = useRef(false);
+
   // Flag para controlar cuando el undo/redo debe sincronizarse
   const isUndoRedoOperation = useRef(false);
   
@@ -242,8 +246,10 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       const computedBlocks = typeof updater === 'function' ? updater(prevBlocks) : updater;
 
       // Asegurar IDs persistibles (UUID) para evitar errores "invalid input syntax for type uuid"
+      // CRÍTICO: incluir 'smart-' para que engine IDs se conviertan a UUID UNA sola vez aquí,
+      // evitando que ensureUUID() genere UUIDs diferentes en cada persistShiftsBatch y duplique filas en DB
       const newBlocks = computedBlocks.map((b) => {
-        if (typeof b.id === 'string' && (b.id.startsWith('shift-') || b.id.startsWith('first-day-'))) {
+        if (typeof b.id === 'string' && (b.id.startsWith('shift-') || b.id.startsWith('first-day-') || b.id.startsWith('smart-'))) {
           return { ...b, id: crypto.randomUUID() };
         }
         return b;
@@ -694,8 +700,9 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           startDate: colaborador.fecha_inicio_contrato || undefined
         }));
 
-        // Recuperar orden manual si existe
-        const savedManualOrder = localStorage.getItem('manual-employee-order');
+        // Recuperar orden manual si existe (scoped por org)
+        const manualOrderKey = getManualOrderKey(org?.id);
+        const savedManualOrder = localStorage.getItem(manualOrderKey);
         let finalEmployees = mappedEmployees;
 
         if (savedManualOrder) {
@@ -716,10 +723,9 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
             });
 
             setSortBy('manual');
-            localStorage.setItem('calendar-sort-criteria', 'manual');
           } catch (error) {
             console.error('Error parsing manual order:', error);
-            localStorage.removeItem('manual-employee-order');
+            localStorage.removeItem(manualOrderKey);
           }
         }
 
@@ -744,11 +750,14 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   };
 
   // 🔄 CRÍTICO: Recargar turnos cuando cambie la semana visible
+  const prevWeekRef = useRef(currentWeek);
   useEffect(() => {
-    // Recalcular el inicio de la semana basado en currentWeek
-    const calculatedWeekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
-    
-    
+    // Si el usuario navega a otra semana, desactivar el guard post-generación
+    if (prevWeekRef.current !== currentWeek) {
+      skipDbReloadRef.current = false;
+      prevWeekRef.current = currentWeek;
+    }
+
     // Solo cargar si tenemos org Y empleados, para evitar cargas innecesarias
     if (org?.id && employees.length > 0) {
       loadShiftsFromSupabase(employees.map(e => e.id));
@@ -757,6 +766,12 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
 
   // Función para cargar turnos desde Supabase
   const loadShiftsFromSupabase = async (employeeIds: string[]) => {
+    // Guard: si acabamos de aplicar una alternativa SMART, no sobrescribir el state
+    // con datos parciales (solo 1 semana) de la DB.
+    if (skipDbReloadRef.current) {
+      console.log('[loadShiftsFromSupabase] Skipped — skipDbReloadRef active (post-generate)');
+      return;
+    }
     try {
       // 🔄 SINCRONIZADO: Filtrar por org_id para evitar mezclar turnos de diferentes organizaciones
       if (!org?.id) {
@@ -812,7 +827,8 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
             hasBreak: savedShift?.hasBreak || !!shift.break_duration || false,
             breakDuration: savedShift?.breakDuration || shift.break_duration || undefined,
             breaks: savedShift?.breaks || [],
-            totalBreakTime: savedShift?.totalBreakTime || (shift.break_duration ? parseInt(shift.break_duration) : 0)
+            totalBreakTime: savedShift?.totalBreakTime || (shift.break_duration ? parseInt(shift.break_duration) : 0),
+            locked: (shift as any).locked ?? false,
           };
         });
 
@@ -1382,8 +1398,9 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           notes: shift.notes || null,
           organization: shift.organization_id || 'default',
           break_duration: shift.breakDuration || null,
-          org_id: org?.id || null
-        }, { onConflict: 'employee_id,date,shift_name', ignoreDuplicates: false })
+          org_id: org?.id || null,
+          locked: shift.locked ?? false,
+        }, { onConflict: 'employee_id,date,org_id', ignoreDuplicates: false })
         .select()
         .single();
 
@@ -1834,6 +1851,89 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   const getShiftForEmployeeAndDate = (employeeId: string, date: Date) => {
     const shifts = getShiftsForEmployeeAndDate(employeeId, date);
     return shifts.length > 0 ? shifts[0] : undefined;
+  };
+
+  /** Bloquea o desbloquea un turno con clic derecho. Solo managers. */
+  const handleToggleLock = (shift: ShiftBlock, event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (isEmployee) return;
+
+    const newLocked = !shift.locked;
+    setShiftBlocksWithHistory((prev) =>
+      prev.map((s) => (s.id === shift.id ? { ...s, locked: newLocked } : s))
+    );
+
+    // Persistir en DB directamente
+    supabase
+      .from("calendar_shifts")
+      .update({ locked: newLocked } as any)
+      .eq("id", shift.id)
+      .then(({ error }) => {
+        if (error) console.error("Error actualizando locked:", error);
+      });
+
+    toast({
+      title: newLocked ? "🔒 Turno bloqueado" : "🔓 Turno desbloqueado",
+      description: newLocked
+        ? "El motor SMART no sobreescribirá este turno al regenerar."
+        : "El motor SMART puede modificar este turno al regenerar.",
+    });
+  };
+
+  const handleRestoreKit = async () => {
+    const orgId = org?.id;
+    if (!orgId) return;
+
+    const KIT_SHIFTS = [
+      { name: "Mañana",      start_time: "07:00", end_time: "15:00", color: "#3b82f6", has_break: true,  total_break_time: 30 },
+      { name: "Tarde",       start_time: "15:00", end_time: "23:00", color: "#f59e0b", has_break: true,  total_break_time: 30 },
+      { name: "Noche",       start_time: "23:00", end_time: "07:00", color: "#8b5cf6", has_break: true,  total_break_time: 30 },
+      { name: "Transición",  start_time: "11:00", end_time: "19:00", color: "#06b6d4", has_break: true,  total_break_time: 30 },
+      { name: "GEX Mañana",  start_time: "09:00", end_time: "17:00", color: "#0ea5e9", has_break: true,  total_break_time: 30 },
+      { name: "GEX Tarde",   start_time: "12:00", end_time: "20:00", color: "#14b8a6", has_break: true,  total_break_time: 30 },
+      { name: "Guardia",     start_time: "09:00", end_time: "21:00", color: "#ef4444", has_break: false, total_break_time: 0  },
+    ];
+
+    const { data: existing, error: fetchError } = await supabase
+      .from("saved_shifts")
+      .select("name")
+      .eq("org_id", orgId);
+
+    if (fetchError) {
+      toast({ title: "Error", description: "No se pudo verificar los horarios existentes.", variant: "destructive" });
+      return;
+    }
+
+    const existingNames = new Set((existing ?? []).map((s: { name: string }) => s.name));
+    const toInsert = KIT_SHIFTS.filter((s) => !existingNames.has(s.name));
+    const skipped = KIT_SHIFTS.length - toInsert.length;
+
+    if (toInsert.length === 0) {
+      toast({ title: "Kit ya instalado", description: `Los ${KIT_SHIFTS.length} horarios base ya existen. Sin duplicados.` });
+      return;
+    }
+
+    const rows = toInsert.map((s) => ({
+      org_id: orgId,
+      name: s.name,
+      start_time: s.start_time,
+      end_time: s.end_time,
+      color: s.color,
+      has_break: s.has_break,
+      total_break_time: s.total_break_time,
+    }));
+
+    const { error: insertError } = await supabase.from("saved_shifts").insert(rows);
+    if (insertError) {
+      toast({ title: "Error al restaurar", description: insertError.message, variant: "destructive" });
+      return;
+    }
+
+    const msg = skipped > 0
+      ? `Restaurados ${toInsert.length} horarios. ${skipped} ya existían (sin duplicar).`
+      : `Restaurados ${toInsert.length} horarios base.`;
+    toast({ title: "Kit restaurado", description: msg });
   };
 
   const handleCellClick = (employee: Employee, date: Date, event?: React.MouseEvent) => {
@@ -2731,7 +2831,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
 
   // 🆕 Usar hook global para sincronizar ordenamiento entre TODAS las vistas
   // Esto garantiza que si cambias de Week a Month a Day, el orden sea IDÉNTICO
-  const { sortedEmployees, sortBy, setSortBy } = useEmployeeSortOrder(activeEmployees);
+  const { sortedEmployees, sortBy, setSortBy } = useEmployeeSortOrder(activeEmployees, org?.id);
 
   // SMART Schedule Generator (v1 — legacy)
   const [showGenerateSheet, setShowGenerateSheet] = useState(false);
@@ -2740,6 +2840,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     currentWeek,
     orgId: org?.id,
     onResult: (newBlocks) => {
+      skipDbReloadRef.current = true;
       const monthStart = new Date(newBlocks[0]?.date ?? currentWeek);
       monthStart.setDate(1);
       const year = monthStart.getFullYear();
@@ -2752,6 +2853,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         return [...otherMonths, ...newBlocks];
       });
       setShowGenerateSheet(false);
+      setTimeout(() => { skipDbReloadRef.current = false; }, 5000);
     },
   });
 
@@ -2767,6 +2869,11 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     currentWeek,
     orgId: org?.id,
     onResult: (newBlocks) => {
+      // 🛡️ Bloquear recargas de DB mientras se persisten los nuevos bloques.
+      // Sin esto, loadShiftsFromSupabase (que solo carga 1 semana) sobrescribe
+      // el state del mes completo que acabamos de generar.
+      skipDbReloadRef.current = true;
+
       const monthStart = new Date(newBlocks[0]?.date ?? currentWeek);
       monthStart.setDate(1);
       const year = monthStart.getFullYear();
@@ -2779,6 +2886,12 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         return [...otherMonths, ...newBlocks];
       });
       setShowAlternativesSheet(false);
+
+      // Desbloquear después de que la persistencia tenga tiempo de completar.
+      // El batch upsert tarda ~1-2s; damos 5s de margen.
+      setTimeout(() => {
+        skipDbReloadRef.current = false;
+      }, 5000);
     },
   });
 
@@ -2830,6 +2943,13 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     // SMART+IA: detectar patrones tras aplicar alternativa
     if (smartGeneration) {
       detectAfterGeneration(smartGeneration);
+    }
+    // Auto-navegar al inicio del período generado para que el FOM vea los turnos inmediatamente
+    if (smartGeneration?.alternatives[index]) {
+      const startDate = smartGeneration.alternatives[index].output.meta.period.startDate;
+      if (startDate) {
+        setCurrentWeek(new Date(startDate + "T00:00:00"));
+      }
     }
     // Persistencia automática: setShiftBlocks updater ya llama persistShiftsBatch
   };
@@ -2902,6 +3022,8 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           onUnpublish={handleUnpublishCalendar}
           onGenerate={canEdit && !isPublished ? handleOpenGenerateSheet : undefined}
           isGenerating={isGenerating}
+          currentDate={currentWeek}
+          hasExistingShifts={shiftBlocks.length > 0}
           onOpenSmartIA={() => setShowSmartSuggestions(true)}
           smartPendingCount={smartPendingCount}
           auditResult={auditResult}
@@ -2973,6 +3095,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           e.dataTransfer.dropEffect = 'copy';
         }}
         onRemoveFavorite={removeFromFavorites}
+        onRestoreKit={handleRestoreKit}
       />
 
       {/* Main Calendar Table */}
@@ -3261,11 +3384,16 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
                                {getWeeklyHoursFromColaborador(employee.name) || compliance.plannedHours}h
                              </span>
                              <span>|</span>
-                             <span 
+                             <span
                                className="cursor-help"
                                title="Horas reales esta semana"
                              >
-                               {getWeeklyRealHours(employee.id)}h 0'
+                               {(() => {
+                                 const realH = getWeeklyRealHours(employee.id);
+                                 const wholeHours = Math.floor(realH);
+                                 const minutes = Math.round((realH - wholeHours) * 60);
+                                 return `${wholeHours}h ${minutes}'`;
+                               })()}
                              </span>
                              <span>|</span>
                              <span 
@@ -3440,7 +3568,19 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
                                 <div className="absolute top-0 left-0 w-2 h-2 rounded-full z-10 bg-blue-500" title="Editado post-publicación" />
                               )}
                               {shifts.map((shift, shiftIndex) => (
-                                <div key={shift.id} className={`${shifts.length > 1 ? 'h-8' : 'h-full'} w-full`}>
+                                <div
+                                  key={shift.id}
+                                  className={`${shifts.length > 1 ? 'h-8' : 'h-full'} w-full relative`}
+                                  onContextMenu={(e) => (canEdit || isManager) ? handleToggleLock(shift, e) : e.preventDefault()}
+                                >
+                                  {/* Icono candado — overlay cuando está bloqueado */}
+                                  {shift.locked && (
+                                    <div className="absolute top-0.5 right-0.5 z-30 pointer-events-none">
+                                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 text-amber-500 drop-shadow">
+                                        <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clipRule="evenodd" />
+                                      </svg>
+                                    </div>
+                                  )}
                                    <ShiftCard
                                       shift={shift}
                                       employee={employee}
@@ -4154,6 +4294,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
             setSortBy(sortedEmployees.some((_, index, arr) => index > 0 && !arr[index-1].apellidos) ? "manual" : "applied"); // Mark as manual if custom order, otherwise applied
           }}
           currentSortCriteria={sortBy}
+          orgId={org?.id}
         />
         
         {/* Calendar Full Screen View */}
