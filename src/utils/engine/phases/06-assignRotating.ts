@@ -107,7 +107,7 @@ export function assignRotating(ctx: PipelineContext): PipelineContext {
   for (let day = 1; day <= totalDays; day++) {
     for (const shift of coverageShifts) {
       const currentCount = countShiftOnDayExcluding(grid, day, shift, fomIds);
-      const minCoverage = constraints.minCoveragePerShift;
+      const minCoverage = constraints.minCoveragePerShift[shift as "M" | "T" | "N"] ?? 1;
       if (currentCount >= minCoverage) continue;
 
       const needed = minCoverage - currentCount;
