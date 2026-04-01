@@ -28,13 +28,19 @@ interface UseTurnoSmartRoleReturn {
 
 export const useTurnoSmartRole = (): UseTurnoSmartRoleReturn => {
   const { user } = useAuth();
-  const { org } = useCurrentOrganization();
+  const { org, loading: orgLoading } = useCurrentOrganization();
   const [tsRole, setTsRole] = useState<TurnoSmartRole>("empleado");
   const [colaboradorId, setColaboradorId] = useState<string | null>(null);
   const [isDelegated, setIsDelegated] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const fetchRole = useCallback(async () => {
+    // Wait for org to finish loading before deciding role
+    if (orgLoading) {
+      setLoading(true);
+      return;
+    }
+
     if (!user || !org?.id) {
       setTsRole("empleado");
       setColaboradorId(null);
@@ -98,7 +104,7 @@ export const useTurnoSmartRole = (): UseTurnoSmartRoleReturn => {
     } finally {
       setLoading(false);
     }
-  }, [user, org?.id]);
+  }, [user, org?.id, orgLoading]);
 
   useEffect(() => {
     fetchRole();
