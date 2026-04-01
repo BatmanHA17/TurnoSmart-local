@@ -599,6 +599,7 @@ function Step5Summary({
   petitions,
   occupancyData,
   employees,
+  previousPeriod,
   onOpenPetitions,
   onOpenOccupancy,
   onOpenCriteria,
