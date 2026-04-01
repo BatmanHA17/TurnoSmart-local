@@ -1,0 +1,1 @@
+import{u as r}from"./useOrganizationsUnified-BvCsZG-i.js";const a=()=>{const n=r();return{organizations:n.organizations,currentOrganizationName:n.currentOrganizationName,isLoading:n.loading,error:n.error}};export{a as u};

@@ -1,0 +1,9 @@
+import{r as s}from"./vendor-ui-szK-tuE8.js";import{w as E,s as f}from"./index-DrYKbzve.js";import{i as v}from"./safeQuery-lZr0WGND.js";const C=r=>{E();const[i,n]=s.useState([]),[h,o]=s.useState(!0),[j,g]=s.useState(null),a=s.useCallback(async e=>{var c;if(!r){(!e||e.current)&&(n([]),o(!1));return}try{(!e||e.current)&&(o(!0),g(null));const{data:t,error:p}=await f.from("colaboradores").select("org_id").eq("id",r).single();if(p)throw p;if(!(t!=null&&t.org_id)){(!e||e.current)&&(n([]),o(!1));return}const{data:d,error:m}=await f.from("colaborador_departments").select(`
+          id,
+          department_id,
+          is_active,
+          job_departments:department_id (
+            id,
+            value
+          )
+        `).eq("colaborador_id",r).eq("org_id",t.org_id).eq("is_active",!0);if(m)throw m;const _=[];if(d&&d.length>0)for(const l of d){const{data:u,error:y}=await f.from("jobs").select("id, title").eq("department_id",l.department_id).eq("org_id",t.org_id).limit(1),b=!y&&u&&u.length>0;_.push({id:l.id,department_id:l.department_id,department_name:((c=l.job_departments)==null?void 0:c.value)||"Departamento sin nombre",has_job:b,job_title:b?u[0].title:void 0})}(!e||e.current)&&n(_)}catch(t){(!e||e.current)&&(g(t instanceof Error?t.message:"Error desconocido"),n([]))}finally{(!e||e.current)&&o(!1)}},[r]);s.useEffect(()=>{const e=v();return a(e),()=>{e.current=!1}},[a]);const q=s.useCallback(()=>{a()},[a]);return{assignments:i,loading:h,error:j,refetch:q,getJobStatus:()=>{const e=i.filter(c=>!c.has_job);return i.length===0?{type:"none",message:"Sin equipos asignados"}:e.length===0?{type:"complete",message:"Todos los equipos tienen puestos asignados"}:e.length===i.length?{type:"incomplete",message:"Ningún equipo tiene puesto de trabajo asignado"}:{type:"partial",message:"No hay puesto de trabajo en uno o varios de los equipos seleccionados"}}}};export{C as u};

@@ -1,0 +1,1 @@
+const E={INSUFFICIENT_REST:"Descanso insuficiente",MISSING_FREE_DAYS:"Faltan días libres",MISSING_COVERAGE:"Cobertura insuficiente",VACATION_NO_FREE_DAYS:"Vacaciones sin días libres",NON_CONSECUTIVE_FREE_DAYS:"Días libres no consecutivos",EMPLOYEE_RESTRICTION:"Restricción de empleado"};export{E as V};

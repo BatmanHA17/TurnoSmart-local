@@ -1,0 +1,1 @@
+import{u as t,z as i}from"./index-DrYKbzve.js";const g=()=>{const{user:e}=t(),{role:c,isAdmin:n,isOwner:s,loading:a}=i();return{user:e,role:c,isAdmin:n,isOwner:s,loading:a,permissions:{canEdit:n||s,canView:e!==null,canDelete:s,canManageUsers:n||s,canAccessSettings:n||s}}};export{g as u};
