@@ -61,26 +61,172 @@ export function assignRotating(ctx: PipelineContext): PipelineContext {
   const coverageShifts: ShiftCode[] = hasNightAgent ? ["M", "T"] : ["M", "T", "N"];
 
   // ===================================================================
-  // PASS 0 — NIGHT AGENT REST COVERAGE
-  // When Night Agent rests, FDAs cover N equitably. This runs FIRST so
-  // the FDA assigned to N is excluded from M/T rotation that day.
-  // N→N consecutive is VALID (16h rest: N ends 07:00, next N starts 23:00).
-  // Only lock post-N rest when next day is NOT another Night Agent rest day.
-  // This allows the same FDA to cover consecutive N shifts (e.g., Sat+Sun).
+  // PASS 0 — NIGHT AGENT REST COVERAGE (Seniority-Rotation Model)
+  //
+  // Per operational rules: ONE FDA covers ALL Night Agent rest days in a
+  // given week. The assignment rotates weekly by seniority (most senior
+  // FDA covers week 1, next week 2, etc.). This ensures:
+  //   - Equitable night coverage rotation across periods
+  //   - Consecutive N shifts are legal (N→N = 16h rest ✅)
+  //   - Only 1 post-N forced rest (after the LAST N), not 1 per N
+  //
+  // CRITICAL: After N, ALL shifts next day violate 12h rest:
+  //   N ends 07:00 → M(07:00)=0h, T(15:00)=8h, 11x19(11:00)=4h — all < 12h
+  // So the post-N day is FORCED rest. To keep 5 work days (40h), we
+  // compensate by unlocking one Phase04 rest day when needed.
   // ===================================================================
   if (hasNightAgent) {
     const nightAgentRestDays = findNightAgentRestDays(grid, roleGroups, totalDays);
-    const nightRestSet = new Set(nightAgentRestDays);
+
+    // Group Night Agent rest days by week
+    const nightRestByWeek: Map<number, number[]> = new Map();
     for (const restDay of nightAgentRestDays) {
-      const candidate = pickBestNightCandidate(
-        rotatingEmployees, grid, restDay, currentEquity, weeks, totalDays
-      );
-      if (candidate) {
-        grid[candidate.id][restDay] = makeAssignment("N", "engine");
-        updateEquity(currentEquity, candidate.id, "N");
-        // Post-N rest: NO lockear. La regla 12h en resolveFinalShift/pickBestShiftForDay
-        // ya bloquea M (07:00) tras N (termina 07:00), pero permite T (15:00).
-        // Lockear un D extra aquí causaba 3 rest/semana = solo 32h para el FDA.
+      const weekIdx = Math.floor((restDay - 1) / 7);
+      if (!nightRestByWeek.has(weekIdx)) nightRestByWeek.set(weekIdx, []);
+      nightRestByWeek.get(weekIdx)!.push(restDay);
+    }
+
+    // Sort FDAs by name (proxy for seniority/order) for rotation
+    const sortedFDAs = [...rotatingEmployees].sort((a, b) => a.name.localeCompare(b.name));
+
+    let rotationIdx = 0; // rotates through FDAs across weeks
+    for (const [weekIdx, restDaysInWeek] of nightRestByWeek) {
+      // Sort rest days within the week for consecutive assignment
+      restDaysInWeek.sort((a, b) => a - b);
+
+      // Try to assign ALL rest days in this week to one FDA (rotation model)
+      let assigned = false;
+      for (let attempt = 0; attempt < sortedFDAs.length; attempt++) {
+        const candidateIdx = (rotationIdx + attempt) % sortedFDAs.length;
+        const candidate = sortedFDAs[candidateIdx];
+
+        // Check if this candidate can cover ALL N days in this week
+        const canCoverAll = restDaysInWeek.every(day => {
+          const cell = grid[candidate.id][day];
+          if (!cell || cell.locked) return false;
+          if (cell.code !== "D") return false;
+          if (candidate.isNewHire && candidate.startDay && day < candidate.startDay) return false;
+          // Check 12h rest with previous day (only for the first N in the group)
+          if (day === restDaysInWeek[0] && day > 1) {
+            const prevCode = grid[candidate.id][day - 1]?.code;
+            if (prevCode && isWorkingShift(prevCode) && violates12hRest(prevCode, "N")) return false;
+          }
+          return true;
+        });
+
+        // Also check weekly hours
+        const weekDays = weeks[weekIdx] ?? [];
+        const currentHours = weeklyHours(grid[candidate.id], weekDays);
+        const nightHours = restDaysInWeek.length * 8;
+        if (currentHours + nightHours > (candidate.weeklyHours ?? 40)) continue;
+
+        if (canCoverAll) {
+          // Assign ALL N shifts in this week to this one FDA
+          for (const day of restDaysInWeek) {
+            grid[candidate.id][day] = makeAssignment("N", "engine");
+            updateEquity(currentEquity, candidate.id, "N");
+          }
+
+          // Post-N mandatory rest: lock day after LAST N as D so PASS 2
+          // can't assign a shift there (N ends 07:00, ALL shifts violate 12h).
+          const lastNDay = restDaysInWeek[restDaysInWeek.length - 1];
+          const postNDay = lastNDay + 1;
+          if (postNDay <= totalDays) {
+            const postNCell = grid[candidate.id][postNDay];
+            const isPostNAlreadyLockedRest = postNCell?.locked && postNCell?.code === "D";
+
+            if (!isPostNAlreadyLockedRest) {
+              // Lock post-N day as mandatory rest
+              grid[candidate.id][postNDay] = {
+                ...grid[candidate.id][postNDay],
+                code: "D",
+                locked: true,
+                hours: 0,
+              };
+
+              // Now we may have 3+ rest days. Count total locked rests this week
+              // (including the new post-N lock) and unlock one Phase04 rest if needed.
+              const postNWeekIdx = Math.floor((postNDay - 1) / 7);
+              const postNWeekDays = weeks[postNWeekIdx] ?? weekDays;
+              const allLockedRests = postNWeekDays.filter(d => {
+                const cell = grid[candidate.id][d];
+                return cell?.locked && cell?.code === "D";
+              });
+              // Also count locked rests in the N-week if different
+              const nWeekLockedRests = weekDays.filter(d => {
+                const cell = grid[candidate.id][d];
+                return cell?.locked && cell?.code === "D";
+              });
+              const totalLockedRests = new Set([...allLockedRests, ...nWeekLockedRests]).size;
+
+              if (totalLockedRests > 2) {
+                // Unlock one Phase04 rest (NOT the post-N one) to compensate
+                const phase04Rests = weekDays.filter(d => {
+                  const cell = grid[candidate.id][d];
+                  return cell?.locked && cell?.code === "D" && d !== postNDay;
+                });
+                if (phase04Rests.length > 0) {
+                  const dayToUnlock = phase04Rests[phase04Rests.length - 1];
+                  grid[candidate.id][dayToUnlock] = {
+                    ...grid[candidate.id][dayToUnlock],
+                    locked: false,
+                  };
+                }
+              }
+            }
+          }
+
+          rotationIdx = (candidateIdx + 1) % sortedFDAs.length;
+          assigned = true;
+          break;
+        }
+      }
+
+      // Fallback: if no single FDA can cover all, assign individually
+      if (!assigned) {
+        for (const day of restDaysInWeek) {
+          const candidate = pickBestNightCandidate(
+            rotatingEmployees, grid, day, currentEquity, weeks, totalDays
+          );
+          if (candidate) {
+            grid[candidate.id][day] = makeAssignment("N", "engine");
+            updateEquity(currentEquity, candidate.id, "N");
+
+            // Lock post-N day as mandatory rest if this is the last N
+            const isLastNInWeek = day === restDaysInWeek[restDaysInWeek.length - 1];
+            const nextDayIsAlsoN = restDaysInWeek.includes(day + 1);
+            if (isLastNInWeek || !nextDayIsAlsoN) {
+              const postNDay = day + 1;
+              if (postNDay <= totalDays) {
+                const postNCell = grid[candidate.id][postNDay];
+                const isPostNAlreadyLockedRest = postNCell?.locked && postNCell?.code === "D";
+                if (!isPostNAlreadyLockedRest) {
+                  // Lock post-N as mandatory rest
+                  grid[candidate.id][postNDay] = {
+                    ...grid[candidate.id][postNDay],
+                    code: "D",
+                    locked: true,
+                    hours: 0,
+                  };
+                  // Unlock one Phase04 rest to compensate if 3+ rests
+                  const wkDays = weeks[weekIdx] ?? [];
+                  const lockedRestDays = wkDays.filter(d => {
+                    const cell = grid[candidate.id][d];
+                    return cell?.locked && cell?.code === "D" && d !== postNDay;
+                  });
+                  if (lockedRestDays.length >= 2) {
+                    const dayToUnlock = lockedRestDays[lockedRestDays.length - 1];
+                    grid[candidate.id][dayToUnlock] = {
+                      ...grid[candidate.id][dayToUnlock],
+                      locked: false,
+                    };
+                  }
+                }
+              }
+            }
+          }
+        }
+        rotationIdx = (rotationIdx + 1) % sortedFDAs.length;
       }
     }
   }
@@ -417,7 +563,7 @@ function pickBestNightCandidate(
   totalDays: number
 ): EngineEmployee | null {
   let bestEmp: EngineEmployee | null = null;
-  let bestScore = Infinity; // lower nightCount = better candidate
+  let bestScore = -Infinity; // higher score = better (overlapBonus - nightCount)
 
   for (const emp of employees) {
     const cell = grid[emp.id][day];
@@ -444,10 +590,19 @@ function pickBestNightCandidate(
     const currentHours = weeklyHours(grid[emp.id], weekDays);
     if (currentHours >= (emp.weeklyHours ?? 40)) continue;
 
-    // Equity: prefer FDA with fewest night shifts
+    // Score: equity (fewer nights = better) + overlap bonus if Phase04
+    // locked rest includes day+1 (post-N rest overlaps → no compensation needed)
     const nightCount = equity[emp.id]?.nightCount ?? 0;
-    if (nightCount < bestScore) {
-      bestScore = nightCount;
+    let overlapBonus = 0;
+    if (day < totalDays) {
+      const nextCell = grid[emp.id][day + 1];
+      if (nextCell?.locked && nextCell?.code === "D") {
+        overlapBonus = 100; // strong preference for overlap
+      }
+    }
+    const score = overlapBonus - nightCount;
+    if (score > bestScore) {
+      bestScore = score;
       bestEmp = emp;
     }
   }
