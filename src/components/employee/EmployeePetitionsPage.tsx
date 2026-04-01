@@ -54,6 +54,7 @@ const TYPE_LABELS: Record<string, { label: string; description: string; color: s
   A: { label: "Vacaciones / Ausencia", description: "Obligatoria (aprobada por RRHH)", color: "bg-red-100 text-red-800" },
   B: { label: "Preferencia", description: "El motor intentará respetarla", color: "bg-blue-100 text-blue-800" },
   C: { label: "Intercambio", description: "Acuerdo con otro compañero", color: "bg-purple-100 text-purple-800" },
+  D: { label: "Recurrente", description: "Petición que se repite cada período (SMART detecta patrones)", color: "bg-emerald-100 text-emerald-800" },
 };
 
 const STATUS_CONFIG: Record<string, { label: string; icon: typeof CheckCircle2; color: string }> = {

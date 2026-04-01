@@ -16,6 +16,7 @@ import {
   SPAIN_LABOR_LAW,
   ROLE_CONFIGS,
   DEFAULT_REINFORCEMENT_THRESHOLD,
+  SHIFT_TIMES,
 } from "@/utils/engine";
 import type {
   EngineEmployee,
@@ -283,17 +284,46 @@ export function useSmartGenerateV2({
             }));
         }
 
-        // --- Construir continuity desde equity (si hay datos) ---
+        // --- Construir continuity desde equity + últimos días del período anterior ---
         let continuity: ContinuityHistory | undefined;
-        if (equityByEmployee.size > 0) {
-          const equitySnapshot: Record<string, EquityBalance> = {};
-          equityByEmployee.forEach((eq, empId) => {
-            equitySnapshot[empId] = eq;
-          });
-          continuity = {
-            lastWeek: {}, // TODO: cargar últimos 3 días de la generación anterior
-            equitySnapshot,
-          };
+        const equitySnapshot: Record<string, EquityBalance> = {};
+        equityByEmployee.forEach((eq, empId) => {
+          equitySnapshot[empId] = eq;
+        });
+
+        // Cargar últimos 3 días del período anterior para cross-period 12h rest
+        const lastWeek: Record<string, import("@/utils/engine/types").DayAssignmentV2[]> = {};
+        if (orgId) {
+          const prevEnd = addDays(new Date(periodStart + "T00:00:00"), -1);
+          const prevStart = addDays(prevEnd, -2); // 3 días antes
+          const empIds = calEmployees.map((e) => e.id);
+          const { data: prevShifts } = await supabase
+            .from("calendar_shifts")
+            .select("employee_id, date, shift_name, start_time, end_time")
+            .eq("org_id", orgId)
+            .in("employee_id", empIds)
+            .gte("date", format(prevStart, "yyyy-MM-dd"))
+            .lte("date", format(prevEnd, "yyyy-MM-dd"))
+            .order("date", { ascending: true });
+
+          if (prevShifts && prevShifts.length > 0) {
+            for (const row of prevShifts as any[]) {
+              const empId = row.employee_id;
+              if (!lastWeek[empId]) lastWeek[empId] = [];
+              const shiftInfo = SHIFT_TIMES[row.shift_name];
+              lastWeek[empId].push({
+                code: row.shift_name || "D",
+                hours: shiftInfo?.hours ?? 0,
+                locked: false,
+                startTime: row.start_time || shiftInfo?.startTime,
+                endTime: row.end_time || shiftInfo?.endTime,
+              });
+            }
+          }
+        }
+
+        if (equityByEmployee.size > 0 || Object.keys(lastWeek).length > 0) {
+          continuity = { lastWeek, equitySnapshot };
         }
 
         const engineEmployees: EngineEmployee[] = calEmployees.map((ce) => {

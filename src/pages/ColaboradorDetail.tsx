@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { DelegationToggle } from "@/components/calendar/DelegationToggle";
 import { AddColaboradorSheet } from "@/components/colaboradores/AddColaboradorSheet";
 import { ContractDetailsSheet } from "@/components/colaboradores/ContractDetailsSheet";
 import { RoleManagementDialog } from "@/components/colaboradores/RoleManagementDialog";
@@ -1792,6 +1793,20 @@ export default function ColaboradorDetail() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Delegación de edición FOM→AFOM (T2-10) */}
+            {isAdmin && colaborador && (
+              <div className="mt-4">
+                <DelegationToggle
+                  colaboradorId={colaborador.id}
+                  employeeName={`${colaborador.nombre || ''}${colaborador.apellidos ? ' ' + colaborador.apellidos : ''}`}
+                  isActive={!!(colaborador as any).delegation_active}
+                  startDate={(colaborador as any).delegation_start}
+                  endDate={(colaborador as any).delegation_end}
+                  grantedByUserId={user?.id || ''}
+                />
+              </div>
+            )}
           </TabsContent>
 
           {/* Sistema & Usuarios Tab - Solo visible para admins */}

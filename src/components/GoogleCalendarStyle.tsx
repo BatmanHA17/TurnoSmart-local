@@ -1795,13 +1795,19 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     hours: getShiftHours(shift)
   }));
 
-  // Function to check if employee exceeds weekly hours
+  // Function to check if employee exceeds weekly hours (scaled to visible period)
   const checkEmployeeHoursCompliance = (employeeId: string): { isExceeded: boolean, plannedHours: number, contractHours: number } => {
     const plannedHours = calculateEmployeeHours(employeeId);
     const colaborador = colaboradores.find(c => c.id === employeeId);
     if (!colaborador) return { isExceeded: false, plannedHours: 0, contractHours: 0 };
 
-    const contractHours = colaborador.tiempo_trabajo_semanal || 40;
+    const weeklyContract = colaborador.tiempo_trabajo_semanal || 40;
+    // Scale contract hours to the number of weeks visible in the calendar
+    const empShifts = shiftBlocks.filter(s => s.employeeId === employeeId);
+    const uniqueDays = new Set(empShifts.map(s => s.date.toISOString().slice(0, 10)));
+    const visibleDays = Math.max(uniqueDays.size, 7); // at least 1 week
+    const weeksInPeriod = Math.ceil(visibleDays / 7);
+    const contractHours = weeklyContract * weeksInPeriod;
     const isExceeded = plannedHours > contractHours;
 
     return { isExceeded, plannedHours, contractHours };
