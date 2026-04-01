@@ -308,11 +308,12 @@ export const ColaboradoresView = () => {
       (selectedTipoContrato === "fijo-discontinuo" && colaborador.tipo_contrato === "Contrato fijo discontinuo") ||
       (selectedTipoContrato === "ett" && colaborador.tipo_contrato === "Empleado trabajo temporal (ETT)");
 
-    // Filtro de estado de usuario
+    // Filtro de estado de usuario (soporta español e inglés en DB)
+    const statusLower = (colaborador.status || '').toLowerCase();
     const matchesEstadoUsuario = selectedEstadoUsuario === "todos-usuarios" ||
-      (selectedEstadoUsuario === "usuarios-activos" && colaborador.status === "activo") ||
-      (selectedEstadoUsuario === "usuarios-inactivos" && colaborador.status === "inactivo") ||
-      (selectedEstadoUsuario === "usuarios-pendientes" && colaborador.status === "pendiente");
+      (selectedEstadoUsuario === "usuarios-activos" && (statusLower === "activo" || statusLower === "active")) ||
+      (selectedEstadoUsuario === "usuarios-inactivos" && (statusLower === "inactivo" || statusLower === "inactive")) ||
+      (selectedEstadoUsuario === "usuarios-pendientes" && (statusLower === "pendiente" || statusLower === "pending"));
 
     return matchesSearch && matchesTipoContrato && matchesEstadoUsuario;
   });
