@@ -71,13 +71,7 @@ export default function Auth() {
     try {
       const emailLower = email.toLowerCase().trim();
 
-      // Temporary hardcode for super-admin testing
-      if (emailLower === 'sendtogalvan@gmail.com' || emailLower === 'goturnosmart@gmail.com') {
-        console.log("Super-admin detected, allowing login");
-        return true;
-      }
-
-      // Try to check profiles table directly
+      // Check profiles table for existing user
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('id')
