@@ -47,7 +47,7 @@ const DEFAULT_CRITERIA: Array<{
   { key: "AFTERNOON_TO_MORNING", name: "Turno pijama", description: "Prohibido T→M (caso específico 12h)", category: "mandatory", defaultEnabled: true },
   { key: "MIN_FREE_DAYS", name: "2 libres/semana", description: "Mínimo 2 días libres por semana", category: "mandatory", defaultEnabled: true },
   { key: "MAX_WEEKLY_HOURS", name: "40h semanales", description: "Máximo 40h de trabajo por semana", category: "mandatory", defaultEnabled: true },
-  { key: "NIGHT_THEN_REST", name: "N→libre", description: "Tras noche, siguiente día libre (ROTA_COMPLETO)", category: "mandatory", defaultEnabled: true },
+  { key: "NIGHT_THEN_REST", name: "N→D+D", description: "Tras las noches, los 2 días libres de la semana (ROTA_COMPLETO)", category: "mandatory", defaultEnabled: true },
   { key: "CROSS_PERIOD_12H", name: "12h cross-período", description: "Verificar 12h entre último turno anterior y día 1", category: "mandatory", defaultEnabled: true },
   { key: "CONTRACT_HOURS_MATCH", name: "Horas vs contrato", description: "Horas semanales coinciden con unidades de contrato", category: "mandatory", defaultEnabled: true },
   // Optional
