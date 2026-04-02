@@ -412,6 +412,178 @@ Patrones de UX a copiar:
 
 
 ================================================================================
+FACTORIAL HR — MÓDULO: HOLIDAYS & LEAVES SOFTWARE
+Fecha análisis: 2 abril 2026
+Fuente: factorialhr.com/holidays-leaves-software + screenshots
+================================================================================
+
+--- CONCEPTO ---
+
+"Time off management software — Automate your PTO process and get real-time
+visibility of remaining days off to plan better and avoid stress and hidden costs."
+
+Posicionamiento: reemplazar email y spreadsheets por un calendario centralizado.
+Enfoque cultural: "Reminders to use remaining days off won't cut it — you need
+to create the culture to support your team."
+
+
+--- HERO VISUAL (Mobile-first composition) ---
+
+Screenshot móvil muestra:
+- "Time off allowance" card navegable por tipo con flechas ← →
+  - Período: "From Feb 2024 to Dec 2024"
+  - 3 KPIs grandes: 23.0 ACCRUED DAYS | 17.0 AVAILABLE DAYS | 6.0 TAKEN DAYS
+- "Upcoming time off" list: "Family Trip" con rango MAR 2→4
+- Calendario mensual (August) con leyenda: azul = Vacation, rojo = Sickness
+- Botón "Request time off" prominente
+
+Screenshot desktop (Manager):
+- Notificación: "Sydney Adamu's time off approval request is pending"
+  - Detalle: "Vacations for 7th of August 2024 to 16th of August 2024"
+  - Fecha/hora: "14/02/24 15:00"
+  - Botones: ❌ Reject | ✅ Approve (inline, sin modal)
+
+Mobile bottom nav: Clock in | Clock in | Shifts | Expenses | More
+
+
+--- 3 FEATURE BLOCKS ---
+
+1. Time off calendar
+   "Stay ahead of absences and avoid overlapping days off with a complete team overview"
+   - Vista equipo completa para detectar solapamientos
+   - Calendario visual con códigos de color por tipo
+
+2. Manage PTO requests from a centralized platform
+   "Replace email and spreadsheets with an easy-to-use time off calendar"
+   - Solicitud desde móvil/desktop
+   - Selección de fechas + motivo + archivos adjuntos
+   - Approval chains customizables por equipo
+
+3. Create time off policies for your company
+   "Set up your system and update it easily across all teams"
+   - Políticas por ubicación y tipo de contrato
+   - Custom PTO policies
+   - Bloqueo de períodos de solicitud
+   - Gestión de carry-over (arrastre entre años)
+
+
+--- PTO LIABILITY CONCEPT (muy relevante) ---
+
+"Create a system to manage your time off"
+"The majority of workers don't use their PTO days and this can lead to PTO liability
+for your company. Reminders to use remaining days off won't cut it — you need to
+create the culture to support your team."
+
+Stats destacados:
+- "24% of employees don't feel comfortable asking for time off"
+- "55% of paid time off goes unused"
+- "$1,898 accrued PTO owed to employees on average"
+
+Solución propuesta por Factorial:
+- Visibilidad de días restantes para el empleado
+- Políticas transparentes de uso
+- Proceso de solicitud simplificado
+- Integración con nómina para calcular pasivo
+
+
+--- APPROVAL FLOW DETALLADO ---
+
+Empleado:
+1. Elige fechas de ausencia
+2. Especifica motivo (dropdown de tipos)
+3. Puede adjuntar archivos (justificante médico, etc.)
+4. Envía desde app móvil o web
+5. Recibe notificación de estado (aprobado/rechazado)
+
+Manager:
+1. Recibe notificación (email + in-app)
+2. Ve el calendario del equipo para detectar solapamientos
+3. Approve/Reject inline (sin abrir modal)
+4. Cadena de aprobación configurable por equipo
+5. Puede ver historial de ausencias del empleado
+
+
+--- INTEGRACIÓN CON OTROS MÓDULOS ---
+
+- Payroll: datos de ausencia fluyen directo a nómina
+- HR Reports: dashboards + KPIs de ausencias
+- Document Management: adjuntar justificantes
+- Organizational Chart: visibilidad de jerarquía para approval chains
+- Shifts: ausencias se reflejan automáticamente en turnos
+
+
+--- FAQs CLAVE (12 preguntas respondidas) ---
+
+Temas cubiertos:
+- Qué es PTO management y PTO tracking software
+- Cómo gestionar PTO de empleados (steps concretos)
+- Mejor forma de trackear time off (software vs manual)
+- Si existe versión gratis (sí pero con limitaciones)
+- Buena política de PTO para small business
+- Si hay app móvil (sí, con clock-in integrado)
+- Si managers tienen que aprobar (sí, centralizado)
+- Cómo manejar solicitudes solapadas (calendar view + overlap detection)
+- Cómo crear una PTO policy (primer paso: crear políticas y asignar a empleados)
+
+Patrón: FAQ accordion, 12 items, copy educativo + link a Factorial como solución
+
+
+--- IDEAS PARA TURNOSMART desde Holidays & Leaves ---
+
+ALTA prioridad (directamente aplicable):
+  > Tracker "Accrued / Available / Taken" con 3 KPIs grandes
+    - Ya tenemos los 48 días/año y el concepto de 30 naturales + 18 festivos
+    - Falta: widget visual prominente en perfil empleado y en dashboard empleado
+    - Diseño: card navegable con flechas ← → para ciclar entre tipos (Vacaciones / Festivos / DB / DG)
+
+  > Overlap detection en calendario equipo
+    - Cuando empleado solicita ausencia, mostrar quién más está ausente esos días
+    - Alertar si cobertura cae por debajo del mínimo
+    - Ya tenemos la lógica en el Wizard Step 5 (check #5 conflictos peticiones duras)
+    - Falta: mostrar overlap en el formulario del empleado ANTES de enviar
+
+  > Approval inline (Reject/Approve sin modal)
+    - Factorial lo hace en notificación inline — muy eficiente
+    - Nuestra Inbox unificada debería replicar esto
+    - Actualmente: PetitionsListPanel tiene botones pero requiere abrir el panel
+
+  > PTO Liability awareness
+    - Concepto: avisar cuando empleados acumulan demasiados días sin usar
+    - Ya tenemos SM-09 (alerta 80% vacaciones consumidas antes de octubre)
+    - Falta: widget visual de "PTO Liability" en HR Home con $ estimado
+    - Copy: "X empleados tienen Y días acumulados sin disfrutar"
+
+MEDIA prioridad:
+  > Adjuntar archivos a solicitudes de ausencia
+    - Justificante médico, certificado, etc.
+    - Requiere: file upload a Supabase Storage + campo en peticiones
+
+  > Políticas por ubicación/contrato
+    - Diferentes reglas para diferentes establecimientos
+    - Carry-over configurable (arrastre de días al siguiente año)
+    - Bloqueo de períodos (ej: no vacaciones en agosto para hostelería)
+
+  > Calendario mensual con leyenda de colores por tipo
+    - Azul = vacaciones, Rojo = baja, Verde = formación, Gris = permiso personal
+    - Ya tenemos colores en el calendario semanal (V, E, etc.)
+    - Falta: vista anual tipo Factorial (12 mini-meses)
+
+BAJA prioridad (futuro):
+  > App móvil nativa para solicitar ausencias
+  > Email notifications automáticas de cambio de estado
+  > Approval chains multi-nivel (director → HR → CEO)
+
+Patrones UX a copiar:
+  > 3 KPIs grandes horizontales (Accrued / Available / Taken) — patrón reutilizable
+  > Card navegable con flechas ← → para ciclar tipos
+  > Approval notification con Reject/Approve inline + fecha + detalle
+  > Calendario mensual con leyenda de colores
+  > FAQ accordion educativo (12 items es buen benchmark)
+  > Mobile-first hero con composición de screenshots superpuestos
+  > Stats de impacto como argumento de venta (24%, 55%, $1,898)
+
+
+================================================================================
 COMPETIDOR #2: [PENDIENTE — próximo análisis]
 ================================================================================
 
