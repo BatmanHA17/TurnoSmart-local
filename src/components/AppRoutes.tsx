@@ -35,6 +35,7 @@ const LinkAccount = React.lazy(() => import("@/pages/LinkAccount"));
 const EstablishmentDetail = React.lazy(() => import("@/pages/EstablishmentDetail"));
 const DashboardEmpleado = React.lazy(() => import("@/pages/DashboardEmpleado"));
 const EmployeePetitionsPage = React.lazy(() => import("@/pages/EmployeePetitions"));
+const QuickCreateTeamPage = React.lazy(() => import("@/pages/QuickCreateTeam"));
 const Welcome = React.lazy(() => import("@/pages/Welcome"));
 const DashboardManager = React.lazy(() => import("@/pages/DashboardManager"));
 const DashboardDirector = React.lazy(() => import("@/pages/DashboardDirector"));
@@ -259,6 +260,7 @@ export const AppRoutes = () => {
           <Route path="/turnosmart/collaborators">
             <Route index element={<ProtectedRoute><RoleGuard minRole="fom"><SectionErrorBoundary label="colaboradores"><Colaboradores /></SectionErrorBoundary></RoleGuard></ProtectedRoute>} />
             <Route path="new" element={<ProtectedRoute><RoleGuard minRole="fom"><AddColaboradorSheetRoute /></RoleGuard></ProtectedRoute>} />
+            <Route path="quick-create" element={<ProtectedRoute><RoleGuard minRole="fom"><QuickCreateTeamPage /></RoleGuard></ProtectedRoute>} />
           </Route>
 
           {/* Reception Employee Manager - Phase 3 Testing */}

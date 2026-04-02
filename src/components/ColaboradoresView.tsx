@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { getInitials } from "@/utils/avatar";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, Search, ChevronDown, Download, ArrowLeft, Check, X, Edit, Calendar } from "lucide-react";
+import { Plus, Search, ChevronDown, Download, ArrowLeft, Check, X, Edit, Calendar, Users } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -522,7 +522,17 @@ export const ColaboradoresView = () => {
           )}
           {canEdit && <InviteColaboradorDialog />}
           {canEdit && (
-            <Button 
+            <Button
+              variant="outline"
+              onClick={() => navigate('/turnosmart/collaborators/quick-create')}
+              className="flex items-center gap-2"
+            >
+              <Users className="h-4 w-4" />
+              Creador Rápido
+            </Button>
+          )}
+          {canEdit && (
+            <Button
               onClick={() => navigate('/colaboradores/new')}
               className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
             >
