@@ -112,17 +112,25 @@ export function useShiftAnalytics(params: AnalyticsDateParams | number = { mode:
 
         setShifts(formattedShifts);
 
-        // Fetch absence requests
-        const { data: requestsData, error: requestsError } = await supabase
-          .from("absence_requests")
-          .select("id, colaborador_id, employee_name, leave_type, status, submitted_date")
-          .eq("org_id", currentOrg.org_id)
-          .gte("submitted_date", format(startDate, "yyyy-MM-dd"))
-          .lte("submitted_date", format(endDate, "yyyy-MM-dd"));
+        // Fetch absence requests (tabla puede no existir en cloud aún)
+        try {
+          const { data: requestsData, error: requestsError } = await supabase
+            .from("absence_requests")
+            .select("id, colaborador_id, employee_name, leave_type, status, submitted_date")
+            .eq("org_id", currentOrg.org_id)
+            .gte("submitted_date", format(startDate, "yyyy-MM-dd"))
+            .lte("submitted_date", format(endDate, "yyyy-MM-dd"));
 
-        if (requestsError) throw requestsError;
-
-        setAbsenceRequests(requestsData || []);
+          if (!requestsError) {
+            setAbsenceRequests(requestsData || []);
+          } else {
+            console.warn("absence_requests table not available:", requestsError.message);
+            setAbsenceRequests([]);
+          }
+        } catch {
+          // Table doesn't exist yet in production — graceful degradation
+          setAbsenceRequests([]);
+        }
       } catch (err) {
         console.error("Error fetching analytics data:", err);
         setError("Error al cargar datos de analítica");

@@ -104,9 +104,9 @@ export default function HRResumen() {
             
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Calendar className="w-4 h-4" />
-              <span>01/09/2025</span>
+              <span>{new Date(new Date().getFullYear(), new Date().getMonth(), 1).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
               <span>-</span>
-              <span>30/09/2025</span>
+              <span>{new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
             </div>
           </div>
 
