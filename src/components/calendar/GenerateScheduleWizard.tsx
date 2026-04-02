@@ -57,8 +57,10 @@ import { VIOLATION_TYPE_LABELS } from "@/types/audit";
 import type { AuditViolation, SuggestedFix } from "@/types/audit";
 import type { GenerationResult, ExistingShiftsPolicy, DailyOccupancy } from "@/utils/engine";
 import type { PetitionRecord } from "@/hooks/usePetitions";
+import { useCriteria, type CriteriaRecord } from "@/hooks/useCriteria";
+import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
 import { toast } from "@/hooks/use-toast";
-import { Wrench } from "lucide-react";
+import { Wrench, Sliders, ShieldCheck } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // TYPES
@@ -788,6 +790,9 @@ function Step5Summary({
         </CardContent>
       </Card>
 
+      {/* Criterios SMART — resumen rápido (T2-2 Copilot Pre-Generación) */}
+      <CriteriaSummaryCard onOpenCriteria={onOpenCriteria} />
+
       {/* Plantilla RRHH compacta */}
       {(employees?.length ?? 0) > 0 && (
         <Card>
@@ -990,6 +995,90 @@ function Step6Generate({
 // ---------------------------------------------------------------------------
 // STEP 7 — Elegir alternativa
 // ---------------------------------------------------------------------------
+
+/** T2-2: Copilot Pre-Generación — Resumen de criterios activos */
+function CriteriaSummaryCard({ onOpenCriteria }: { onOpenCriteria?: () => void }) {
+  const { org } = useCurrentOrganization();
+  const { criteria, isLoading } = useCriteria({ organizationId: org?.id });
+
+  if (isLoading || criteria.length === 0) return null;
+
+  const mandatory = criteria.filter(c => c.category === 'mandatory' && c.enabled);
+  const optional = criteria.filter(c => c.category === 'optional' && c.enabled);
+  const disabled = criteria.filter(c => c.category === 'optional' && !c.enabled);
+  const boosted = optional.filter(c => c.boost >= 3);
+
+  // Coverage minimums from mandatory criteria
+  const coverageM = criteria.find(c => c.criteria_key === 'MIN_COVERAGE_M');
+  const coverageT = criteria.find(c => c.criteria_key === 'MIN_COVERAGE_T');
+  const coverageN = criteria.find(c => c.criteria_key === 'MIN_COVERAGE_N');
+
+  return (
+    <Card>
+      <CardContent className="pt-3 pb-2 space-y-2">
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+            <Sliders className="h-3.5 w-3.5" />
+            Criterios SMART activos
+          </h4>
+          {onOpenCriteria && (
+            <Button variant="link" size="sm" className="h-auto p-0 text-[10px]" onClick={onOpenCriteria}>
+              Ajustar
+            </Button>
+          )}
+        </div>
+
+        {/* Coverage minimums */}
+        {(coverageM || coverageT || coverageN) && (
+          <div className="flex items-center gap-3 text-xs">
+            <span className="text-muted-foreground">Cobertura mín:</span>
+            <div className="flex gap-2">
+              {coverageM && <Badge variant="outline" className="text-[10px] py-0">M:{coverageM.boost}</Badge>}
+              {coverageT && <Badge variant="outline" className="text-[10px] py-0">T:{coverageT.boost}</Badge>}
+              {coverageN && <Badge variant="outline" className="text-[10px] py-0">N:{coverageN.boost}</Badge>}
+            </div>
+          </div>
+        )}
+
+        {/* Mandatory count */}
+        <div className="flex items-center gap-2 text-xs">
+          <ShieldCheck className="h-3 w-3 text-green-600" />
+          <span className="text-green-800">{mandatory.length} criterios legales activos</span>
+        </div>
+
+        {/* Optional enabled */}
+        {optional.length > 0 && (
+          <div className="text-xs space-y-0.5">
+            <span className="text-muted-foreground">{optional.length} opcionales activados:</span>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {optional.map(c => (
+                <Badge key={c.id} variant={c.boost >= 3 ? "default" : "secondary"} className="text-[9px] py-0">
+                  {c.criteria_name}{c.boost >= 3 ? ` ×${c.boost}` : ''}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Boosted criteria highlight */}
+        {boosted.length > 0 && (
+          <div className="text-[10px] text-primary flex items-center gap-1">
+            <Sparkles className="h-3 w-3" />
+            {boosted.length} criterio{boosted.length > 1 ? 's' : ''} con boost alto — el motor los priorizará
+          </div>
+        )}
+
+        {/* Disabled warnings */}
+        {disabled.length > 0 && (
+          <div className="text-[10px] text-amber-700 flex items-center gap-1">
+            <CircleAlert className="h-3 w-3" />
+            {disabled.length} opcional{disabled.length > 1 ? 'es' : ''} desactivado{disabled.length > 1 ? 's' : ''}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function Step7Choose({
   generation,
