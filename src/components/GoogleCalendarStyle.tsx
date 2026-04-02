@@ -684,7 +684,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         .from('colaboradores')
         .select('id, nombre, apellidos, avatar_url, email, tiempo_trabajo_semanal, tipo_contrato, fecha_inicio_contrato, fecha_fin_contrato, status')
         .eq('org_id', org.org_id)
-        .or(`status.eq.activo,and(status.eq.inactivo,fecha_fin_contrato.gte.${today})`)
+        .or(`status.eq.activo,status.eq.active,fecha_fin_contrato.gte.${today}`)
         .order('nombre', { ascending: true }); // Mismo orden que en CalendarDay
 
       if (error) {
