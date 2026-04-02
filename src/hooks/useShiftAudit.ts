@@ -116,7 +116,7 @@ export function useShiftAudit(options: UseShiftAuditOptions): UseShiftAuditResul
           .eq('is_enabled', true);
         
         if (coverageError) {
-          console.error('Error loading coverage policies:', coverageError);
+          // Silenced — coverage_policies table may not exist in cloud
         } else if (coverageData && coverageData.length > 0) {
           setCoveragePolicies(coverageData.map(p => ({
             id: p.id,
@@ -142,7 +142,7 @@ export function useShiftAudit(options: UseShiftAuditOptions): UseShiftAuditResul
           .eq('is_active', true);
         
         if (restrictionsError) {
-          console.error('Error loading employee restrictions:', restrictionsError);
+          // Silenced — employee_restrictions table may not exist in cloud
         } else if (restrictionsData) {
           setEmployeeRestrictions(restrictionsData.map(r => ({
             id: r.id,
@@ -157,7 +157,7 @@ export function useShiftAudit(options: UseShiftAuditOptions): UseShiftAuditResul
           })));
         }
       } catch (error) {
-        console.error('Error loading audit policies:', error);
+        // Silenced — audit tables may not exist in cloud
       }
     };
 

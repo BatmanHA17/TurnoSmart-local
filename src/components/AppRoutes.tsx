@@ -271,6 +271,7 @@ export const AppRoutes = () => {
           </Route>
 
           {/* Legacy redirects */}
+          <Route path="/turnosmart/colaboradores" element={<Navigate to="/turnosmart/collaborators" replace />} />
           <Route path="/colaboradores" element={<Navigate to="/turnosmart/collaborators" replace />} />
           <Route path="/colaboradores/new" element={<Navigate to="/turnosmart/collaborators/new" replace />} />
           <Route path="/colaboradores/:id/*" element={<ColaboradorRedirect />} />

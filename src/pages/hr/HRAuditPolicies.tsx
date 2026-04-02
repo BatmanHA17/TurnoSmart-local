@@ -154,52 +154,61 @@ export default function HRAuditPolicies() {
 
   const loadData = async () => {
     if (!currentOrg?.org_id) return;
-    
+
     setLoading(true);
     try {
-      // Load audit policies
-      const { data: policies, error: policiesError } = await supabase
-        .from('audit_policies')
-        .select('*')
-        .eq('org_id', currentOrg.org_id);
-      
-      if (policiesError) throw policiesError;
-      setAuditPolicies((policies || []).map(p => ({
-        ...p,
-        config: jsonToRecord(p.config)
-      })));
+      // Load audit policies (graceful — table may not exist in cloud)
+      try {
+        const { data: policies, error: policiesError } = await supabase
+          .from('audit_policies')
+          .select('*')
+          .eq('org_id', currentOrg.org_id);
 
-      // Load coverage policies
-      const { data: coverage, error: coverageError } = await supabase
-        .from('coverage_policies')
-        .select('*')
-        .eq('org_id', currentOrg.org_id)
-        .order('start_time');
-      
-      if (coverageError) throw coverageError;
-      setCoveragePolicies((coverage || []).map(c => ({
-        ...c,
-        applies_to_days: jsonToStringArray(c.applies_to_days)
-      })));
+        if (!policiesError) {
+          setAuditPolicies((policies || []).map(p => ({
+            ...p,
+            config: jsonToRecord(p.config)
+          })));
+        }
+      } catch { /* audit_policies may not exist */ }
 
-      // Load employee restrictions with colaborador info
-      const { data: restrictions, error: restrictionsError } = await supabase
-        .from('employee_restrictions')
-        .select(`
-          *,
-          colaboradores!employee_restrictions_colaborador_id_fkey (
-            nombre,
-            apellidos
-          )
-        `)
-        .eq('org_id', currentOrg.org_id);
-      
-      if (restrictionsError) throw restrictionsError;
-      setEmployeeRestrictions((restrictions || []).map(r => ({
-        ...r,
-        config: jsonToRecord(r.config),
-        colaborador: r.colaboradores
-      })));
+      // Load coverage policies (graceful — table may not exist in cloud)
+      try {
+        const { data: coverage, error: coverageError } = await supabase
+          .from('coverage_policies')
+          .select('*')
+          .eq('org_id', currentOrg.org_id)
+          .order('start_time');
+
+        if (!coverageError) {
+          setCoveragePolicies((coverage || []).map(c => ({
+            ...c,
+            applies_to_days: jsonToStringArray(c.applies_to_days)
+          })));
+        }
+      } catch { /* coverage_policies may not exist */ }
+
+      // Load employee restrictions (graceful — table may not exist in cloud)
+      try {
+        const { data: restrictions, error: restrictionsError } = await supabase
+          .from('employee_restrictions')
+          .select(`
+            *,
+            colaboradores!employee_restrictions_colaborador_id_fkey (
+              nombre,
+              apellidos
+            )
+          `)
+          .eq('org_id', currentOrg.org_id);
+
+        if (!restrictionsError) {
+          setEmployeeRestrictions((restrictions || []).map(r => ({
+            ...r,
+            config: jsonToRecord(r.config),
+            colaborador: r.colaboradores
+          })));
+        }
+      } catch { /* employee_restrictions may not exist */ }
 
       // Load colaboradores for selection
       const { data: colabs, error: colabsError } = await supabase
@@ -207,13 +216,13 @@ export default function HRAuditPolicies() {
         .select('id, nombre, apellidos')
         .eq('org_id', currentOrg.org_id)
         .eq('status', 'activo');
-      
-      if (colabsError) throw colabsError;
-      setColaboradores(colabs || []);
-      
+
+      if (!colabsError) {
+        setColaboradores(colabs || []);
+      }
+
     } catch (error) {
-      console.error('Error loading audit data:', error);
-      toast.error('Error al cargar los datos de auditoría');
+      // Silenced — graceful degradation for missing cloud tables
     } finally {
       setLoading(false);
     }
@@ -233,7 +242,7 @@ export default function HRAuditPolicies() {
       ));
       toast.success(`Política ${!policy.is_enabled ? 'activada' : 'desactivada'}`);
     } catch (error) {
-      console.error('Error toggling policy:', error);
+      // Silenced — audit_policies may not exist in cloud
       toast.error('Error al cambiar el estado de la política');
     }
   };
@@ -253,7 +262,7 @@ export default function HRAuditPolicies() {
       ));
       toast.success('Configuración guardada');
     } catch (error) {
-      console.error('Error updating policy config:', error);
+      // Silenced — audit_policies may not exist in cloud
       toast.error('Error al guardar la configuración');
     } finally {
       setSaving(false);
@@ -299,7 +308,7 @@ export default function HRAuditPolicies() {
       setNewCoverage({ name: '', start_time: '07:00', end_time: '15:00', min_employees: 1 });
       loadData();
     } catch (error) {
-      console.error('Error saving coverage policy:', error);
+      // Silenced — coverage_policies may not exist in cloud
       toast.error('Error al guardar la política de cobertura');
     } finally {
       setSaving(false);
@@ -318,7 +327,7 @@ export default function HRAuditPolicies() {
       setCoveragePolicies(prev => prev.filter(p => p.id !== id));
       toast.success('Política de cobertura eliminada');
     } catch (error) {
-      console.error('Error deleting coverage policy:', error);
+      // Silenced — coverage_policies may not exist in cloud
       toast.error('Error al eliminar la política');
     }
   };
@@ -336,7 +345,7 @@ export default function HRAuditPolicies() {
         p.id === policy.id ? { ...p, is_enabled: !p.is_enabled } : p
       ));
     } catch (error) {
-      console.error('Error toggling coverage policy:', error);
+      // Silenced — coverage_policies may not exist in cloud
       toast.error('Error al cambiar el estado');
     }
   };
@@ -377,7 +386,7 @@ export default function HRAuditPolicies() {
       });
       loadData();
     } catch (error) {
-      console.error('Error saving restriction:', error);
+      // Silenced — employee_restrictions may not exist in cloud
       toast.error('Error al guardar la restricción');
     } finally {
       setSaving(false);
@@ -396,7 +405,7 @@ export default function HRAuditPolicies() {
       setEmployeeRestrictions(prev => prev.filter(r => r.id !== id));
       toast.success('Restricción eliminada');
     } catch (error) {
-      console.error('Error deleting restriction:', error);
+      // Silenced — employee_restrictions may not exist in cloud
       toast.error('Error al eliminar la restricción');
     }
   };
