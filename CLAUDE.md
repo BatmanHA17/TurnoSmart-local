@@ -139,7 +139,7 @@ Guía usuario con notas PO: `docs/GUIA_USUARIO_GENERACION_TURNOS_CON_MIS_NOTAS.m
 9. **T1-9** Emails invitación personalizados (branding TurnoSmart español)
 
 ### Tier 2 — Medio Plazo (25-33 días) 🎯
-1. **T2-1** Copilot Auditoría (botón "Resolver" con sugerencia automática por alerta)
+1. **T2-1** ~~Copilot Auditoría (botón "Resolver" con sugerencia automática por alerta)~~ ✅ `778074e`
 2. **T2-2** Copilot Pre-Generación (checklist criterios en Wizard Step 5)
 3. **T2-3** Calculadora plantilla bruta/activa/presencial (widget + alertas RRHH)
 4. **T2-4** Peticiones desde vista empleado (/mi-espacio autoservicio)
@@ -173,7 +173,7 @@ Copilot chat NLP completo, NLP en notas, Unificar roles/seniority, Eliminar expo
 | # | Bug | Archivo/Zona | Severidad | Origen |
 |---|-----|-------------|-----------|--------|
 | P1 | ~~**Motor genera con 0 empleados**~~ — bloqueado en Wizard + guard en hook | Wizard / engine | ✅ Fix `b6b33b2` | Smoke test |
-| P2 | **"Revisar" en Step 7 no abre auditoría** — feature pendiente (no hay UI de audit en Step 7) | Wizard Step 7 | 🟡 Feature | Smoke test |
+| P2 | ~~**"Revisar" en Step 7 no abre auditoría**~~ — panel violaciones expandible + Copilot Wrench | Wizard Step 7 | ✅ Fix `778074e` | Smoke test |
 | P3 | ~~**Dropdown empleados vacío en Peticiones**~~ | Panel Peticiones | ✅ Fix `856ff75` | Smoke test |
 | P4 | ~~**"Error al cargar datos de analítica"**~~ | `/mi-actividad` | ✅ Fix `8d7dc47` | Smoke test |
 | P5 | ~~**HR Home fechas hardcoded 2025**~~ | `HRResumen.tsx` | ✅ Fix `8d7dc47` | Smoke test SA |
