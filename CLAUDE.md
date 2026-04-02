@@ -142,7 +142,7 @@ Guía usuario con notas PO: `docs/GUIA_USUARIO_GENERACION_TURNOS_CON_MIS_NOTAS.m
 1. **T2-1** ~~Copilot Auditoría (botón "Resolver" con sugerencia automática por alerta)~~ ✅ `778074e`
 2. **T2-2** ~~Copilot Pre-Generación (checklist criterios en Wizard Step 5)~~ ✅ `3c57aac` — CriteriaSummaryCard + 8-point checklist
 3. **T2-3** ~~Calculadora plantilla bruta/activa/presencial (widget + alertas RRHH)~~ ✅ `447e4ae` — HR Home con datos reales + PlantillaCalculator en header + wizard
-4. **T2-4** Peticiones desde vista empleado (/mi-espacio autoservicio)
+4. **T2-4** ~~Peticiones desde vista empleado (/mi-espacio autoservicio)~~ ✅ `273b338` — Dashboard + nav + mobile integrados
 5. **T2-5** ~~Templates de organización (onboarding inteligente por sector)~~ ✅ Ya implementado — wizardTemplates.ts con 6 sectores + genérico
 6. **T2-6** ~~Días debidos guardia → acumulación en dg_balance (no auto-asignar)~~ ✅ `10cde51` — engine acumula + UI muestra DG/DB
 7. **T2-7** ~~Tour onboarding (5 tooltips)~~ ✅ Ya implementado — OnboardingTour.tsx custom (sin react-joyride)
