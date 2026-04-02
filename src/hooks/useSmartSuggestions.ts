@@ -13,6 +13,7 @@ import {
   detectFrequentAdHocShifts,
   detectTransitionNeeds,
   detectVacationAlerts,
+  detectVacationOpportunities,
 } from "@/utils/engine/smartIA";
 import type { SmartSuggestion } from "@/utils/engine/smartIA";
 
@@ -30,6 +31,8 @@ interface UseSmartSuggestionsProps {
     vacationDaysUsed: number;
     vacationDaysTotal: number;
   }>;
+  /** Datos de ocupación diaria (para SM-11) */
+  occupancy?: Array<{ day: number; totalMovements: number }>;
 }
 
 interface UseSmartSuggestionsResult {
@@ -53,6 +56,7 @@ interface UseSmartSuggestionsResult {
 export function useSmartSuggestions({
   savedShiftCodes,
   employees,
+  occupancy,
 }: UseSmartSuggestionsProps): UseSmartSuggestionsResult {
   const [suggestions, setSuggestions] = useState<SmartSuggestion[]>([]);
 
@@ -81,6 +85,13 @@ export function useSmartSuggestions({
       allSuggestions.push(
         ...detectTransitionNeeds(schedules, totalDays)
       );
+
+      // SM-11: Sugerir vacaciones en períodos de baja ocupación (T3-6)
+      if (occupancy && occupancy.length > 0) {
+        allSuggestions.push(
+          ...detectVacationOpportunities(employees, occupancy, new Date().getMonth() + 1)
+        );
+      }
 
       setSuggestions((prev) => {
         // No duplicar sugerencias del mismo tipo

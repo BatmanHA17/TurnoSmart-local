@@ -3012,7 +3012,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     dismissSuggestion,
     clearAll: clearSmartSuggestions,
     pendingCount: smartPendingCount,
-  } = useSmartSuggestions({ savedShiftCodes, employees: employeesForIA });
+  } = useSmartSuggestions({ savedShiftCodes, employees: employeesForIA, occupancy: occupancyForWizard });
 
   const handleOpenGenerateSheet = () => setShowWizard(true);
   const handleGenerate = (config: GenerateConfig) => {
