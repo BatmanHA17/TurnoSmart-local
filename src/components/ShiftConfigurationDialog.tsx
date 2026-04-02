@@ -125,12 +125,7 @@ export function ShiftConfigurationDialog({ isOpen, onClose }: ShiftConfiguration
                     >
                       Horarios guardados
                     </TabsTrigger>
-                    <TabsTrigger 
-                      value="rotating" 
-                      className="text-sm px-0 pb-3 bg-transparent border-none shadow-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:font-semibold rounded-none relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-transparent data-[state=active]:after:bg-foreground"
-                    >
-                      Horarios rotativos
-                    </TabsTrigger>
+                    {/* "Horarios rotativos" tab removed — rotation handled by SMART engine */}
                   </TabsList>
                 </div>
 
@@ -265,11 +260,7 @@ export function ShiftConfigurationDialog({ isOpen, onClose }: ShiftConfiguration
                   </div>
                 </TabsContent>
 
-                <TabsContent value="rotating" className="flex-1 overflow-y-auto">
-                  <div className="p-4">
-                    <RotatingShiftsConfig />
-                  </div>
-                </TabsContent>
+                {/* rotating tab removed — SMART engine handles rotation */}
               </Tabs>
             </div>
           </div>
