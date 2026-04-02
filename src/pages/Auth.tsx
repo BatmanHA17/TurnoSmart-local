@@ -579,29 +579,25 @@ export default function Auth() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone" className="text-sm font-normal text-muted-foreground">
-                  Teléfono (opcional)
+                <Label className="text-sm font-normal text-muted-foreground">
+                  Tu rol
                 </Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="h-11 bg-gray-50"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="position" className="text-sm font-normal text-muted-foreground">
-                  Cargo (opcional)
-                </Label>
-                <Input
-                  id="position"
-                  type="text"
-                  value={position}
-                  onChange={(e) => setPosition(e.target.value)}
-                  className="h-11 bg-gray-50"
-                />
+                <Select value={position} onValueChange={setPosition}>
+                  <SelectTrigger className="h-11 bg-gray-50">
+                    <SelectValue placeholder="Selecciona tu rol" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Management Team">Management Team</SelectItem>
+                    <SelectItem value="HR Manager">HR Manager</SelectItem>
+                    <SelectItem value="HR Specialist">HR Specialist</SelectItem>
+                    <SelectItem value="Operations Team">Operations Team</SelectItem>
+                    <SelectItem value="Administrative/Accounting Team">Administrative/Accounting Team</SelectItem>
+                    <SelectItem value="IT Team">IT Team</SelectItem>
+                    <SelectItem value="I'm a student">I'm a student</SelectItem>
+                    <SelectItem value="I'm an intern">I'm an intern</SelectItem>
+                    <SelectItem value="Other">Otro</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <Button 
