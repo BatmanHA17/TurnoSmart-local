@@ -278,7 +278,141 @@ Large (1-2 semanas):
 
 
 ================================================================================
+FACTORIAL HR — MÓDULO: PERFORMANCE MANAGEMENT
+Fecha análisis: 2 abril 2026
+Fuente: factorialhr.com/performance-management + screenshots del tour
+================================================================================
+
+--- CONCEPTO ---
+
+"A complete performance management toolkit in a single platform"
+Tres fases: Plan performance reviews → Track performance → Take action
+Precio: desde $7.30/mes por usuario (módulo específico)
+
+
+--- PLAN PERFORMANCE REVIEWS ---
+
+Funcionalidades:
+- Configurar períodos de evaluación con timeline (ej: "Q1 2024 - Sales Team, 3 weeks remaining")
+- Estado visual "Ongoing" con badge verde
+- Recordatorios automáticos de participación a empleados
+- Reviews 360° con feedback de empleados, managers y peers
+- Asignar y gestionar goals usando KPIs
+- IA para resúmenes de performance reviews
+- Alineación de objetivos
+
+UI observada:
+- Dashboard con 3 action cards: "Peer assignment" (View all), "Complete reviews" (Complete reviews), "Sign agreement" (Sign agreement)
+- 46 Participants counter en cabecera
+- KPIs Overview: Low performers 30.6% | High performers 8% | Completion rate 35% (con barra progreso)
+
+
+--- TRACK PERFORMANCE ---
+
+Funcionalidades:
+- Dashboard de monitorización en tiempo real
+- Spider graph (gráfico de araña) para visualización multi-dimensional
+- Recopilación de insights + exportación de datos
+- Reviews customizables con gestión flexible de participantes
+- Performance review agreements (firma de acuerdos de evaluación)
+- Exportar datos para decisiones estratégicas
+
+UI patterns observados:
+- Gráfico radar/spider para competencias múltiples
+- Progress bars para completion rate
+- Cards con KPIs grandes (números prominentes con % y label debajo)
+
+
+--- TAKE ACTION ---
+
+Funcionalidades:
+- Reuniones 1:1 personalizadas con feedback constructivo
+- Asignación de tareas accionables para mejora de performance
+- Establecimiento de goals con objetivos medibles
+- Planificación de desarrollo del empleado
+
+Filosofía:
+"Give each employee the feedback, insight, and growth plan essential to their development"
+
+
+--- HERRAMIENTAS ESPECÍFICAS (4 tools destacadas en la página) ---
+
+1. 360° Reviews
+   - Vista holística del rendimiento
+   - Feedback desde múltiples fuentes (self, peers, manager, reports)
+   - Configurable por período y equipo
+
+2. Performance Insights
+   - Spider graph (gráfico radar) por competencias
+   - Exportación para decisiones estratégicas
+   - Vista agregada de equipo + individual
+
+3. Goals & KPIs
+   - Tracking diario de objetivos
+   - Alineación con OKRs de empresa
+   - Medibles y con deadline
+
+4. 1:1 Meetings
+   - Reuniones personalizadas
+   - Feedback constructivo estructurado
+   - Planes de acción como output
+
+
+--- STATS DE IMPACTO (Social proof con datos) ---
+
+- "15% lower turnover" para empresas que comparten feedback constructivo
+- "68% of employees" que reciben feedback preciso y consistente prosperan en el trabajo
+- "4.6x productivity increase" para empleados cuya voz es escuchada
+
+Nota: patrón muy efectivo de usar stats antes de mostrar features → justifican la inversión
+
+
+--- CROSS-SELL (Módulos relacionados mostrados al final) ---
+
+1. Time Tracking — "137h 04m worked, +3h 04m hour balance" con time slots y breaks
+2. Document Management — firma electrónica de empleado, auto-fill, envío bulk
+3. Training Expenses — "$9,020 total, 17 employees, $4,200 presupuesto"
+
+Patrón: 3 cards con screenshot + título + descripción + "Learn more →"
+
+
+--- TESTIMONIAL ---
+
+Oliant (Tech, +50 employees):
+"Our main challenge was the lack of integration; we needed one central point
+of operation to simplify our processes. Time off reflected in shifts and payroll,
+and hiring people through that same platform – Factorial helped integrate these processes."
+— Max Rios, CEO
+
+
+--- IDEAS PARA TURNOSMART desde Performance Management ---
+
+Aplicabilidad directa (corto plazo):
+  > Dashboard de rendimiento del equipo con KPIs: % cumplimiento horario, puntualidad, disponibilidad
+  > "Completion rate" pattern aplicable a: % turnos cubiertos del mes, % peticiones respondidas
+  > Stats de impacto tipo "15% lower turnover" en nuestra landing page con datos reales
+  > Spider graph para equidad multi-dimensional (M/T/N/FDS/festivos por empleado)
+
+Aplicabilidad media (si añadimos evaluaciones):
+  > Evaluaciones simples del FOM al equipo (no full 360, pero sí "nota del jefe" por período)
+  > 1:1 meetings estructurados FOM↔empleado (acta + tareas de mejora)
+  > Goals simples por empleado (ej: "reducir tardanzas", "cubrir más noches", "formación X")
+
+Aplicabilidad baja (no core para turnos):
+  > 360° Reviews completo (overkill para equipos de 5-12 personas)
+  > Competency frameworks / skill matrices
+  > OKR enterprise tracking
+
+Patrones de UX a copiar:
+  > 3 KPIs grandes con % en Overview (Low/High/Completion → nosotros: Déficit/Exceso/Cobertura)
+  > Spider graph para visualizar equidad multi-eje
+  > Action cards "Peer assignment / Complete reviews / Sign" → "Aprobar peticiones / Resolver alertas / Publicar turno"
+  > Barra de progreso para completion rate
+  > Cross-sell de módulos con screenshots al final de cada página
+
+
+================================================================================
 COMPETIDOR #2: [PENDIENTE — próximo análisis]
 ================================================================================
 
-(Añadir aquí el siguiente competidor analizado)
+(Añadir aquí el siguiente competidor analizado: HiBob, Kenjo, Sesame, Personio, etc.)
