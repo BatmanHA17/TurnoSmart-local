@@ -51,7 +51,8 @@ export function CriteriaConfigDialog({
 }: CriteriaConfigDialogProps) {
   const COVERAGE_KEYS = ["MIN_COVERAGE_M", "MIN_COVERAGE_T", "MIN_COVERAGE_N"];
   const coverageCriteria = criteria.filter((c) => COVERAGE_KEYS.includes(c.criteria_key));
-  const mandatory = criteria.filter((c) => c.category === "mandatory" && !COVERAGE_KEYS.includes(c.criteria_key));
+  const HIDDEN_KEYS = [...COVERAGE_KEYS, "CROSS_PERIOD_12H"]; // CROSS_PERIOD_12H merged into 12H_REST
+  const mandatory = criteria.filter((c) => c.category === "mandatory" && !HIDDEN_KEYS.includes(c.criteria_key));
   const optional = criteria.filter((c) => c.category === "optional");
   const custom = criteria.filter((c) => c.category === "custom");
 
