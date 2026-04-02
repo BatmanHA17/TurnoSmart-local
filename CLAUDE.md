@@ -150,9 +150,16 @@ Guía usuario con notas PO: `docs/GUIA_USUARIO_GENERACION_TURNOS_CON_MIS_NOTAS.m
 9. **T2-9** ~~Visualizar período anterior (panel resumen Wizard Step 5)~~ ✅ `0b6e700` — loads from employee_equity DB
 10. **T2-10** ~~Modo edición delegable FOM→AFOM (toggle + fechas)~~ ✅ Ya implementado — DelegationToggle + useTurnoSmartRole isDelegated
 
-### Tier 3 — Post-Lanzamiento 🔮
-CSV/Excel parsing mejorado, Tablet Mode, Paleta colores pastel progresiva, Vista diaria optimizada,
-Landing bienvenida empleado, Sugerir vacaciones en baja ocupación, Analítica peticiones, SMART tags en notas, OCR foto PMS
+### Tier 3 — Post-Lanzamiento 🔮 (6/9 completados)
+- ~~CSV/Excel parsing mejorado~~ ⚠️ CSV OK, .xlsx pendiente
+- ~~Tablet Mode~~ ⚠️ Responsive OK, touch gestures pendiente
+- ~~Paleta colores pastel progresiva~~ ✅ Ya implementado
+- ~~Vista diaria optimizada~~ ✅ Ya implementado (DayView.tsx)
+- ~~Landing bienvenida empleado~~ ✅ Ya implementado (WelcomeDashboard.tsx)
+- Sugerir vacaciones en baja ocupación — pendiente
+- ~~Analítica peticiones~~ ✅ `ccb28f7` — PetitionAnalyticsCard
+- ~~SMART tags en notas~~ ✅ `9c1d698` — tag dots en celdas calendario
+- OCR foto PMS — pendiente (futuro)
 
 ### Descartado ❌
 Copilot chat NLP completo, NLP en notas, Unificar roles/seniority, Eliminar exportación, Eliminar campos RRHH
