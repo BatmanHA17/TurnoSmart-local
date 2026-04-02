@@ -150,8 +150,8 @@ Guía usuario con notas PO: `docs/GUIA_USUARIO_GENERACION_TURNOS_CON_MIS_NOTAS.m
 9. **T2-9** ~~Visualizar período anterior (panel resumen Wizard Step 5)~~ ✅ `0b6e700` — loads from employee_equity DB
 10. **T2-10** ~~Modo edición delegable FOM→AFOM (toggle + fechas)~~ ✅ Ya implementado — DelegationToggle + useTurnoSmartRole isDelegated
 
-### Tier 3 — Post-Lanzamiento 🔮 (7/9 completados)
-- ~~CSV/Excel parsing mejorado~~ ⚠️ CSV OK, .xlsx pendiente
+### Tier 3 — Post-Lanzamiento 🔮 (8/9 completados)
+- ~~CSV/Excel parsing mejorado~~ ✅ `1a50c01` — xlsx dynamic import + unified parser
 - ~~Tablet Mode~~ ⚠️ Responsive OK, touch gestures pendiente
 - ~~Paleta colores pastel progresiva~~ ✅ Ya implementado
 - ~~Vista diaria optimizada~~ ✅ Ya implementado (DayView.tsx)
