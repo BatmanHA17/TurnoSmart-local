@@ -8,7 +8,7 @@ Stack: Vite + React 18 + TypeScript + Supabase + shadcn/ui + Tailwind.
 - **App:** `https://turno-smart-local.vercel.app`
 - **Supabase Cloud:** `povgwdbnyqdcygedcijl` (Frankfurt eu-central-1)
 - **Deploy:** Auto CI/CD GitHub `main` → Vercel (~25s build)
-- **Dominio pendiente:** `turnosmart.app` (IONOS, aún apunta a Canva)
+- **Dominio:** `turnosmart.app` → redirect 307 → `www.turnosmart.app` (IONOS DNS → Vercel, SSL activo)
 - **Admin:** goturnosmart@gmail.com / TurnoSmart2026! (super_admin)
 - **Manager:** jmgalvan@telefonica.net / TurnoSmart2026! (fom)
 - **Org cloud:** "Recepción" (`99c21a44-a760-4fc2-a0ad-152cf5d3d77f`)
