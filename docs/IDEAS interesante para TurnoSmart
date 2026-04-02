@@ -898,6 +898,148 @@ Patrones UX:
 
 
 ================================================================================
+FACTORIAL HR — MÓDULO: HR REPORTS & ANALYTICS
+Fecha análisis: 2 abril 2026
+Fuente: factorialhr.com/hr-reports + screenshots de dashboards
+================================================================================
+
+--- CONCEPTO ---
+
+"Transform data into insights with HR reports software"
+"Gain insights into employee performance and productivity with HR analytics
+software that empowers managers to make data-driven decisions."
+
+Incluido en core package. Reports customizables con SQL o IA.
+
+
+--- 6 ÁREAS DE REPORTING (con dashboards visuales) ---
+
+1. Finance
+   - Company costs: $25,926.12 (↑6% after May 2024) — line chart
+   - Annual total: $180,872.02 (↑22% in 2024)
+   - Headcount: 10 — bar chart mensual
+   - Distribución de costes por market/team/project
+
+2. Performance
+   - Average scores: 6/10
+   - High performance: 8% (badge verde)
+   - Low performance: 30.6% (badge rojo)
+   - Bar chart con distribución de scores por equipo
+
+3. Project management
+   - Horas y cost trends por proyecto
+   - Expenses vs profits
+   - "Evaluate the success of your projects"
+
+4. Recruiting
+   - Canales de talent acquisition
+   - Efectividad por canal
+   - Budget allocation
+
+5. Training
+   - Team enrollment: bar chart por equipo (Marketing 40, 34%)
+   - Number of courses: 17
+   - Total costs: $9,020
+   - Total subsidies: $4,200
+   - Course hours, progress tracking
+
+6. Employee satisfaction
+   - Turnover rate: 3.4% (↓4% vs prev month)
+   - eNPS donut chart: Promoters 65% / Neutral 14% / Critics 31%
+   - Workplace satisfaction: 8/10 "employees are satisfied"
+
+
+--- FEATURES TÉCNICAS ---
+
+- Reports estándar + customizados complejos
+- SQL o IA para reports personalizados ("Use SQL or AI")
+- Real-time analytics (datos actualizados automáticamente)
+- Export + share dentro de Factorial
+- Central data management: time off, salary, contract info centralizado
+- Datos cross-módulo: Time, Talent, Payroll, Finance
+- Datos disponibles para download
+
+
+--- UI PATTERNS DE DASHBOARDS (screenshots capturados) ---
+
+Finance dashboard:
+  - 2 KPIs grandes con $ + trend arrows (↑6%, ↑22%)
+  - Line chart de evolución temporal
+  - Bar chart de headcount mensual
+  - Fondo suave rosa/coral
+
+Performance dashboard:
+  - 3 KPIs: Average / High / Low con colores (negro/verde/rojo)
+  - Bar chart con barras azul (high) y rojo (low) por período
+  - Fondo suave rosa/salmón
+
+Training dashboard:
+  - Bar chart stacked por equipo (enrollment)
+  - Tooltip con % y count
+  - KPIs: courses count, total costs, subsidies
+
+Satisfaction dashboard:
+  - Turnover rate KPI con trend arrow
+  - eNPS donut chart (3 colores: rojo/amarillo/verde)
+  - Workplace satisfaction score x/10
+
+Patrón visual consistente:
+  - Fondo pastel suave por categoría
+  - 2-3 KPIs grandes + 1 chart principal
+  - Trend arrows (↑↓) con % cambio
+  - Cards con border-radius ~16px
+
+
+--- IDEAS PARA TURNOSMART desde HR Reports ---
+
+ALTA prioridad (datos que YA tenemos):
+  > Dashboard analítico mejorado con los 6 patrones de Factorial adaptados:
+
+  1. "Turnos" (equiv Finance):
+     - Total horas generadas este mes + trend vs mes anterior
+     - Headcount activo: bar chart mensual
+     - Coste estimado de horas (horas × coste/hora medio)
+
+  2. "Equidad" (equiv Performance):
+     - Equity score medio del equipo (nuestro Score 0-100)
+     - High equity: X% empleados con balance perfecto M/T/N
+     - Low equity: X% con desequilibrio >5 turnos
+     - Bar chart equidad por empleado
+
+  3. "Peticiones" (equiv Recruiting funnel):
+     - Satisfaction rate: X% aprobadas (ya implementado en T3-7)
+     - Funnel: Creadas → Pendientes → Aprobadas → Aplicadas en motor
+     - Tendencia mensual de volumen de peticiones
+
+  4. "Ausencias" (equiv Training):
+     - Días ausencia por tipo (V/E/PM/DB/DG)
+     - Vacaciones consumidas vs presupuesto (48 días)
+     - PTO Liability estimado
+
+  5. "Cobertura" (equiv Satisfaction):
+     - Cobertura rate: X% turnos cubiertos sin alerta
+     - Turnover rate del equipo (si implementamos)
+     - Occupancy vs staffing correlation
+
+  > Trend arrows (↑↓) en todos los KPIs — compara vs período anterior
+  > Donut chart para distribución de tipos de turno (M/T/N/D)
+  > Export de datos a CSV/Excel (ya tenemos parcialmente)
+
+MEDIA prioridad:
+  > SQL/AI report builder (futuro — requiere backend)
+  > Scheduled reports (envío automático semanal por email al FOM)
+  > Benchmark entre períodos (este mes vs mismo mes año anterior)
+
+Patrones UX de dashboards a copiar:
+  > 2-3 KPIs grandes + 1 chart = 1 card de reporte
+  > Trend arrows con % cambio vs período anterior
+  > Fondos pastel suaves por categoría (reutilizar notion-*-bg)
+  > Consistencia visual: todos los dashboards siguen el mismo patrón
+  > eNPS donut adaptable a: Promoters/Neutral/Critics → OK/Warning/Error
+  > "included in core package" — analytics no es premium, es base
+
+
+================================================================================
 COMPETIDOR #2: [PENDIENTE — próximo análisis]
 ================================================================================
 
