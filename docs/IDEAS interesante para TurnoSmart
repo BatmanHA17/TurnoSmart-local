@@ -758,6 +758,146 @@ Patrón UX clave:
 
 
 ================================================================================
+FACTORIAL HR — MÓDULO: EMPLOYEE PORTAL (Self-Service)
+Fecha análisis: 2 abril 2026
+Fuente: factorialhr.com/employee-portal + web fetch
+================================================================================
+
+--- CONCEPTO ---
+
+"No one can take care of employee data better than employees"
+"Cut your time in half by authorizing your employees to take charge of their tasks"
+Portal 100% self-service: el empleado gestiona sus propios datos sin intervención de HR.
+
+
+--- FILOSOFÍA CLAVE ---
+
+Empowerment > Control. El portal de empleado reduce la fricción administrativa
+dándole autonomía total al empleado sobre su información personal, fichaje,
+ausencias y documentos. HR solo interviene para aprobar, no para gestionar.
+
+Stats del mercado:
+- 15,500+ empresas usan Factorial
+- App Store 4.7/5, Google Play disponible
+
+
+--- SELF-SERVICE: QUÉ PUEDE HACER EL EMPLEADO SOLO ---
+
+1. Datos personales
+   - Ver y editar su perfil completo
+   - Actualizar dirección, teléfono, contacto emergencia
+   - Gestionar información en su propio horario
+
+2. Documentos
+   - Ver documentos personales (contrato, nóminas, políticas)
+   - Firma electrónica de documentos
+   - Acceso a guidelines y protocolos de empresa
+   - Almacenamiento seguro accesible 24/7
+
+3. Fichaje
+   - Clock in/out desde móvil con geolocalización
+   - QR code en ubicación física
+   - Ver horas trabajadas y balance
+
+4. Ausencias
+   - Ver saldo de PTO (Accrued/Available/Taken)
+   - Solicitar time off desde móvil
+   - Ver estado de solicitudes (pending/approved/rejected)
+
+5. Turnos
+   - Ver su horario de turnos
+   - Recibir alertas de cambios de última hora
+   - Swap shifts con compañeros en emergencias
+
+6. Onboarding
+   - Auto-onboarding con documentos y firmas
+   - Completar training materials a su ritmo
+   - Acceso inmediato a materiales de su rol
+
+7. Equipo
+   - Ver organigrama
+   - Directorio de compañeros
+   - Comunicaciones y anuncios de empresa
+
+
+--- MOBILE APP ---
+
+- iOS + Android nativo
+- Clock in/out con geolocalización
+- Gestión de PTO desde el móvil
+- Shift swapping
+- Push notifications para cambios
+- Funcionalidad offline (implícita)
+- QR code para demo environments
+
+
+--- ADMIN vs EMPLOYEE: DIFERENCIA DE VISTAS ---
+
+Employee Portal:
+  → Gestión de datos personales
+  → Self-service (fichaje, ausencias, documentos)
+  → Vista de su propio horario
+  → Feedback de equipo
+
+Admin/Manager Portal:
+  → Configuración company-wide
+  → Aprobaciones (timesheets, ausencias, peticiones)
+  → Analytics y reporting
+  → Gestión de empleados
+  → Generación de turnos y publicación
+
+
+--- IDEAS PARA TURNOSMART desde Employee Portal ---
+
+ALTA prioridad (ya parcialmente implementado):
+  > Filosofía "empowerment > control" — nuestro DashboardEmpleado ya va por aquí
+    pero necesita MÁS autoservicio:
+    - ✅ Ver mis turnos (implementado)
+    - ✅ Mis peticiones (T2-4 implementado)
+    - ⬜ Ver mi saldo de vacaciones/festivos/DG/DB (falta widget prominente)
+    - ⬜ Editar mis datos personales desde mi perfil (actualmente solo FOM puede)
+    - ⬜ Ver mis documentos (contrato, nóminas — futuro)
+
+  > "Cut your time in half" messaging — copy de ahorro de tiempo para FOM
+    - El FOM no debería gestionar datos del empleado — el empleado lo hace solo
+    - Reducir tareas administrativas del FOM = más tiempo para gestión operativa
+
+  > Shift swap self-service
+    - Dos empleados proponen intercambio → sistema valida → FOM aprueba
+    - Ya tenemos Petición tipo C (intercambio) pero el flujo es manual
+    - Falta: botón "Proponer swap" en la vista de turnos del empleado
+
+MEDIA prioridad:
+  > Onboarding self-service
+    - Nuevo empleado recibe email → entra al portal → firma documentos → completa training
+    - Ya tenemos onboarding wizard pero es para el ADMIN, no para el empleado
+    - Falta: flujo de onboarding desde perspectiva del nuevo empleado
+
+  > Push notifications para cambios de turno
+    - "Tu turno del martes ha cambiado de M a T" → push al móvil
+    - Ya tenemos el concepto en post-publicación (cambios en azul)
+    - Falta: canal de notificación real (email/push)
+
+  > Directorio de equipo accesible al empleado
+    - Quién trabaja conmigo, teléfono, email, foto
+    - Actualmente empleados no ven la lista de colaboradores (RoleGuard minRole="fom")
+    - Considerar: vista limitada del directorio (solo nombre, foto, puesto — sin datos sensibles)
+
+BAJA prioridad:
+  > Firma electrónica de documentos
+  > Training materials / LMS
+  > Employee surveys / engagement
+  > Benefits enrollment
+
+Patrones UX:
+  > Self-service como filosofía de producto, no como feature
+  > Mobile-first para TODO lo del empleado
+  > "Manage on your own schedule" — acceso 24/7 a datos
+  > Reducir intervención de HR/FOM al mínimo (solo aprobaciones)
+  > Copy de ahorro: "Cut your time in half" con datos concretos
+
+
+================================================================================
 COMPETIDOR #2: [PENDIENTE — próximo análisis]
 ================================================================================
 
