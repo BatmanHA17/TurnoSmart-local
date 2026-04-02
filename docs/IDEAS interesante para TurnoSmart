@@ -584,6 +584,180 @@ Patrones UX a copiar:
 
 
 ================================================================================
+FACTORIAL HR — MÓDULO: TIME & ATTENDANCE (CLOCK-IN / FICHAJE)
+Fecha análisis: 2 abril 2026
+Fuente: factorialhr.com/time-attendance-signing + web fetch intenso
+================================================================================
+
+--- CONCEPTO ---
+
+"Take the guesswork out of how many hours your team worked, when they clocked
+in, and where they worked from."
+
+Tres tabs: Track time → Manage time → Plan time
+Precio: desde $8/mes por empleado (módulo modular)
+
+
+--- MÉTODOS DE FICHAJE (6 métodos) ---
+
+1. Mobile App — un toque para clock in/out
+2. QR Code — escaneo en ubicación específica (no requiere hardware)
+3. Geofencing — radio GPS configurable de 50m a 1km
+4. Facial Recognition — Face ID via smartphone camera
+5. Web Browser — fichaje desde desktop
+6. Project Assignment — fichar directamente a un proyecto/tarea
+
+NOTA: No usan hardware tradicional (lectores RFID, relojes de fichaje). Todo via smartphone.
+
+IDEAS para TurnoSmart:
+  > QR code por establecimiento (impreso en recepción) — el empleado escanea al llegar
+  > Geofencing como verificación: el fichaje solo vale si estás en radio del hotel
+  > Fichar a proyecto/tarea es interesante para hostelería: fichar a "turno M" o "evento especial"
+
+
+--- EMPLOYEE EXPERIENCE ---
+
+- Clock in/out con un toque desde móvil
+- Vista de su horario de turnos con notificaciones en tiempo real
+- Alertas de cambios de última hora en el turno
+- Selección de proyecto al fichar
+- Grace period configurable (margen para llegar tarde sin alerta)
+- Notificación si fichas fuera del horario programado
+
+IDEAS para TurnoSmart:
+  > Grace period configurable — evitar falsas alertas de impuntualidad (ej: 5 min)
+  > Notificación al empleado si ficha fuera de horario: "Has fichado a las 07:12, tu turno empieza a las 07:00"
+  > Selección de turno al fichar (validar que el turno fichado coincide con el programado)
+
+
+--- MANAGER DASHBOARD ---
+
+- Tracking de horas en tiempo real
+- Aprobación/rechazo/des-aprobación de timesheets
+- Notificaciones de fichajes incorrectos (ambas partes alertadas)
+- Alertas de fichajes olvidados via email
+- Visibilidad de turnos y horarios
+- Flag de irregularidades de asistencia
+
+IDEAS para TurnoSmart:
+  > Dashboard "Hoy" para el FOM: quién ha fichado, quién falta, quién va tarde
+  > Alerta email/push cuando alguien no ha fichado 15 min después de inicio de turno
+  > Timesheet approval: FOM aprueba horas semanales antes de enviar a nómina
+  > "Período cerrado": una vez aprobado, el empleado no puede editar sus fichajes
+
+
+--- TIMESHEETS ---
+
+- Empleados envían su timesheet semanal/mensual
+- Manager aprueba, rechaza o des-aprueba
+- Protección de período cerrado (approved → no editable por empleado)
+- Integración automática con nómina
+- Cálculo automático de horas para salarios
+
+IDEAS para TurnoSmart:
+  > Vista "Mi timesheet" para el empleado: horas por día, total semana, balance vs contrato
+  > Approval flow: empleado envía → FOM aprueba → datos van a nómina
+  > Protección post-aprobación (ya tenemos concepto similar con "publicar" en turnos)
+
+
+--- GEOFENCING / UBICACIÓN ---
+
+- Coordenadas GPS capturadas por cada fichaje
+- Radio configurable: 1km → 50m (granularidad paso a paso)
+- QR como fallback si GPS no disponible
+- Impide fichar fuera de zonas designadas
+
+IDEAS para TurnoSmart:
+  > Radio GPS del hotel como zona válida de fichaje
+  > Registro de coordenadas por fichaje (trazabilidad legal España)
+  > QR code impreso en cada departamento (Recepción, Bar, Cocina)
+
+
+--- PROJECT-BASED TRACKING ---
+
+- Fichar directamente a un proyecto específico
+- Asignación retroactiva de proyecto
+- Horas por tarea para facturación
+- Soporte billing por proyecto
+
+IDEAS para TurnoSmart:
+  > No core para hostelería pero interesante para: eventos especiales, montajes, formaciones
+  > "Fichar a evento" cuando hay boda/congreso/grupo → tracking de horas extra por evento
+
+
+--- COMPLIANCE & LEGAL ---
+
+- Cumplimiento de leyes laborales por estado/país
+- Almacenamiento seguro de registros (GDPR)
+- SOC 2 Type II certificado
+- ENAC (certificadora española) aprobado
+- Firma electrónica para documentos oficiales
+- Retención de registros según jurisdicción
+
+IDEAS para TurnoSmart:
+  > ENAC + GDPR compliance badges en nuestra landing (confianza)
+  > Registro de fichajes cumpliendo ley española de control horario (RD 8/2019)
+  > Almacenamiento 4 años de registros (obligatorio en España)
+  > Firma electrónica de timesheets aprobados
+
+
+--- STATS DE IMPACTO ---
+
+- 15,000+ empresas usan Factorial
+- Capterra 4.5/5, G2 4.5/5, App Store 4.8/5
+- Sectores: Tech, Retail, Hospitality, Startups
+
+Empresas mencionadas: Globalfy, vFairs, Oliant, Checkr, Freshly Cosmetics, Beso Beach,
+Nude Project, Miin
+
+
+--- FAQs CLAVE (12 respuestas) ---
+
+Temas cubiertos:
+- Cómo registran horas los small business (manual, Excel, o software)
+- Si managers deben aprobar timesheets (sí, con approve/reject/unapprove)
+- Si funciona para remote (sí, cloud + geolocation)
+- Si notifica fichajes incorrectos (sí, a ambas partes)
+- Si notifica fichajes olvidados (sí, via email con grace period)
+- Si ofrece reconocimiento facial (sí, via app móvil)
+- Si solo para salaried (no, también hourly)
+- Si incluye GPS (sí, radio 1km-50m)
+- Si trackea proyectos/tareas (sí, con asignación flexible)
+- Cuánto cuesta ($8/empleado/mes, modular)
+- Si está conectado a nómina (sí, automático)
+- Cuál es el mejor software de time & attendance (integrado > aislado)
+
+
+--- RESUMEN: IDEAS PARA TURNOSMART (Time & Attendance) ---
+
+ALTA prioridad (si implementamos fichaje):
+  > QR code por establecimiento — impresión simple, escaneo via app
+  > Dashboard FOM "Hoy": Fichados / Falta / Tarde / En pausa (pattern "Who is in?")
+  > Alerta de fichaje olvidado (15 min post-inicio de turno)
+  > Grace period configurable (5-15 min sin alarma)
+  > Timesheet semanal con approval flow
+
+MEDIA prioridad:
+  > Geofencing con radio configurable
+  > Validación turno fichado vs turno programado
+  > Registro GPS por fichaje (compliance RD 8/2019 España)
+  > Protección período cerrado post-aprobación
+  > Facial recognition via smartphone (Face ID nativo)
+
+BAJA prioridad (futuro):
+  > Project-based tracking (eventos especiales)
+  > Firma electrónica de timesheets
+  > SOC 2 / ENAC certification
+  > Hardware integrations (no recomendado — mobile-first es mejor)
+
+Patrón UX clave:
+  > 3 tabs: Track time | Manage time | Plan time
+  > Clock-in widget con timer circular (ya visto en el tour)
+  > Grace period como UX feature (no técnica — evita frustración del empleado)
+  > "Incorrect punch" notification a AMBAS partes (transparencia total)
+
+
+================================================================================
 COMPETIDOR #2: [PENDIENTE — próximo análisis]
 ================================================================================
 
