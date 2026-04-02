@@ -367,8 +367,7 @@ export function UnifiedCalendarHeader({
                 {onOpenCriteria && (
                   <DropdownMenuItem onClick={onOpenCriteria}>Criterios SMART</DropdownMenuItem>
                 )}
-                <DropdownMenuItem>Horarios rotativos</DropdownMenuItem>
-                <DropdownMenuItem>Balance anual</DropdownMenuItem>
+                {/* Horarios rotativos y Balance anual: removidos (funcionalidad cubierta por SMART engine + Analytics) */}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
