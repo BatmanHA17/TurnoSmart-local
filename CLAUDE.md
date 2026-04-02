@@ -172,21 +172,22 @@ Copilot chat NLP completo, NLP en notas, Unificar roles/seniority, Eliminar expo
 ### 🔴 BUGS PRODUCCIÓN — PENDIENTES (Smoke Test 2026-04-02)
 | # | Bug | Archivo/Zona | Severidad | Origen |
 |---|-----|-------------|-----------|--------|
-| P1 | **Motor genera con 0 empleados** — scores ficticios 85/75/55, debería bloquear en Step 5 | Wizard / engine | 🔴 Crítico | Smoke test |
-| P2 | **"Revisar" en Step 7 no abre auditoría** — botón sin handler | Wizard Step 7 | 🟠 Medio | Smoke test |
-| P3 | **Dropdown empleados vacío en Peticiones** — selector no carga opciones | Panel Peticiones | 🟠 Medio | Smoke test |
-| P4 | **"Error al cargar datos de analítica"** — mensaje rojo visible | `/mi-actividad` | 🟠 Medio | Smoke test |
-| P5 | **HR Home fechas hardcoded 2025** — "01/09/2025" en vez de fecha dinámica | `HRResumen.tsx:106-110` | 🟡 Menor | Smoke test SA |
-| P6 | **Console errors cascada** — useUserRole + useUserProfile legacy (~100+/sesión) | hooks legacy | 🟡 Menor | Smoke test SA |
-| P7 | **Tablas cloud faltantes** — `coverage_policies`, `employee_restrictions` | useShiftAudit | 🟡 Menor | Smoke test SA |
-| P8 | **🔴 Dashboard sin RBAC** — Manager ve panel Super Admin completo (Gestión usuarios, BD, Seguridad, APIs, Herramientas dev) | `/dashboard` | 🔴 CRÍTICO | Smoke test FOM |
-| P9 | **🔴 Dashboard "permisos completos"** — FOM ve mensaje "Puede acceder a toda la aplicación con permisos completos" | `/dashboard` | 🔴 CRÍTICO | Smoke test FOM |
-| P10 | **Dashboard datos ficticios** — "1,247 usuarios activos", "99.8% uptime" hardcoded | `/dashboard` | 🟠 Medio | Smoke test FOM |
-| P11 | **"Ver mi perfil" roto** — navega a `/collaborators/:id` literal, cargando infinito | Menú avatar | 🔴 Crítico | Smoke test FOM |
-| P12 | **Rol colaborador muestra "Empleado"** — FOM/Manager se ve como Empleado en Equipo | ColaboradoresView | 🟠 Medio | Smoke test FOM |
-| P13 | **🔴 Usuarios auth sin profile NO pueden login** — `checkIfUserExists()` busca en profiles/colaboradores, no en auth.users. Usuarios existentes en Supabase Auth pero sin profile quedan bloqueados con "No encontramos esta cuenta" | Auth.tsx | 🔴 CRÍTICO | Smoke test Empleado |
-| P14 | **"Iniciar sesión" link es loop** — enlace href="/auth" en formulario de registro apunta a la misma página, no cambia modo | Auth.tsx | 🟠 Medio | Smoke test Empleado |
-| P15 | **404 ruta legacy `/turnosmart/colaboradores`** — console muestra 404 para ruta española, algo aún navega a ella | AppRoutes / Nav | 🟡 Menor | Console Empleado |
+| P1 | ~~**Motor genera con 0 empleados**~~ — bloqueado en Wizard + guard en hook | Wizard / engine | ✅ Fix `b6b33b2` | Smoke test |
+| P2 | **"Revisar" en Step 7 no abre auditoría** — feature pendiente (no hay UI de audit en Step 7) | Wizard Step 7 | 🟡 Feature | Smoke test |
+| P3 | ~~**Dropdown empleados vacío en Peticiones**~~ | Panel Peticiones | ✅ Fix `856ff75` | Smoke test |
+| P4 | ~~**"Error al cargar datos de analítica"**~~ | `/mi-actividad` | ✅ Fix `8d7dc47` | Smoke test |
+| P5 | ~~**HR Home fechas hardcoded 2025**~~ | `HRResumen.tsx` | ✅ Fix `8d7dc47` | Smoke test SA |
+| P6 | ~~**Console errors cascada**~~ — silenciados useUserRole + useUserProfile | hooks legacy | ✅ Fix `b6b33b2` | Smoke test SA |
+| P7 | ~~**Tablas cloud faltantes**~~ — graceful degradation en useShiftAudit + HRAuditPolicies | useShiftAudit / HRAuditPolicies | ✅ Fix `e20a495` | Smoke test SA |
+| P8 | ~~**Dashboard sin RBAC**~~ | `/dashboard` | ✅ Fix `310a6bf` | Smoke test FOM |
+| P9 | ~~**Dashboard "permisos completos"**~~ | `/dashboard` | ✅ Fix `310a6bf` | Smoke test FOM |
+| P10 | ~~**Dashboard datos ficticios**~~ — resuelto por P8/P9 (nadie llega a DashboardAdministrator) | `/dashboard` | ✅ Fix `310a6bf` | Smoke test FOM |
+| P11 | ~~**"Ver mi perfil" roto**~~ | Menú avatar | ✅ Fix `310a6bf` | Smoke test FOM |
+| P12 | ~~**Rol colaborador muestra "Empleado"**~~ | ColaboradoresView | ✅ Fix `0563088` | Smoke test FOM |
+| P13 | ~~**Usuarios auth sin profile NO pueden login**~~ | Auth.tsx | ✅ Fix `310a6bf` | Smoke test Empleado |
+| P14 | ~~**"Iniciar sesión" link es loop**~~ | Auth.tsx | ✅ Fix `310a6bf` | Smoke test Empleado |
+| P15 | ~~**404 ruta legacy `/turnosmart/colaboradores`**~~ — añadido redirect a /turnosmart/collaborators | AppRoutes | ✅ Fix `e20a495` | Console Empleado |
+| P16 | ~~**Perfil colaborador "Cargando..." infinito**~~ | useColaboradorFull | ✅ Fix `0563088` | Verificación P11 |
 
 ### 🟡 BUGS QA — PENDIENTES (Revisión guía usuario 2026-03-31)
 | # | Bug | Archivo/Zona | Severidad |
@@ -195,9 +196,9 @@ Copilot chat NLP completo, NLP en notas, Unificar roles/seniority, Eliminar expo
 | Q2 | Clic en alerta auditoría no navega a celda | Audit UI | 🟡 Menor |
 | Q3 | Cobertura insuficiente noche 23 marzo | Engine lógica vs bug | 🟡 Verificar |
 | Q4 | Botón Guardar manual — verificar funcionalidad | Calendario toolbar | 🟡 Verificar |
-| Q5 | Botón Generar presente en TODAS las vistas | Calendario toolbar | 🟡 Menor |
-| Q6 | Peticiones "?" nombres de empleado | Peticiones panel | 🟠 Medio |
-| Q7 | Audit "Exceso horas 152h/40h" falso | useShiftAudit | 🟠 Medio |
+| Q5 | ~~Botón Generar presente en TODAS las vistas~~ — verificado: canEdit=false para empleados, OK | Calendario toolbar | ✅ No-bug |
+| Q6 | ~~Peticiones "?" nombres de empleado~~ | usePetitions.ts | ✅ Fix `134b2a4` |
+| Q7 | ~~Audit "Exceso horas 152h/40h" falso~~ | GoogleCalendarStyle.tsx | ✅ Fix `134b2a4` |
 | Q8 | Notificaciones in-app al publicar cuadrante | Step 8 plan, parcial | 🟡 Feature |
 | Q9 | Version History "Generaciones SMART" | Step 9 plan, parcial | 🟡 Feature |
 
@@ -209,6 +210,21 @@ Copilot chat NLP completo, NLP en notas, Unificar roles/seniority, Eliminar expo
 | F3 | Profiles table sin `first_name`, `last_name`, `avatar_url` | ALTER TABLE en cloud | SQL directo |
 | F4 | Fake Supabase anon key en `.env.production` | Reemplazada con JWT real | manual |
 | F5 | Hardcoded email whitelist en Auth.tsx | Eliminado | `ea9d780` |
+| F6 | **P13** Auth bloqueaba users sin profile | Siempre mostrar password step, Supabase Auth valida | `310a6bf` |
+| F7 | **P14** "Iniciar sesión" link loop | Cambiado texto + href a `/auth?mode=register` | `310a6bf` |
+| F8 | **P8/P9** Dashboard sin RBAC — FOM veía panel Super Admin | RoleBasedDashboard usa useTurnoSmartRole | `310a6bf` |
+| F9 | **P11** "Ver mi perfil" → `/collaborators/:id` literal | Navega a ruta correcta + ColaboradorRedirect helper | `310a6bf` |
+| F10 | **P16** Perfil colaborador "Cargando..." infinito | setLoading(false) en 3 early returns de useColaboradorById | `0563088` |
+| F11 | **P12** Rol muestra "Empleado" en vez de FOM | Fallback a memberships.app_role cuando colaborador_roles vacía | `0563088` |
+| F12 | **P3** Dropdown empleados vacío en Peticiones | Fix .or() syntax inválida en query PostgREST | `856ff75` |
+| F13 | **P4** "Error al cargar datos de analítica" | Graceful degradation — absence_requests faltante no crashea | `8d7dc47` |
+| F14 | **P5** HR Home fechas hardcoded 2025 | Fechas dinámicas mes actual | `8d7dc47` |
+| F15 | **P1** Motor genera con 0 empleados | Wizard bloquea Step 5 + guard en hook | `b6b33b2` |
+| F16 | **P6** Console errors cascada legacy | Silenciado useUserRole/useUserProfile | `b6b33b2` |
+| F17 | **P7** Tablas cloud faltantes (coverage_policies, employee_restrictions, audit_policies) | Graceful degradation con try/catch independientes | `e20a495` |
+| F18 | **P15** 404 ruta legacy /turnosmart/colaboradores | Redirect a /turnosmart/collaborators | `e20a495` |
+| F19 | **Q6** Peticiones "?" nombres de empleado | Fallback a "Empleado <id>" cuando FK huérfana | `134b2a4` |
+| F20 | **Q7** Audit "Exceso horas 152h/40h" falso positivo | Usar rango real de fechas para calcular semanas, no solo días con turnos | `134b2a4` |
 
 ### ✅ SMOKE TEST SUPER ADMIN — VERIFICADOS OK (2026-04-02)
 Login, Calendario, Equipo, HR, Analítica, Settings, Wizard SMART, Criterios SMART,
