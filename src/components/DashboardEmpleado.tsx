@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, FileText, User, Settings, HelpCircle } from "lucide-react";
+import { Calendar, FileText, User, Settings, HelpCircle, Send } from "lucide-react";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -88,7 +88,7 @@ export const DashboardEmpleado = () => {
         </div>
 
         {/* Cards principales */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 mb-16 sm:mb-20">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 mb-16 sm:mb-20">
           {/* Card 1 - Turnosmart */}
           <Card 
             className="group p-6 sm:p-8 text-center hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 border-border/50 bg-card/80 backdrop-blur-sm cursor-pointer animate-fade-in"
@@ -135,10 +135,33 @@ export const DashboardEmpleado = () => {
             </Button>
           </Card>
 
-          {/* Card 3 - Perfil */}
-          <Card 
-            className="group p-6 sm:p-8 text-center hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 border-border/50 bg-card/80 backdrop-blur-sm cursor-pointer animate-fade-in md:col-span-2 lg:col-span-1"
+          {/* Card 3 - Peticiones */}
+          <Card
+            className="group p-6 sm:p-8 text-center hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 border-border/50 bg-card/80 backdrop-blur-sm cursor-pointer animate-fade-in"
             style={{ animationDelay: '300ms' }}
+            onClick={() => navigate("/turnosmart/peticiones")}
+          >
+            <div className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-notion-purple-bg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+              <Send className="w-12 h-12 text-notion-purple-text" strokeWidth={1.5} />
+            </div>
+            <h3 className="text-lg font-semibold text-foreground mb-3 leading-snug">
+              Solicita preferencias de turno
+            </h3>
+            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+              Pide días, turnos favoritos o intercambios con compañeros
+            </p>
+            <Button
+              variant="ghost"
+              className="w-full rounded-full font-medium hover:bg-notion-purple-bg hover:text-notion-purple-text transition-all duration-200"
+            >
+              Mis peticiones
+            </Button>
+          </Card>
+
+          {/* Card 4 - Perfil */}
+          <Card
+            className="group p-6 sm:p-8 text-center hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 border-border/50 bg-card/80 backdrop-blur-sm cursor-pointer animate-fade-in"
+            style={{ animationDelay: '400ms' }}
             onClick={navigateToProfile}
           >
             <div className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-notion-green-bg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
@@ -150,7 +173,7 @@ export const DashboardEmpleado = () => {
             <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
               Consulta y actualiza tu perfil
             </p>
-            <Button 
+            <Button
               variant="ghost"
               className="w-full rounded-full font-medium hover:bg-notion-green-bg hover:text-notion-green-text transition-all duration-200"
             >
@@ -160,7 +183,7 @@ export const DashboardEmpleado = () => {
         </div>
 
         {/* Sección de ayuda y configuración */}
-        <div className="border-t border-border/50 pt-12 sm:pt-16 animate-fade-in" style={{ animationDelay: '400ms' }}>
+        <div className="border-t border-border/50 pt-12 sm:pt-16 animate-fade-in" style={{ animationDelay: '500ms' }}>
           <h2 className="text-2xl sm:text-3xl font-semibold text-foreground mb-10 flex items-center gap-3">
             <Settings className="w-7 h-7 text-muted-foreground" strokeWidth={1.5} />
             Configuración y ayuda

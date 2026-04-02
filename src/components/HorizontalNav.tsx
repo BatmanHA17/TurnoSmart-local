@@ -31,6 +31,7 @@ import {
 const mainNavItems = [
   { title: "Analítica", url: "/mi-actividad" },
   { title: "Turnos", url: "/turnosmart" },
+  { title: "Peticiones", url: "/turnosmart/peticiones" },
   { title: "Equipo", url: "/colaboradores" },
   { title: "HR", url: "/hr" },
 ];
@@ -53,7 +54,7 @@ export function HorizontalNav() {
     if (tsRoleLoading) return true; // No filtrar mientras carga
     // Empleados solo ven "Turnos" (su horario)
     if (isEmpleado) {
-      return item.url === "/turnosmart";
+      return item.url === "/turnosmart" || item.url === "/turnosmart/peticiones";
     }
     return true;
   });

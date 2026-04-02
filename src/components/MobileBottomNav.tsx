@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { Home, Calendar, Inbox, MessageSquare, User } from "lucide-react";
+import { Home, Calendar, Inbox, Send, MessageSquare, User } from "lucide-react";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useUserRoleCanonical } from "@/hooks/useUserRoleCanonical";
 import { useAuth } from "@/hooks/useAuth";
@@ -36,10 +36,10 @@ export function MobileBottomNav() {
       matchPrefix: "/turnosmart",
     },
     {
-      label: "Solicitudes",
-      icon: Inbox,
-      path: "/turnosmart/absence-requests",
-      matchPrefix: "/turnosmart/absence-requests",
+      label: isManager ? "Solicitudes" : "Peticiones",
+      icon: isManager ? Inbox : Send,
+      path: isManager ? "/turnosmart/absence-requests" : "/turnosmart/peticiones",
+      matchPrefix: isManager ? "/turnosmart/absence-requests" : "/turnosmart/peticiones",
     },
     {
       label: "Mensajes",
