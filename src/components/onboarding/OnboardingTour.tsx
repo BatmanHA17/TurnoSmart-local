@@ -21,6 +21,8 @@ interface TourStep {
   description: string;
   /** Posición del tooltip relativa al target */
   placement: "top" | "bottom" | "left" | "right";
+  /** Action to run before showing this step (e.g., open a panel) */
+  onBeforeStep?: () => void;
 }
 
 const TOUR_STEPS: TourStep[] = [
@@ -32,9 +34,20 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     target: '[data-tour="favorites-area"]',
-    title: "Zona de favoritos",
-    description: "Arrastra horarios desde aquí al calendario. Puedes crear los tuyos o restaurar el kit base.",
+    title: "⭐ Zona de favoritos",
+    description: "Pulsa la estrella ⭐ en la cabecera para abrir este panel. Arrastra horarios y ausencias directamente al calendario. Puedes crear los tuyos o restaurar el kit base.",
     placement: "right",
+    onBeforeStep: () => {
+      // Open favorites panel if closed
+      const btn = document.querySelector('[data-tour="favorites-area"]');
+      if (btn && btn.clientHeight < 50) {
+        // Panel is collapsed — try clicking the star toggle
+        const starBtn = document.querySelector('button[title*="Favoritos"], button[aria-label*="Favoritos"]');
+        if (starBtn) (starBtn as HTMLElement).click();
+      }
+      // Fallback: set localStorage to ensure it opens
+      try { localStorage.setItem('turnosmart-show-favorites', 'true'); } catch {}
+    },
   },
   {
     target: '[data-tour="generate-button"]',
@@ -102,6 +115,8 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
   // Position tooltip relative to target element
   const positionTooltip = useCallback(() => {
     if (!currentStep) return;
+    // Run pre-step action (e.g., open favorites panel)
+    currentStep.onBeforeStep?.();
     const el = document.querySelector(currentStep.target);
     if (!el) {
       // Target not found — skip to next or end
