@@ -164,13 +164,13 @@ Guía usuario con notas PO: `docs/GUIA_USUARIO_GENERACION_TURNOS_CON_MIS_NOTAS.m
 ### Descartado ❌
 Copilot chat NLP completo, NLP en notas, Unificar roles/seniority, Eliminar exportación, Eliminar campos RRHH
 
-## Pendiente técnico (deuda anterior)
-- **Continuidad cross-período** — Phase 02 falta `lastWeek` (absorbido por T2-9)
-- **Dashboard Empleado** — Conectar con datos reales (absorbido por T2-4 peticiones empleado)
-- **Escalonar libres** — evitar que todos libren el mismo día
-- **Scores bajos** — fórmula scoring necesita ajuste fino
-- **Notificaciones publicación** — in-app por empleado al publicar (Step 8 plan anterior)
-- **Version History detallado** — pestaña Generaciones SMART (Step 9 plan anterior)
+## Pendiente técnico (deuda anterior) — TODO CERRADO ✅
+- ~~**Continuidad cross-período**~~ — absorbido por T2-9 (`0b6e700`)
+- ~~**Dashboard Empleado**~~ — absorbido por T2-4 (`273b338`)
+- ~~**Escalonar libres**~~ ✅ Ya implementado en Phase 04 (collision score -10 per rest overlap)
+- ~~**Scores bajos**~~ ✅ Fix `a1a7b13` — equity ±3h grace, ergonomics/continuity capped
+- ~~**Notificaciones publicación**~~ ✅ Ya implementado en useCalendarPublishState (líneas 387-406)
+- ~~**Version History detallado**~~ ✅ Ya implementado — VersionHistoryDialog.tsx + useCalendarVersions.ts
 
 ## ═══════════════════════════════════════════════════════
 ## REGISTRO MAESTRO DE BUGS — TurnoSmart
@@ -200,14 +200,14 @@ Copilot chat NLP completo, NLP en notas, Unificar roles/seniority, Eliminar expo
 | # | Bug | Archivo/Zona | Severidad |
 |---|-----|-------------|-----------|
 | Q1 | ~~Favoritos desaparecen al navegar~~ — useLocalStorageCleanup borraba favorites en cada mount | useLocalStorageCleanup + useFavoriteShifts | ✅ Fix `a92a69b` |
-| Q2 | Clic en alerta auditoría no navega a celda | Audit UI | 🟡 Menor |
-| Q3 | Cobertura insuficiente noche 23 marzo | Engine lógica vs bug | 🟡 Verificar |
-| Q4 | Botón Guardar manual — verificar funcionalidad | Calendario toolbar | 🟡 Verificar |
+| Q2 | ~~Clic en alerta auditoría no navega a celda~~ — verificado: scrollIntoView + ring highlight funcional | Audit UI | ✅ OK |
+| Q3 | ~~Cobertura insuficiente noche 23 marzo~~ — verificado: default N=1 correcto, no es bug | Engine | ✅ OK |
+| Q4 | ~~Botón Guardar manual~~ — verificado: saveShiftsToSupabase funcional | Calendario toolbar | ✅ OK |
 | Q5 | ~~Botón Generar presente en TODAS las vistas~~ — verificado: canEdit=false para empleados, OK | Calendario toolbar | ✅ No-bug |
 | Q6 | ~~Peticiones "?" nombres de empleado~~ | usePetitions.ts | ✅ Fix `134b2a4` |
 | Q7 | ~~Audit "Exceso horas 152h/40h" falso~~ | GoogleCalendarStyle.tsx | ✅ Fix `134b2a4` |
-| Q8 | Notificaciones in-app al publicar cuadrante | Step 8 plan, parcial | 🟡 Feature |
-| Q9 | Version History "Generaciones SMART" | Step 9 plan, parcial | 🟡 Feature |
+| Q8 | ~~Notificaciones in-app al publicar cuadrante~~ — ya implementado en useCalendarPublishState | Step 8 | ✅ OK |
+| Q9 | ~~Version History "Generaciones SMART"~~ — ya implementado VersionHistoryDialog + useCalendarVersions | Step 9 | ✅ OK |
 
 ### ✅ BUGS CORREGIDOS (2026-04-02)
 | # | Bug | Fix | Commit |
