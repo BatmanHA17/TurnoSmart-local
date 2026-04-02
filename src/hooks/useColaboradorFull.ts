@@ -213,6 +213,7 @@ export const useColaboradorById = (id: string | undefined) => {
           description: "No se pudo cargar el colaborador",
           variant: "destructive"
         });
+        setLoading(false);
         return;
       }
 
@@ -230,6 +231,7 @@ export const useColaboradorById = (id: string | undefined) => {
           description: "No se pudo cargar el colaborador",
           variant: "destructive"
         });
+        setLoading(false);
         return;
       }
 
@@ -239,6 +241,7 @@ export const useColaboradorById = (id: string | undefined) => {
           description: "Colaborador no encontrado",
           variant: "destructive"
         });
+        setLoading(false);
         return;
       }
 

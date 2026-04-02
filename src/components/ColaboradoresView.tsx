@@ -125,7 +125,7 @@ export const ColaboradoresView = () => {
 
       // Obtener roles activos para cada colaborador
       const colaboradorIds = (colaboradoresData || []).map(c => c.id);
-      
+
       let rolesData: any[] = [];
       if (colaboradorIds.length > 0) {
         const { data: roles } = await supabase
@@ -133,9 +133,33 @@ export const ColaboradoresView = () => {
           .select('colaborador_id, role, departamento')
           .in('colaborador_id', colaboradorIds)
           .eq('activo', true)
-          .order('asignado_en', { ascending: false }); // Tomar el más reciente primero
-        
+          .order('asignado_en', { ascending: false });
+
         rolesData = roles || [];
+      }
+
+      // Obtener roles desde memberships como fallback (OWNER/ADMIN/USER)
+      const userIds = (colaboradoresData || []).map(c => (c as any).user_id).filter(Boolean);
+      let membershipMap: Record<string, string> = {};
+      if (userIds.length > 0 && currentOrg?.org_id) {
+        const { data: memberships } = await supabase
+          .from('memberships')
+          .select('user_id, app_role')
+          .in('user_id', userIds)
+          .eq('org_id', currentOrg.org_id);
+
+        if (memberships) {
+          // Mapear app_role canónico a nombre display
+          const appRoleToDisplay: Record<string, string> = {
+            OWNER: 'propietario',
+            ADMIN: 'administrador',
+            USER: 'empleado',
+            GUEST: 'empleado'
+          };
+          memberships.forEach(m => {
+            membershipMap[m.user_id] = appRoleToDisplay[m.app_role] || 'empleado';
+          });
+        }
       }
 
       // Fetch job titles for colaboradores that have job_id
@@ -158,12 +182,14 @@ export const ColaboradoresView = () => {
       }
 
       // Procesar colaboradores con sus roles reales y puestos
+      // Prioridad: colaborador_roles > memberships > fallback 'empleado'
       const colaboradoresWithRoles = (colaboradoresData || []).map((colaborador) => {
         const roleRecord = rolesData.find(r => r.colaborador_id === colaborador.id);
+        const membershipRole = (colaborador as any).user_id ? membershipMap[(colaborador as any).user_id] : null;
         const jobTitle = colaborador.job_id ? jobsMap[colaborador.job_id] : null;
         return {
           ...colaborador,
-          role: roleRecord?.role || 'empleado',
+          role: roleRecord?.role || membershipRole || 'empleado',
           jobs: jobTitle ? { title: jobTitle } : null
         };
       });
