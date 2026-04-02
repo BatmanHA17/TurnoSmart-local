@@ -7,6 +7,7 @@ import { WeekendComparisonCard } from "./WeekendComparisonCard";
 import { AbsencesByTypeTable } from "./AbsencesByTypeTable";
 import { ShiftTimesTable } from "./ShiftTimesTable";
 import { RequestsStatsCard } from "./RequestsStatsCard";
+import { PetitionAnalyticsCard } from "./PetitionAnalyticsCard";
 import { AnalyticsDateSelector } from "./AnalyticsDateSelector";
 import { BarChart3, Download, Calendar, Users, TrendingUp, CalendarX } from "lucide-react";
 import { format } from "date-fns";
@@ -141,6 +142,7 @@ export function AnalyticsDashboard() {
         <AbsencesByTypeTable data={absencesByType} loading={loading} />
         <ShiftTimesTable data={shiftTimeDistribution} loading={loading} />
         <RequestsStatsCard data={requestStats} loading={loading} />
+        <PetitionAnalyticsCard />
       </div>
     </div>
   );
