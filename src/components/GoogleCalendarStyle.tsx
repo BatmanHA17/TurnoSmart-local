@@ -78,6 +78,7 @@ import { ShiftForAudit } from "@/utils/shiftAudit";
 import { AuditCellHighlight, EmployeeViolationBadge } from "@/components/audit";
 import { SuggestedFix, AuditViolation } from "@/types/audit";
 import { OnboardingTour, useOnboardingTour } from "@/components/onboarding/OnboardingTour";
+import { getTagObjects } from "@/utils/engine/smartTags";
 import { AuditViolationTooltip } from "@/components/audit/AuditViolationTooltip";
 import { useSmartGenerate } from "@/hooks/useSmartGenerate";
 import { useSmartGenerateV2 } from "@/hooks/useSmartGenerateV2";
@@ -3728,6 +3729,17 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
                               {/* Indicador de edición post-publicación */}
                               {isPostPubEdited(employee.id, format(day, 'yyyy-MM-dd')) && (
                                 <div className="absolute top-0 left-0 w-2 h-2 rounded-full z-10 bg-blue-500" title="Editado post-publicación" />
+                              )}
+                              {/* T3-8: SMART tag indicator */}
+                              {shifts.some(s => s.notes && getTagObjects(s.notes).length > 0) && (
+                                <div
+                                  className="absolute bottom-0 left-0 z-10 flex gap-0.5 p-0.5"
+                                  title={shifts.flatMap(s => getTagObjects(s.notes).map(t => t.label)).join(' ')}
+                                >
+                                  {shifts.flatMap(s => getTagObjects(s.notes)).slice(0, 2).map((tag, i) => (
+                                    <div key={i} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tag.color }} />
+                                  ))}
+                                </div>
                               )}
                               {shifts.map((shift, shiftIndex) => (
                                 <div
