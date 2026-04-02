@@ -2,15 +2,19 @@ import { HRSidebar } from "@/components/HRSidebar";
 import { MainLayout } from "@/components/MainLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, Calendar, DoorOpen, User, Settings, FileText, DoorClosed } from "lucide-react";
+import { ChevronDown, Calendar, DoorOpen, User, Settings, FileText, DoorClosed, Users, Calculator } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
+import { PlantillaCalculator, calculatePlantilla } from "@/components/calendar/PlantillaCalculator";
 
 export default function HRResumen() {
   const navigate = useNavigate();
+  const { org } = useCurrentOrganization();
   const [colaboradores, setColaboradores] = useState([]);
   const [colaboradoresSalidas, setColaboradoresSalidas] = useState([]);
+  const [totalActivos, setTotalActivos] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadingSalidas, setLoadingSalidas] = useState(true);
 
@@ -18,7 +22,8 @@ export default function HRResumen() {
     document.title = "HR Home – TurnoSmart";
     fetchColaboradores();
     fetchColaboradoresSalidas();
-  }, []);
+    fetchTotalActivos();
+  }, [org?.id]);
 
   const fetchColaboradores = async () => {
     try {
@@ -63,6 +68,20 @@ export default function HRResumen() {
       setLoadingSalidas(false);
     }
   };
+
+  const fetchTotalActivos = async () => {
+    try {
+      if (!org?.id) return;
+      const { count, error } = await supabase
+        .from('colaboradores')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', org.id)
+        .or('status.eq.activo,status.eq.active');
+      if (!error && count !== null) setTotalActivos(count);
+    } catch { /* graceful */ }
+  };
+
+  const plantilla = calculatePlantilla(totalActivos);
 
   const getInitials = (nombre, apellidos) => {
     const firstInitial = nombre?.charAt(0)?.toUpperCase() || '';
@@ -110,42 +129,58 @@ export default function HRResumen() {
             </div>
           </div>
 
-          {/* Stats cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {/* Plantilla RRHH — T2-3 Calculadora */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <Card className="p-4 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Perfiles incompletos</p>
-                  <p className="text-2xl font-semibold mt-1">1</p>
+                  <p className="text-sm text-muted-foreground">Plantilla bruta</p>
+                  <p className="text-2xl font-semibold mt-1">{totalActivos}</p>
                 </div>
                 <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <User className="w-5 h-5 text-blue-600" />
+                  <Users className="w-5 h-5 text-blue-600" />
                 </div>
               </div>
+              <p className="text-[10px] text-muted-foreground mt-1">Contratos activos</p>
             </Card>
 
             <Card className="p-4 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">En del periodo de prueba</p>
-                  <p className="text-2xl font-semibold mt-1">0</p>
+                  <p className="text-sm text-muted-foreground">Plantilla activa</p>
+                  <p className="text-2xl font-semibold mt-1">{plantilla.activa.toFixed(1)}</p>
                 </div>
                 <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                  <Settings className="w-5 h-5 text-green-600" />
+                  <User className="w-5 h-5 text-green-600" />
                 </div>
               </div>
+              <p className="text-[10px] text-muted-foreground mt-1">Bruta - cobertura vacaciones ({plantilla.coberturaVacaciones.toFixed(1)})</p>
             </Card>
 
             <Card className="p-4 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Permisos de trabajo</p>
-                  <p className="text-2xl font-semibold mt-1">0</p>
+                  <p className="text-sm text-muted-foreground">Presencial/día</p>
+                  <p className="text-2xl font-semibold mt-1">{plantilla.presencialRounded}</p>
                 </div>
-                <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-orange-600" />
+                <div className="w-10 h-10 bg-violet-100 rounded-lg flex items-center justify-center">
+                  <Calculator className="w-5 h-5 text-violet-600" />
                 </div>
               </div>
+              <p className="text-[10px] text-muted-foreground mt-1">Techo personas/día (activa ÷ 1.4)</p>
+            </Card>
+
+            <Card className="p-4 hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Vacaciones/año</p>
+                  <p className="text-2xl font-semibold mt-1">48</p>
+                </div>
+                <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-orange-600" />
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">30 naturales + 18 festivos (Hostelería)</p>
             </Card>
           </div>
 
