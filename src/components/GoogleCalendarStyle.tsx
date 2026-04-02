@@ -483,7 +483,9 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   // Confirmation dialogs state  
   const [confirmClearCalendar, setConfirmClearCalendar] = useState(false);
   const [confirmRestoreVersion, setConfirmRestoreVersion] = useState<string | null>(null);
-  const [showFavorites, setShowFavorites] = useState(false);
+  const [showFavorites, setShowFavorites] = useState(() => {
+    try { return localStorage.getItem('turnosmart-show-favorites') === 'true'; } catch { return false; }
+  });
   const [draggedFavorite, setDraggedFavorite] = useState<any>(null);
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
@@ -3349,7 +3351,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
                                        ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100' 
                                        : 'hover:bg-muted'
                                    }`}
-                                   onClick={() => setShowFavorites(!showFavorites)}
+                                   onClick={() => { const next = !showFavorites; setShowFavorites(next); try { localStorage.setItem('turnosmart-show-favorites', String(next)); } catch {} }}
                                  >
                                    <Star className={`h-3 w-3 ${showFavorites ? 'fill-amber-400 text-amber-400' : ''}`} />
                                  </Button>

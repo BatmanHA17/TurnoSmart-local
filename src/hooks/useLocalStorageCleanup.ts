@@ -1,39 +1,29 @@
 import { useEffect } from 'react';
 
 /**
- * Hook that clears all stale localStorage keys on app initialization.
- * This implements "km 0" - clean slate with no cached data.
+ * Hook that clears stale/legacy localStorage keys on app initialization.
+ * Only removes truly temporary cache data — NOT user preferences or favorites.
  */
 export function useLocalStorageCleanup() {
   useEffect(() => {
-    // List of ALL localStorage keys used by TurnoSmart
-    // Removing all of them ensures km 0 clean state
+    // Only remove temporary cache and legacy keys
+    // DO NOT remove user-configured data (favorites, employee order, selection)
     const keysToRemove = [
-      // Shift/calendar data
+      // Temporary shift cache (real data lives in Supabase)
       'turnosmart_configuration',
-      'calendar-employees',
       'calendar-shift-blocks',
       'calendar-shifts-backup-timestamp',
       'calendar_shifts_backup',
-      'calendar-sort-criteria',
-      'calendar-employee-sort-criteria',
-      'calendar-employee-exclusions',
 
-      // Leave/absence requests
+      // Legacy leave/absence cache
       'gestion-jornada-periods',
       'leaveRequests',
       'absenceRequests',
       'processed-leave-requests',
       'absenceRequestsCleaned',
 
-      // Saved shifts
+      // Stale flags
       'saved-shifts-updated',
-      'turnosmart-favorite-shifts',
-
-      // Employee selection
-      'selectedEmployeesForCalendar',
-      'updatedEmployeeForCalendar',
-      'manual-employee-order',
 
       // Legacy/deprecated keys
       'old_shifts_data',
@@ -41,13 +31,21 @@ export function useLocalStorageCleanup() {
       'dev_mode_settings'
     ];
 
-    // Clear each key
+    // PRESERVED (user preferences, persist across navigation):
+    // - 'turnosmart-favorite-shifts'  (Q1 fix: favorites must persist)
+    // - 'manual-employee-order'       (T1-8: persistent sort order)
+    // - 'selectedEmployeesForCalendar' (employee selection)
+    // - 'calendar-employees'          (employee list cache)
+    // - 'calendar-sort-criteria'      (sort preference)
+    // - 'calendar-employee-sort-criteria'
+    // - 'calendar-employee-exclusions'
+    // - 'updatedEmployeeForCalendar'
+
     keysToRemove.forEach(key => {
       try {
         localStorage.removeItem(key);
-      } catch (error) {
+      } catch {
         // Silently ignore errors (e.g., private browsing mode)
-        console.debug(`Could not remove localStorage key: ${key}`);
       }
     });
   }, []);

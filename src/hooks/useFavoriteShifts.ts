@@ -14,9 +14,9 @@ export const useFavoriteShifts = () => {
       if (stored) {
         const parsed = JSON.parse(stored);
         
-        // Filtrar duplicados de "Descanso Semanal" - solo debe haber uno por defecto
-        const cleanedFavorites = parsed.filter((shift: SavedShift) => 
-          shift.name !== "Descanso Semanal" && shift.accessType !== 'absence'
+        // Filtrar solo "Descanso Semanal" default (se renderiza aparte en FavoritesArea)
+        const cleanedFavorites = parsed.filter((shift: SavedShift) =>
+          shift.name !== "Descanso Semanal"
         );
         
         setFavoriteShifts(cleanedFavorites);
