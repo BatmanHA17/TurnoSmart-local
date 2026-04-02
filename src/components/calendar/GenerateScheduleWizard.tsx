@@ -161,18 +161,20 @@ export function GenerateScheduleWizard({
 
   const monthLabel = format(startOfMonth(currentWeek), "MMMM yyyy", { locale: es });
 
+  const employeeCount = wizardEmployees?.length ?? 0;
+
   const canNext = useMemo(() => {
     switch (step) {
       case 1: return true;
       case 2: return true;
       case 3: return true; // guardias (puede ser vacío = sin guardias)
       case 4: return true; // conflictos
-      case 5: return true; // resumen
+      case 5: return employeeCount > 0; // bloquear generación sin empleados
       case 6: return !isGenerating && generation !== null;
       case 7: return false; // último paso
       default: return false;
     }
-  }, [step, isGenerating, generation]);
+  }, [step, isGenerating, generation, employeeCount]);
 
   const handleNext = () => {
     if (step === 5) {

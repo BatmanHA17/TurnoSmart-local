@@ -163,6 +163,13 @@ export function useSmartGenerateV2({
       setError(null);
 
       try {
+        // Guard: no generar sin empleados
+        if (!calEmployees || calEmployees.length === 0) {
+          setError("No hay empleados configurados. Añade empleados al calendario antes de generar.");
+          setIsGenerating(false);
+          return;
+        }
+
         const refDate = startOfMonth(currentWeek);
         const year = refDate.getFullYear();
         const month = refDate.getMonth() + 1;

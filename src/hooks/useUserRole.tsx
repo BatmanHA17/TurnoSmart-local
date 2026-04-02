@@ -20,7 +20,7 @@ export const useUserRole = () => {
     setError(null);
     const { data, error } = await supabase.rpc("get_user_role", { _user_id: user.id });
     if (error) {
-      console.error("Error fetching user role:", error);
+      // Legacy RPC — silenced (get_user_role doesn't exist in cloud, use useTurnoSmartRole instead)
       setError(error.message);
       setRole(null);
     } else {

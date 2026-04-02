@@ -35,14 +35,14 @@ export const useUserProfile = () => {
         .single();
 
       if (error) {
-        console.error("Error fetching user profile:", error);
+        // Silenced — profile may not exist for users without full onboarding
         setError(error.message);
         setProfile(null);
       } else {
         setProfile(data);
       }
     } catch (err: any) {
-      console.error("Unexpected error fetching profile:", err);
+      // Silenced — expected in some auth states
       setError(err.message);
       setProfile(null);
     }
