@@ -49,6 +49,16 @@ export function CriteriaConfigDialog({
   onToggle,
   onSeedDefaults,
 }: CriteriaConfigDialogProps) {
+  const BOOST_PLACEHOLDERS: Record<string, string> = {
+    ERGONOMIC_ROTATION: "ej. Priorizar rotación M→T→N esta quincena",
+    CONSECUTIVE_REST: "ej. Asegurar L+M consecutivos para Ana",
+    FOM_AFOM_SAME_SHIFT: "ej. FOM y AFOM nunca mismo turno",
+    EQUITY_DEVIATION: "ej. Compensar noches de Pedro este mes",
+    MAX_CONSECUTIVE_NIGHTS: "ej. Máximo 3 noches seguidas para FDA",
+    WEEKEND_EQUITY: "ej. Priorizar FDS libre para María",
+    OCCUPANCY_UNDERSTAFFING: "ej. Reforzar M los días 3, 6, 8",
+    PETITION_NOT_SATISFIED: "ej. Intentar respetar todas las tipo B",
+  };
   const COVERAGE_KEYS = ["MIN_COVERAGE_M", "MIN_COVERAGE_T", "MIN_COVERAGE_N"];
   const coverageCriteria = criteria.filter((c) => COVERAGE_KEYS.includes(c.criteria_key));
   const HIDDEN_KEYS = [...COVERAGE_KEYS, "CROSS_PERIOD_12H"]; // CROSS_PERIOD_12H merged into 12H_REST
@@ -200,7 +210,7 @@ export function CriteriaConfigDialog({
             {local.boost >= 3 && (
               <Input
                 className="h-7 text-xs"
-                placeholder="Nota del boost (opcional): ej. Reforzar M los días 3, 6, 8"
+                placeholder={BOOST_PLACEHOLDERS[c.criteria_key] || "Nota del boost (opcional)"}
                 value={local.note}
                 onChange={(e) => handleNoteChange(c.criteria_key, e.target.value)}
                 onBlur={() => handleBoostCommit(c)}
