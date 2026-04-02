@@ -91,10 +91,11 @@ export const AddColaboradorSheet = ({
           // Versión con tabs para editar información
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="datos-personales">Datos personales</TabsTrigger>
-              <TabsTrigger value="contacto">Contacto</TabsTrigger>
+              <TabsTrigger value="datos-personales">Datos de turno</TabsTrigger>
+              <TabsTrigger value="contacto">Contacto y HR</TabsTrigger>
               <TabsTrigger value="salud">Salud</TabsTrigger>
             </TabsList>
+            <p className="text-[10px] text-muted-foreground -mt-4 px-1">Solo la pestaña "Datos de turno" es necesaria para la planificación de turnos</p>
 
             <TabsContent value="datos-personales" className="space-y-4">
               {/* Contenido de Datos Personales */}

@@ -3190,6 +3190,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           }}
           onClean={() => setShowCleanDialog(true)}
           employeeCount={sortedEmployees.length}
+          scheduledToday={shiftBlocks.filter(s => format(s.date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd') && !s.isAbsence).length}
           dayCount={7}
           avgMovementsPerDay={avgMovementsPerDay}
         />

@@ -139,6 +139,7 @@ export default function HRAuditPolicies() {
     restriction_type: 'NO_DAY',
     day_of_week: 0,
     max_hours: 8,
+    shift_type: 'N',
     reason: ''
   });
 
@@ -358,6 +359,8 @@ export default function HRAuditPolicies() {
       const config: Record<string, any> = {};
       if (newRestriction.restriction_type === 'NO_DAY') {
         config.dayOfWeek = newRestriction.day_of_week;
+      } else if (newRestriction.restriction_type === 'NO_SHIFT_TYPE') {
+        config.shiftType = newRestriction.shift_type;
       } else if (newRestriction.restriction_type === 'MAX_HOURS_DAY') {
         config.maxHours = newRestriction.max_hours;
       }
@@ -665,6 +668,7 @@ export default function HRAuditPolicies() {
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="NO_DAY">No puede trabajar cierto día</SelectItem>
+                                  <SelectItem value="NO_SHIFT_TYPE">No puede hacer cierto turno</SelectItem>
                                   <SelectItem value="MAX_HOURS_DAY">Máximo horas por día</SelectItem>
                                 </SelectContent>
                               </Select>
@@ -691,6 +695,26 @@ export default function HRAuditPolicies() {
                               </div>
                             )}
                             
+                            {newRestriction.restriction_type === 'NO_SHIFT_TYPE' && (
+                              <div className="space-y-2">
+                                <Label>Turno restringido</Label>
+                                <Select
+                                  value={newRestriction.shift_type || 'N'}
+                                  onValueChange={(v) => setNewRestriction(prev => ({ ...prev, shift_type: v }))}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="M">Mañana (M)</SelectItem>
+                                    <SelectItem value="T">Tarde (T)</SelectItem>
+                                    <SelectItem value="N">Noche (N)</SelectItem>
+                                    <SelectItem value="G">Guardia (G)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+
                             {newRestriction.restriction_type === 'MAX_HOURS_DAY' && (
                               <div className="space-y-2">
                                 <Label>Máximo horas por día</Label>
@@ -902,10 +926,13 @@ function getPoliciDescription(type: string): string {
 }
 
 function getRestrictionDescription(restriction: EmployeeRestriction): string {
+  const shiftLabels: Record<string, string> = { M: 'Mañana', T: 'Tarde', N: 'Noche', G: 'Guardia' };
   switch (restriction.restriction_type) {
     case 'NO_DAY':
       const dayName = DAYS_OF_WEEK.find(d => d.value === restriction.config.dayOfWeek)?.label || '';
       return `No puede trabajar los ${dayName}s`;
+    case 'NO_SHIFT_TYPE':
+      return `No puede hacer turno de ${shiftLabels[restriction.config.shiftType] || restriction.config.shiftType}`;
     case 'MAX_HOURS_DAY':
       return `Máximo ${restriction.config.maxHours || 8} horas por día`;
     default:

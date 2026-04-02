@@ -114,6 +114,48 @@ export function usePetitions({
   const createPetition = useCallback(
     async (petition: Omit<PetitionRecord, "id" | "created_at" | "updated_at" | "employee_name">) => {
       try {
+        // Validation: AFOM cannot request vacation (type A) when FOM has vacation same days
+        if (petition.type === 'A' && petition.organization_id) {
+          // Check if this employee is AFOM (colaborador_roles.role = 'afom')
+          const { data: empRole } = await supabase
+            .from('colaborador_roles' as any)
+            .select('role')
+            .eq('colaborador_id', petition.employee_id)
+            .maybeSingle();
+
+          if (empRole?.role === 'afom') {
+            // Find FOM in same org
+            const { data: fomRole } = await supabase
+              .from('colaborador_roles' as any)
+              .select('colaborador_id')
+              .eq('role', 'super_admin')
+              .maybeSingle();
+
+            if (fomRole?.colaborador_id) {
+              // Check FOM petitions type A for overlapping days
+              const { data: fomPetitions } = await supabase
+                .from('schedule_petitions' as any)
+                .select('days, status')
+                .eq('employee_id', fomRole.colaborador_id)
+                .eq('type', 'A')
+                .in('status', ['approved', 'pending']);
+
+              if (fomPetitions && fomPetitions.length > 0) {
+                const fomDays = new Set(fomPetitions.flatMap((p: any) => p.days || []));
+                const overlap = (petition.days || []).some(d => fomDays.has(d));
+                if (overlap) {
+                  toast({
+                    title: "No permitido",
+                    description: "El FOM ya tiene vacaciones esos días. El AFOM debe cubrir su ausencia.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+              }
+            }
+          }
+        }
+
         const { error: dbError } = await supabase
           .from("schedule_petitions" as any)
           .insert(petition as any);

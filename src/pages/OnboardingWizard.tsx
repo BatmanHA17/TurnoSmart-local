@@ -84,9 +84,9 @@ const OnboardingWizard: React.FC = () => {
       if (error) throw error;
 
       if (data?.success) {
-        toast.success('¡Organización configurada correctamente!');
-        // Navigate to dashboard
-        navigate('/turnosmart/day');
+        toast.success('¡Organización creada! Ahora añade a tu primer empleado.');
+        // Navigate to collaborators — next logical step after onboarding
+        navigate('/turnosmart/collaborators');
       } else {
         throw new Error(data?.error || 'Error al completar la configuración');
       }
