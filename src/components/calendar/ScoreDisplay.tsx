@@ -58,9 +58,11 @@ interface ScoreDisplayProps {
   violations?: AuditViolation[];
   /** Modo compacto (sin desglose) */
   compact?: boolean;
+  /** Callback cuando se hace clic en el badge "Revisar" (naranja) */
+  onReviewClick?: () => void;
 }
 
-export function ScoreDisplay({ score, violations = [], compact = false }: ScoreDisplayProps) {
+export function ScoreDisplay({ score, violations = [], compact = false, onReviewClick }: ScoreDisplayProps) {
   const config = TRAFFIC_LIGHT_CONFIG[score.trafficLight];
   const Icon = config.icon;
 
@@ -76,7 +78,11 @@ export function ScoreDisplay({ score, violations = [], compact = false }: ScoreD
           <span className="text-3xl font-bold tabular-nums">{score.overall}</span>
           <span className="text-sm text-muted-foreground">/100</span>
         </div>
-        <Badge variant={config.variant} className="gap-1.5 px-3 py-1">
+        <Badge
+          variant={config.variant}
+          className={`gap-1.5 px-3 py-1${onReviewClick && score.trafficLight !== 'green' ? ' cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+          onClick={onReviewClick && score.trafficLight !== 'green' ? onReviewClick : undefined}
+        >
           <Icon className="h-3.5 w-3.5" />
           {config.label}
         </Badge>

@@ -52,8 +52,13 @@ import {
   Info,
 } from "lucide-react";
 import { ScoreDisplay } from "./ScoreDisplay";
+import { ViolationIcon } from "@/components/audit/AuditViolationBadge";
+import { VIOLATION_TYPE_LABELS } from "@/types/audit";
+import type { AuditViolation, SuggestedFix } from "@/types/audit";
 import type { GenerationResult, ExistingShiftsPolicy, DailyOccupancy } from "@/utils/engine";
 import type { PetitionRecord } from "@/hooks/usePetitions";
+import { toast } from "@/hooks/use-toast";
+import { Wrench } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // TYPES
@@ -994,6 +999,11 @@ function Step7Choose({
   onApply: (index: number) => void;
 }) {
   const { alternatives, recommendedIndex } = generation;
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+
+  const toggleExpand = (idx: number) => {
+    setExpandedIdx(expandedIdx === idx ? null : idx);
+  };
 
   return (
     <div className="space-y-3">
@@ -1001,10 +1011,13 @@ function Step7Choose({
 
       {alternatives.map((alt, idx) => {
         const isRecommended = idx === recommendedIndex;
+        const violations = alt.output.violations || [];
+        const isExpanded = expandedIdx === idx;
+
         return (
           <Card
             key={alt.id}
-            className={`cursor-pointer transition-all hover:shadow-md ${
+            className={`transition-all hover:shadow-md ${
               isRecommended ? "ring-2 ring-violet-400" : ""
             }`}
           >
@@ -1016,9 +1029,30 @@ function Step7Choose({
                     <Badge variant="info" className="text-[10px]">Recomendada</Badge>
                   )}
                 </div>
+                {violations.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => toggleExpand(idx)}
+                  >
+                    <AlertTriangle className="h-3 w-3" />
+                    {violations.length} alerta{violations.length !== 1 ? 's' : ''}
+                  </Button>
+                )}
               </div>
 
-              <ScoreDisplay score={alt.output.score} violations={alt.output.violations} compact />
+              <ScoreDisplay
+                score={alt.output.score}
+                violations={violations}
+                compact
+                onReviewClick={violations.length > 0 ? () => toggleExpand(idx) : undefined}
+              />
+
+              {/* Expandable violations list */}
+              {isExpanded && violations.length > 0 && (
+                <WizardViolationList violations={violations} />
+              )}
 
               <Button
                 size="sm"
@@ -1032,6 +1066,66 @@ function Step7Choose({
           </Card>
         );
       })}
+    </div>
+  );
+}
+
+/** Lista compacta de violaciones para Wizard Step 7 — Copilot Auditoría */
+function WizardViolationList({ violations }: { violations: AuditViolation[] }) {
+  const [showAll, setShowAll] = useState(false);
+  const MAX_VISIBLE = 5;
+
+  // Sort: errors first, then warnings, then info
+  const sorted = useMemo(() => {
+    const order: Record<string, number> = { error: 0, critical: 0, warning: 1, info: 2 };
+    return [...violations].sort((a, b) => (order[a.severity] ?? 3) - (order[b.severity] ?? 3));
+  }, [violations]);
+
+  const visible = showAll ? sorted : sorted.slice(0, MAX_VISIBLE);
+
+  const handleResolve = (fix: SuggestedFix) => {
+    toast({
+      title: "Sugerencia del Copilot",
+      description: fix.label,
+      duration: 5000,
+    });
+  };
+
+  return (
+    <div className="border rounded-lg bg-muted/30 p-2 space-y-1">
+      <p className="text-[10px] font-medium text-muted-foreground px-1 mb-1">
+        Violaciones detectadas
+      </p>
+      {visible.map((v) => (
+        <div
+          key={v.id}
+          className={`flex items-start gap-2 px-2 py-1.5 rounded text-xs ${
+            v.severity === 'error' ? 'bg-destructive/5' : v.severity === 'warning' ? 'bg-amber-500/5' : ''
+          }`}
+        >
+          <ViolationIcon type={v.type} severity={v.severity} size={12} className="mt-0.5 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs truncate">{v.message}</p>
+            {v.suggestedFix && (
+              <button
+                onClick={() => handleResolve(v.suggestedFix!)}
+                className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 rounded px-1.5 py-0.5"
+              >
+                <Wrench className="h-2.5 w-2.5" />
+                <span className="truncate">{v.suggestedFix.label}</span>
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+      {sorted.length > MAX_VISIBLE && !showAll && (
+        <button
+          onClick={() => setShowAll(true)}
+          className="text-[10px] text-primary hover:underline px-2 py-1"
+        >
+          Ver {sorted.length - MAX_VISIBLE} más...
+        </button>
+      )}
     </div>
   );
 }
