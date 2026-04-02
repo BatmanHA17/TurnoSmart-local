@@ -355,7 +355,7 @@ export function UnifiedCalendarHeader({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-popover border border-border shadow-lg">
-                <DropdownMenuItem onClick={onOpenSettings}>Configuración</DropdownMenuItem>
+                <DropdownMenuItem onClick={onOpenSettings}>Horarios guardados</DropdownMenuItem>
                 {onOpenPetitions && (
                   <DropdownMenuItem onClick={onOpenPetitions}>
                     Peticiones {pendingPetitionsCount > 0 && `(${pendingPetitionsCount})`}
