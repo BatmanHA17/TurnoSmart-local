@@ -1240,7 +1240,208 @@ Lo que Shiftbase tiene y nosotros NO:
 
 
 ================================================================================
-COMPETIDOR #3: [PENDIENTE — próximo análisis]
+================================================================================
+COMPETIDOR #3: CLOCKIFY (clockify.me)
+Fecha análisis: 2 abril 2026
+Fuente: clockify.me/es/ + /es/funciones-adicionales + video YouTube
+================================================================================
+================================================================================
+
+--- QUIÉN ES ---
+
+La herramienta de time tracking MÁS popular del mundo.
+5+ millones de usuarios. Clientes: HP, Verizon, AmEx, Siemens, Cisco, Nestlé.
+Empresa: CAKE.com Inc (Palo Alto, CA). Fundada 2016.
+4.8/5 (9,073 reseñas). 95% satisfacción.
+Parte del ecosistema CAKE: Clockify (tiempo) + Plaky (proyectos) + Pumble (comunicación).
+
+
+--- PRICING (benchmark competitivo — MUY agresivo) ---
+
+| Plan | Precio/mes (anual) | Usuarios | Enfoque |
+|------|-------------------|----------|---------|
+| FREE | $0 | ILIMITADOS | Time tracking + reports + proyectos |
+| Basic | $3.99 ($4.99) | Por usuario | Admin features, bulk edit, breaks |
+| Standard | $5.49 ($6.99) | Por usuario | Invoicing, timesheets, time-off, QR |
+| Pro | $7.99 ($9.99) | Por usuario | Scheduling, budgets, GPS, screenshots |
+| Enterprise | $11.99 ($14.99) | Por usuario | SSO, audit logs, custom domain |
+| Bundle | $12.99 ($15.99) | Por usuario | Clockify + Plaky + Pumble (todo) |
+
+Kiosk users especiales: $0.79-$2.39/mes
+
+NOTA: Plan FREE con USUARIOS ILIMITADOS es su killer feature. Nadie más ofrece esto.
+
+
+--- MÓDULOS PRINCIPALES ---
+
+1. CRONOMETRAJE (core — todos los planes)
+   - Temporizador en tiempo real
+   - Planilla horaria semanal
+   - Calendario visual
+   - Rastreador automático (apps y sitios web)
+   - Quiosco para dispositivos compartidos (tablet en recepción)
+   - Pomodoro timer
+   - Detección de inactividad
+   - Entrada manual + breaks
+
+2. INFORMES
+   - Análisis exportable (PDF, Excel)
+   - Vista de actividad (quién trabaja en qué)
+   - Tarifas (ganancias, costos, beneficios)
+   - Presupuestos por proyecto
+   - Ubicación GPS (sitios visitados, rutas)
+
+3. GESTIÓN
+   - Planificación y asignaciones (PRO)
+   - Time off / vacaciones (Standard+)
+   - Aprobación de planillas (Standard+)
+   - Facturación (Standard+)
+   - Gastos (Pro)
+   - Gestión de equipo y roles
+
+4. SCHEDULING (solo PRO $7.99)
+   - Resource planning
+   - Forecasting
+   - Capacity planning
+   - Assignments
+   - NO auto-scheduling con IA
+
+
+--- FEATURES ÚNICOS DE CLOCKIFY ---
+
+Auto-tracker:
+  - Registra automáticamente qué apps y sitios web usas
+  - Categoriza tiempo por actividad
+  - "Rastreador automático" — productividad sin input manual
+  → Interesante para oficina pero no para hostelería
+
+Quiosco (Kiosk):
+  - Tablet compartido en la entrada del establecimiento
+  - Empleados fichan con PIN o QR
+  - Breaks trackables desde el kiosk
+  - Interfaz touch-friendly
+  → MUY relevante para hostelería: tablet en recepción para fichaje
+
+Screenshots (Pro):
+  - Captura pantallas durante el trabajo
+  - Monitorización de productividad
+  → No relevante para hostelería
+
+GPS tracking (Pro):
+  - Ve ubicaciones visitadas
+  - Rutas del día
+  - Historial de localización
+  → Relevante para empleados móviles o multi-ubicación
+
+Scheduled email reports (Pro):
+  - Envío automático de informes por email
+  - Periódico (semanal, mensual)
+  → Idea para TurnoSmart: enviar resumen semanal al FOM
+
+
+--- MULTIPLATAFORMA (ventaja competitiva) ---
+
+- Web app
+- Desktop: Windows, Mac, Linux
+- Mobile: iOS, Android
+- Browser extensions: Chrome, Firefox, Edge
+- API pública documentada (docs.clockify.me)
+- 80+ integraciones
+
+
+--- IDEAS PARA TURNOSMART desde Clockify ---
+
+ALTA prioridad:
+
+  > KIOSK MODE — tablet en recepción para fichaje
+    - Concepto perfecto para hostelería: iPad en el mostrador de recepción
+    - Empleados fichan con PIN personal (4 dígitos) al llegar/salir
+    - Breaks trackables (pausa café, comida)
+    - Sin necesidad de app personal en el móvil de cada empleado
+    - Implementación: ruta /kiosk con UI simplificada + PIN input
+    - Combinable con nuestro QR code idea de Factorial
+
+  > PLAN FREE — benchmark de pricing
+    - Clockify FREE = usuarios ilimitados (!) con time tracking completo
+    - Shiftbase FREE = 15 usuarios con scheduling básico
+    - TurnoSmart debería considerar: Free ≤5 empleados (scheduling + calendar view)
+    - Nuestro SMART v2.0 + Copilot como feature premium diferenciador
+    - Pricing sugerido revisado:
+      Free (≤5 emp): calendario + peticiones básicas
+      Basic €4/emp: scheduling + auditoría + analytics
+      Pro €8/emp: SMART IA + Copilot + forecasting + ocupación
+
+  > SCHEDULED EMAIL REPORTS
+    - Enviar resumen semanal automático al FOM:
+      "Esta semana: 8 turnos cubiertos, 1 alerta resuelta, score 87"
+    - Enviar al empleado: "Tu semana: 38h trabajadas, próximo libre: jueves"
+    - Implementación: cron job Supabase Edge Function + template email
+
+  > BREAKS tracking
+    - Clockify trackea breaks dentro del turno
+    - TurnoSmart ya tiene breakType/breakDuration en saved_shifts
+    - Falta: tracking real de breaks tomados vs planificados
+    - Idea: "Pausas: 30min planificada, 27min real" en timesheet
+
+MEDIA prioridad:
+
+  > Browser extension para managers
+    - Ver rápidamente quién trabaja hoy sin abrir la app completa
+    - Badge con count de alertas pendientes
+    - Click para ir directo al calendario
+
+  > API pública documentada
+    - Clockify tiene API abierta → integraciones de terceros
+    - TurnoSmart debería tener API para PMS (Opera, Mews)
+    - Roadmap: REST API para import/export de turnos y ocupación
+
+  > Pomodoro timer (no relevante para hostelería)
+
+BAJA prioridad:
+  > Auto-tracker de apps/sitios (oficina only)
+  > Screenshots de productividad (invasivo)
+  > Multi-currency invoicing (no core)
+
+
+--- COMPARATIVA DE PRICING (3 competidores) ---
+
+| Feature | Clockify | Shiftbase | Factorial | TurnoSmart (propuesta) |
+|---------|----------|-----------|-----------|----------------------|
+| Plan FREE | ✅ ∞ users | ✅ 15 users | ❌ | ✅ ≤5 emp (propuesta) |
+| Scheduling | $7.99 Pro | €4 Basic | $8 módulo | €4 Basic |
+| Auto IA | ❌ | Coming soon | ✅ | ✅ SMART v2.0 |
+| Time tracking | $0 FREE | €4 Basic | $8 módulo | €4 Basic (propuesta) |
+| Kiosk/QR | $3.99 Basic | ❌ | ❌ | ⬜ Implementar |
+| GPS | $7.99 Pro | ❌ | ✅ | ⬜ Futuro |
+| Reports | $0 FREE | €5 Premium | Incluido | Incluido |
+| Breaks | $3.99 Basic | ❌ | ❌ | ✅ Ya en saved_shifts |
+
+
+--- VENTAJA COMPETITIVA TURNOSMART vs CLOCKIFY ---
+
+Clockify es TIME TRACKING puro. NO genera turnos.
+TurnoSmart es SHIFT SCHEDULING con IA. Genera, audita, optimiza.
+
+Lo que Clockify hace bien y nosotros podemos copiar:
+  > Kiosk mode para fichaje colectivo
+  > Plan free como gancho de adquisición
+  > Scheduled email reports automáticos
+  > Breaks tracking granular
+  > API pública documentada
+
+Lo que TurnoSmart tiene y Clockify NUNCA tendrá:
+  ✅ Motor SMART v2.0 (generación automática de turnos)
+  ✅ Copilot Auditoría con sugerencias
+  ✅ Score 0-100 con semáforo
+  ✅ Peticiones tipo A/B/C/D del equipo
+  ✅ Ocupación integrada (check-in/check-out)
+  ✅ Convenio colectivo español
+  ✅ Equidad cross-período
+  ✅ SMART+IA proactiva
+
+
+================================================================================
+COMPETIDOR #4: [PENDIENTE — próximo análisis]
 ================================================================================
 
 (Añadir aquí: HiBob, Kenjo, Sesame, Personio, Planday, 7shifts, Deputy, etc.)
