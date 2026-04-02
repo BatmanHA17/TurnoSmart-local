@@ -97,12 +97,56 @@ export async function clearSavedShifts(): Promise<void> {
   }
 }
 
+/** T1-2: Default shift kit — auto-seeds when org has 0 saved shifts */
+const DEFAULT_KIT: Array<Omit<SavedShift, 'id' | 'createdAt' | 'updatedAt'>> = [
+  { name: 'Mañana (M)', startTime: '07:00', endTime: '15:00', color: '#fbbf24', accessType: 'company', hasBreak: true, breakDuration: '30', totalBreakTime: 30, notes: 'Turno de mañana estándar' },
+  { name: 'Tarde (T)', startTime: '15:00', endTime: '23:00', color: '#fb923c', accessType: 'company', hasBreak: true, breakDuration: '30', totalBreakTime: 30, notes: 'Turno de tarde estándar' },
+  { name: 'Noche (N)', startTime: '23:00', endTime: '07:00', color: '#818cf8', accessType: 'company', hasBreak: true, breakDuration: '30', totalBreakTime: 30, notes: 'Turno de noche estándar' },
+  { name: 'Transición (11×19)', startTime: '11:00', endTime: '19:00', color: '#e97600', accessType: 'company', hasBreak: true, breakDuration: '30', totalBreakTime: 30, notes: 'Turno transición T→M' },
+  { name: 'GEX Mañana (9×17)', startTime: '09:00', endTime: '17:00', color: '#fde047', accessType: 'company', hasBreak: true, breakDuration: '30', totalBreakTime: 30, notes: 'Guest Experience mañana' },
+  { name: 'GEX Tarde (12×20)', startTime: '12:00', endTime: '20:00', color: '#fdba74', accessType: 'company', hasBreak: true, breakDuration: '30', totalBreakTime: 30, notes: 'Guest Experience tarde' },
+  { name: 'Guardia (G)', startTime: '09:00', endTime: '21:00', color: '#f87171', accessType: 'company', hasBreak: false, breakDuration: '0', totalBreakTime: 0, notes: 'Guardia FOM fin de semana' },
+];
+
+async function seedDefaultKit(): Promise<void> {
+  try {
+    const { data: userOrgs } = await supabase.rpc('get_user_organizations');
+    const orgId = userOrgs?.[0]?.org_id;
+    if (!orgId) return;
+
+    const rows = DEFAULT_KIT.map(s => ({
+      name: s.name,
+      start_time: s.startTime || null,
+      end_time: s.endTime || null,
+      color: s.color,
+      access_type: s.accessType,
+      break_type: 'meal',
+      break_duration: s.breakDuration,
+      has_break: s.hasBreak,
+      total_break_time: s.totalBreakTime,
+      notes: s.notes,
+      org_id: orgId,
+    }));
+
+    await supabase.from('saved_shifts').insert(rows);
+    shiftsCache = null;
+  } catch {
+    // Silenced — table may not exist or insert fails
+  }
+}
+
 export async function getSavedShifts(forceReload = false): Promise<SavedShift[]> {
   if (shiftsCache && !forceReload) {
     return shiftsCache;
   }
   shiftsCache = null; // Clear cache to force reload
-  const shifts = await read();
+  let shifts = await read();
+
+  // Auto-seed kit if org has 0 shifts
+  if (shifts.length === 0) {
+    await seedDefaultKit();
+    shifts = await read();
+  }
   return shifts;
 }
 
