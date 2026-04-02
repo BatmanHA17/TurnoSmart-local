@@ -3043,34 +3043,60 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   };
 
   // C9: Calcular resumen del período anterior para Wizard Step 5
-  const previousPeriodSummary: PreviousPeriodSummary[] = useMemo(() => {
-    if (shiftBlocks.length === 0 || employees.length === 0) return [];
-    const summaryMap = new Map<string, PreviousPeriodSummary>();
-    for (const emp of employees) {
-      summaryMap.set(emp.id, {
-        employeeId: emp.id,
-        employeeName: emp.name,
-        lastShift: '-',
-        morningCount: 0,
-        afternoonCount: 0,
-        nightCount: 0,
-      });
-    }
-    // Sort shifts by date to find last shift per employee
-    const sorted = [...shiftBlocks]
-      .filter(s => !s.isAbsence)
-      .sort((a, b) => a.date.getTime() - b.date.getTime());
-    for (const shift of sorted) {
-      const s = summaryMap.get(shift.employeeId);
-      if (!s) continue;
-      s.lastShift = shift.shiftName || '-';
-      const code = (shift.shiftName || '').charAt(0).toUpperCase();
-      if (code === 'M' || shift.shiftName === 'Mañana') s.morningCount++;
-      else if (code === 'T' || shift.shiftName === 'Tarde') s.afternoonCount++;
-      else if (code === 'N' || shift.shiftName === 'Noche') s.nightCount++;
-    }
-    return Array.from(summaryMap.values()).filter(s => s.lastShift !== '-');
-  }, [shiftBlocks, employees]);
+  // T2-9: Previous period summary from employee_equity DB (real historical data)
+  const [previousPeriodSummary, setPreviousPeriodSummary] = useState<PreviousPeriodSummary[]>([]);
+  useEffect(() => {
+    if (!org?.id || employees.length === 0) { setPreviousPeriodSummary([]); return; }
+    const loadPreviousPeriod = async () => {
+      try {
+        const periodStart = format(currentWeek, 'yyyy-MM-dd');
+        const { data } = await supabase
+          .from('employee_equity')
+          .select('employee_id, morning_count, afternoon_count, night_count, period_end')
+          .eq('organization_id', org.id)
+          .lt('period_end', periodStart)
+          .order('period_end', { ascending: false });
+        if (data && data.length > 0) {
+          // Take most recent per employee
+          const seen = new Set<string>();
+          const summaries: PreviousPeriodSummary[] = [];
+          for (const row of data) {
+            if (seen.has(row.employee_id)) continue;
+            seen.add(row.employee_id);
+            const emp = employees.find(e => e.id === row.employee_id);
+            if (!emp) continue;
+            summaries.push({
+              employeeId: row.employee_id,
+              employeeName: emp.name,
+              lastShift: '-',
+              morningCount: row.morning_count ?? 0,
+              afternoonCount: row.afternoon_count ?? 0,
+              nightCount: row.night_count ?? 0,
+            });
+          }
+          if (summaries.length > 0) { setPreviousPeriodSummary(summaries); return; }
+        }
+      } catch { /* graceful — table may not exist */ }
+      // Fallback: compute from current shiftBlocks if no DB data
+      if (shiftBlocks.length === 0) { setPreviousPeriodSummary([]); return; }
+      const summaryMap = new Map<string, PreviousPeriodSummary>();
+      for (const emp of employees) {
+        summaryMap.set(emp.id, { employeeId: emp.id, employeeName: emp.name, lastShift: '-', morningCount: 0, afternoonCount: 0, nightCount: 0 });
+      }
+      const sorted = [...shiftBlocks].filter(s => !s.isAbsence).sort((a, b) => a.date.getTime() - b.date.getTime());
+      for (const shift of sorted) {
+        const s = summaryMap.get(shift.employeeId);
+        if (!s) continue;
+        s.lastShift = shift.shiftName || '-';
+        const code = (shift.shiftName || '').charAt(0).toUpperCase();
+        if (code === 'M' || shift.shiftName === 'Mañana') s.morningCount++;
+        else if (code === 'T' || shift.shiftName === 'Tarde') s.afternoonCount++;
+        else if (code === 'N' || shift.shiftName === 'Noche') s.nightCount++;
+      }
+      setPreviousPeriodSummary(Array.from(summaryMap.values()).filter(s => s.lastShift !== '-'));
+    };
+    loadPreviousPeriod();
+  }, [org?.id, employees.length, currentWeek]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Transformar shiftBlocks a formato de auditoría
   const shiftsForAudit: ShiftForAudit[] = useMemo(() => {
