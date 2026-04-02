@@ -1040,7 +1040,207 @@ Patrones UX de dashboards a copiar:
 
 
 ================================================================================
-COMPETIDOR #2: [PENDIENTE — próximo análisis]
+================================================================================
+COMPETIDOR #2: SHIFTBASE (shiftbase.com)
+Fecha análisis: 2 abril 2026
+Fuente: shiftbase.com/employee-scheduling + /pricing
+================================================================================
 ================================================================================
 
-(Añadir aquí el siguiente competidor analizado: HiBob, Kenjo, Sesame, Personio, etc.)
+--- QUIÉN ES ---
+
+Competidor DIRECTO de TurnoSmart. Empresa UK (Edinburgh).
+Enfocado 100% en shift scheduling + time tracking + absence management.
+8,000+ businesses. ISO certified.
+Sectores: Retail, Restaurant, Hotel, Healthcare, Transportation, Security, Production.
+Multi-idioma: EN, DE, ES, FR, NL.
+
+
+--- PRICING (muy relevante para benchmark) ---
+
+Plan FREE:
+  - Gratis hasta 15 usuarios y 15 empleados
+  - Scheduling básico + time tracking + mobile app
+  - SIN tarjeta de crédito
+
+Plan BASIC (€4/mes por empleado adicional, €3.60 anual):
+  - Incluye 6 empleados base
+  - Scheduling, time tracking, disponibilidad, shift exchanges, open shifts
+  - 14 días trial
+
+Plan PREMIUM (€5/mes por empleado adicional, €4.50 anual):
+  - Incluye 12 empleados base
+  - TODO de Basic + skill-based scheduling, budget management, forecasting, flexpool, surcharges avanzados
+
+Add-ons:
+  - Compliance+: extra/mes por empleado
+  - App Center+: €17.50/mes (integraciones ilimitadas)
+  - Automatic Scheduling: COMING SOON
+  - HR PRO: COMING SOON
+  - Performance: BETA
+
+NOTA: Automatic Scheduling = IA para generar turnos. Aún no lo tienen. NOSOTROS SÍ (SMART v2.0).
+
+
+--- DIFERENCIADORES vs FACTORIAL vs TURNOSMART ---
+
+| Feature | Shiftbase | Factorial | TurnoSmart |
+|---------|-----------|-----------|------------|
+| Plan gratis | ✅ 15 users | ❌ | ❌ (considerar) |
+| Auto-scheduling IA | Coming soon | ✅ "Auto Scheduling" | ✅ SMART v2.0 (10 fases) |
+| Open shifts | ✅ | ❌ (no mencionado) | ⬜ (no implementado) |
+| Flex pools multi-location | ✅ | ❌ | ⬜ |
+| Shift swap self-service | ✅ via app | ✅ via app | ✅ Petición tipo C |
+| Skill-based scheduling | ✅ Premium | ❌ | ✅ Via roles (FDA/GEX/Night) |
+| Budget management | ✅ Premium | ❌ en shifts | ⬜ |
+| Forecasting | ✅ Premium | ❌ en shifts | ✅ Ocupación (daily_occupancy) |
+| Compliance legal | ✅ Add-on | ✅ Incluido | ✅ 12h rest, 40h, convenio |
+| Time tracking | ✅ Incluido | ✅ Módulo separado | ⬜ (no implementado) |
+| Precio/empleado | €4-5/mes | $8/mes | Por definir |
+
+
+--- FEATURES CLAVE DE SHIFTBASE ---
+
+1. Schedule Building
+   - Templates + recurring shifts
+   - Drag-and-drop
+   - Disponibilidad, ausencias y compliance visibles durante la creación
+   - "Build a schedule that stays done"
+
+2. Open Shifts (turnos sin cubrir)
+   - Publicar turnos abiertos al equipo
+   - Empleados disponibles pueden reclamarlos
+   - "Invite available staff to claim open shifts fast"
+   - Approve replacements en segundos
+
+3. Flex Pools (multi-location)
+   - Pool de empleados disponibles entre ubicaciones
+   - Cobertura cruzada entre establecimientos
+   - Vista consolidada de todas las ubicaciones
+
+4. Shift Swapping (self-service)
+   - Empleados proponen intercambios via app
+   - Sin "message chaos" (sin WhatsApp/email)
+   - Manager aprueba con un tap
+   - "Let staff swap shifts without creating message chaos"
+
+5. Mobile App
+   - Ver turnos y rotas
+   - Swap requests
+   - Actualizar disponibilidad
+   - Solicitar ausencias
+   - Push notifications de cambios
+
+6. Compliance
+   - Labour law pre-loaded durante creación del rota
+   - Checks automáticos de rest periods
+   - Add-on Compliance+ para más detalle
+
+7. Integraciones
+   - Lightspeed, Personio, Vectron, Wagestream, Untill, Formitable, Datafox, Piggy
+   - POS systems (retail), HRM, Payroll
+
+
+--- FAQs DE SHIFTBASE (10 preguntas) ---
+
+Temas clave:
+- Mejor software para shift teams → reducir back-and-forth
+- Self-service features → check shifts, swap, availability, leave via app
+- Move away from Excel → scheduling + availability + leave en un sistema live
+- SME friendly → diseñado para negocio que ha superado Excel
+- Best for restaurants/hotels/retail → fast rota, easy changes, mobile, coverage
+- Absence management incluido → rota + leave combinado
+- Mobile access → rotas, swap, availability, leave; managers approve rápido
+- Payroll connection → scheduling + time tracking + leave + payroll conectados
+- Qué buscar en rota software → más que publicar: swaps, open shifts, availability, leave
+- Accuracy → automates swaps, absence tracking, compliance, payroll data
+
+
+--- TESTIMONIAL ---
+
+"We are happy with Shiftbase because all our employees can easily view the schedule
+and indicate their availability in the app! And the customer service is helpful and
+responds quickly" — Sabrina Barten, HR-employee at Flying Tiger Copenhagen
+
+
+--- SOCIAL PROOF ---
+
+- 8,000+ businesses
+- Capterra: 4.4/5
+- App Store: 4.5/5
+- Google Play: 4.0/5
+- 14-day free trial, no credit card
+
+
+--- IDEAS PARA TURNOSMART desde Shiftbase ---
+
+ALTA prioridad (ventajas competitivas claras):
+
+  > OPEN SHIFTS — Turnos sin cubrir que el equipo puede reclamar
+    - Concepto: FOM publica turno "Noche del viernes necesita cobertura"
+    - Empleados disponibles ven la notificación y se ofrecen
+    - FOM aprueba al primero que cumpla requisitos
+    - Implementación: nuevo estado de turno "open" + notificación push
+    - MUY relevante para hostelería (bajas de último minuto)
+
+  > PLAN GRATIS (benchmark de pricing)
+    - Shiftbase ofrece gratis hasta 15 empleados
+    - Para TurnoSmart: considerar freemium hasta 10 empleados
+    - Nuestro SMART v2.0 es ventaja premium (Shiftbase aún no lo tiene)
+    - Pricing sugerido: Free (≤10) → Basic €5/emp → Pro €8/emp (con SMART IA)
+
+  > "Build a schedule that stays done" — messaging
+    - Copy potente: "Tu rota no debería llevarte toda la semana"
+    - Nuestro motor SMART genera en segundos lo que manualmente lleva horas
+    - Mensaje de ahorro de tiempo cuantificable en landing page
+
+MEDIA prioridad:
+
+  > Flex Pools multi-location
+    - No inmediato para TurnoSmart (empezamos single-location)
+    - Pero importante para cadenas hoteleras con múltiples establecimientos
+    - Roadmap: pool de empleados compartido entre ubicaciones
+
+  > Disponibilidad visible durante creación
+    - Shiftbase muestra availability + leave + compliance DURANTE drag-and-drop
+    - Nosotros lo hacemos en el Wizard pre-generación pero no en edición manual
+    - Idea: al hacer drag-drop de turno, mostrar tooltip "empleado no disponible" si tiene petición/ausencia
+
+  > Recurring shifts / Templates
+    - Copiar semana anterior con un click
+    - Templates nombrados ("Semana tipo A", "Semana tipo B")
+    - Nosotros tenemos favoritos pero no templates de semana completa
+
+BAJA prioridad:
+
+  > Budget management (coste por turno)
+  > Integraciones POS (Lightspeed, Vectron)
+  > Surcharges avanzados (plus nocturnidad, festivos)
+
+
+--- VENTAJA COMPETITIVA DE TURNOSMART vs SHIFTBASE ---
+
+Lo que nosotros tenemos y Shiftbase NO:
+  ✅ Motor SMART v2.0 con IA (10 fases, 3 alternativas, score)
+  ✅ Copilot Auditoría con sugerencias automáticas
+  ✅ SMART+IA proactiva (SM-01 a SM-11)
+  ✅ Ocupación real integrada en generación (check-in/check-out)
+  ✅ Score 0-100 con semáforo y desglose por categoría
+  ✅ Equidad cross-período (employee_equity histórico)
+  ✅ Criterios configurables con BOOST
+  ✅ Convenio colectivo español precargado
+
+Lo que Shiftbase tiene y nosotros NO:
+  ⬜ Open shifts (turnos abiertos que el equipo reclama)
+  ⬜ Time tracking / clock-in
+  ⬜ Plan gratuito
+  ⬜ Multi-location flex pools
+  ⬜ Templates de semana completa
+  ⬜ Integraciones POS
+
+
+================================================================================
+COMPETIDOR #3: [PENDIENTE — próximo análisis]
+================================================================================
+
+(Añadir aquí: HiBob, Kenjo, Sesame, Personio, Planday, 7shifts, Deputy, etc.)
