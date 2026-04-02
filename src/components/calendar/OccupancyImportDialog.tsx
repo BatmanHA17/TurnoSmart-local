@@ -22,6 +22,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Upload, FileSpreadsheet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+// xlsx loaded dynamically to avoid 300KB+ bundle impact
+const loadXLSX = () => import("xlsx");
 
 interface OccupancyEntry {
   day: number;
@@ -143,6 +145,58 @@ export function OccupancyImportDialog({
     reader.readAsText(file);
   };
 
+  // T3-1: Excel (.xlsx/.xls) parser — dynamic import for code-splitting
+  const handleExcelUpload = async (file: File) => {
+    setCsvFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const XLSX = await loadXLSX();
+        const data = new Uint8Array(ev.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+        const entries: OccupancyEntry[] = [];
+        // Skip header row if detected
+        const startIdx = rows[0]?.some((c: any) => String(c).match(/day|día|fecha|date|check|llegada|salida/i)) ? 1 : 0;
+
+        for (let i = startIdx; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || row.length < 3) continue;
+          const day = parseDayFromColumn(String(row[0] ?? ''));
+          const checkIns = parseInt(String(row[1] ?? ''), 10);
+          const checkOuts = parseInt(String(row[2] ?? ''), 10);
+          if (day !== null && day >= 1 && day <= totalDays && !isNaN(checkIns) && !isNaN(checkOuts)) {
+            entries.push({ day, checkIns, checkOuts });
+          }
+        }
+
+        if (entries.length === 0) {
+          toast({ title: "Error de formato", description: "No se pudieron parsear datos del Excel. Formato: día, check-ins, check-outs.", variant: "destructive" });
+          return;
+        }
+        setCsvPreview(entries);
+      } catch {
+        toast({ title: "Error al leer Excel", description: "El archivo no se pudo procesar. Verifica que sea un .xlsx válido.", variant: "destructive" });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  // Unified file handler: CSV or Excel
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext === 'xlsx' || ext === 'xls') {
+      handleExcelUpload(file);
+    } else {
+      // Delegate to CSV handler (simulate change event)
+      handleCSVUpload(e);
+    }
+  };
+
   const handleImportGrid = async () => {
     const nonZero = gridData.filter((e) => e.checkIns > 0 || e.checkOuts > 0);
     if (nonZero.length === 0) {
@@ -229,17 +283,17 @@ export function OccupancyImportDialog({
               <div className="border-2 border-dashed rounded-lg p-6 text-center space-y-3">
                 <FileSpreadsheet className="h-8 w-8 mx-auto text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">
-                  CSV con 3 columnas: <code>día, check_ins, check_outs</code>
+                  CSV o Excel con 3 columnas: <code>día, check_ins, check_outs</code>
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Separador: coma, punto y coma, o tabulador
+                  Formatos: .csv, .tsv, .xlsx, .xls
                 </p>
                 <input
                   ref={fileRef}
                   type="file"
-                  accept=".csv,.tsv,.txt"
+                  accept=".csv,.tsv,.txt,.xlsx,.xls"
                   className="hidden"
-                  onChange={handleCSVUpload}
+                  onChange={handleFileUpload}
                 />
                 <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
                   <Upload className="h-3.5 w-3.5 mr-1.5" />
