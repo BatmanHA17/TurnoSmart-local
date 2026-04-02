@@ -147,7 +147,7 @@ Guía usuario con notas PO: `docs/GUIA_USUARIO_GENERACION_TURNOS_CON_MIS_NOTAS.m
 6. **T2-6** Días debidos guardia → acumulación en dg_balance (no auto-asignar)
 7. **T2-7** ~~Tour onboarding (5 tooltips)~~ ✅ Ya implementado — OnboardingTour.tsx custom (sin react-joyride)
 8. **T2-8** Auto-refuerzo inteligente por ocupación (Phase 07 + daily_occupancy)
-9. **T2-9** Visualizar período anterior (panel resumen Wizard Step 5)
+9. **T2-9** ~~Visualizar período anterior (panel resumen Wizard Step 5)~~ ✅ `0b6e700` — loads from employee_equity DB
 10. **T2-10** Modo edición delegable FOM→AFOM (toggle + fechas)
 
 ### Tier 3 — Post-Lanzamiento 🔮
