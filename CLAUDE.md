@@ -192,7 +192,7 @@ Copilot chat NLP completo, NLP en notas, Unificar roles/seniority, Eliminar expo
 ### 🟡 BUGS QA — PENDIENTES (Revisión guía usuario 2026-03-31)
 | # | Bug | Archivo/Zona | Severidad |
 |---|-----|-------------|-----------|
-| Q1 | Favoritos desaparecen al navegar | saved_shifts persistencia | 🟠 Medio |
+| Q1 | ~~Favoritos desaparecen al navegar~~ — useLocalStorageCleanup borraba favorites en cada mount | useLocalStorageCleanup + useFavoriteShifts | ✅ Fix `a92a69b` |
 | Q2 | Clic en alerta auditoría no navega a celda | Audit UI | 🟡 Menor |
 | Q3 | Cobertura insuficiente noche 23 marzo | Engine lógica vs bug | 🟡 Verificar |
 | Q4 | Botón Guardar manual — verificar funcionalidad | Calendario toolbar | 🟡 Verificar |
@@ -225,6 +225,7 @@ Copilot chat NLP completo, NLP en notas, Unificar roles/seniority, Eliminar expo
 | F18 | **P15** 404 ruta legacy /turnosmart/colaboradores | Redirect a /turnosmart/collaborators | `e20a495` |
 | F19 | **Q6** Peticiones "?" nombres de empleado | Fallback a "Empleado <id>" cuando FK huérfana | `134b2a4` |
 | F20 | **Q7** Audit "Exceso horas 152h/40h" falso positivo | Usar rango real de fechas para calcular semanas, no solo días con turnos | `134b2a4` |
+| F21 | **Q1** Favoritos desaparecen al navegar | useLocalStorageCleanup no borra favorites + filtro absence relajado + showFavorites persiste | `a92a69b` |
 
 ### ✅ SMOKE TEST SUPER ADMIN — VERIFICADOS OK (2026-04-02)
 Login, Calendario, Equipo, HR, Analítica, Settings, Wizard SMART, Criterios SMART,
