@@ -93,7 +93,7 @@ export function HorizontalNav() {
           description: "Error al obtener tu perfil",
           variant: "destructive"
         });
-        navigate('/colaboradores');
+        navigate('/turnosmart/collaborators');
         return;
       }
 
@@ -105,7 +105,7 @@ export function HorizontalNav() {
           description: "No se encontró email en tu perfil",
           variant: "destructive"
         });
-        navigate('/colaboradores');
+        navigate('/turnosmart/collaborators');
         return;
       }
 
@@ -123,7 +123,7 @@ export function HorizontalNav() {
           description: "Error al buscar tu perfil de colaborador",
           variant: "destructive"
         });
-        navigate('/colaboradores');
+        navigate('/turnosmart/collaborators');
         return;
       }
 
@@ -132,7 +132,7 @@ export function HorizontalNav() {
         return;
       }
 
-      navigate(`/colaboradores/${colaborador.id}/profile`);
+      navigate(`/turnosmart/collaborators/${colaborador.id}/profile`);
       
     } catch (error) {
       console.error('💥 Error inesperado:', error);
@@ -141,7 +141,7 @@ export function HorizontalNav() {
         description: "Ocurrió un error al acceder a tu perfil",
         variant: "destructive"
       });
-      navigate('/colaboradores');
+      navigate('/turnosmart/collaborators');
     }
   };
 

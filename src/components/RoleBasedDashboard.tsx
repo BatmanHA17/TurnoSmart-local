@@ -1,44 +1,37 @@
-import { useUserRoleCanonical } from "@/hooks/useUserRoleCanonical";
+import { useTurnoSmartRole } from "@/hooks/useTurnoSmartRole";
 import { DashboardEmpleado } from "@/components/DashboardEmpleado";
 import DashboardManager from "@/components/DashboardManager";
-import DashboardDirector from "@/components/DashboardDirector";
-import DashboardAdministrator from "@/components/DashboardAdministrator";
 import DashboardOwner from "@/components/DashboardOwner";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { MainLayout } from "@/components/MainLayout";
 
 /**
  * Dashboard canónico único en /dashboard.
- * Renderiza el contenido apropiado según el rol del usuario.
- * FASE 3: Consolidación de dashboards.
+ * Usa useTurnoSmartRole (super_admin / fom / empleado) para decidir qué panel mostrar.
+ *
+ * Mapeo:
+ * - super_admin → DashboardOwner (panel completo con herramientas admin)
+ * - fom         → DashboardManager (gestión de equipo, turnos, ausencias)
+ * - empleado    → DashboardEmpleado (mi horario, peticiones)
  */
 export default function RoleBasedDashboard() {
-  const { role, loading } = useUserRoleCanonical();
+  const { tsRole, loading } = useTurnoSmartRole();
 
   if (loading) {
     return <LoadingSpinner text="Cargando panel de control..." />;
   }
 
   let dashboardContent;
-  
-  switch (role) {
-    case "EMPLOYEE":
-      dashboardContent = <DashboardEmpleado />;
-      break;
-    case "MANAGER":
-      dashboardContent = <DashboardManager />;
-      break;
-    case "DIRECTOR":
-      dashboardContent = <DashboardDirector />;
-      break;
-    case "ADMIN":
-      dashboardContent = <DashboardAdministrator />;
-      break;
-    case "OWNER":
+
+  switch (tsRole) {
+    case "super_admin":
       dashboardContent = <DashboardOwner />;
       break;
+    case "fom":
+      dashboardContent = <DashboardManager />;
+      break;
+    case "empleado":
     default:
-      // Fallback seguro
       dashboardContent = <DashboardEmpleado />;
   }
 

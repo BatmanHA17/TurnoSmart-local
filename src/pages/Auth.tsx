@@ -117,17 +117,12 @@ export default function Auth() {
     try {
       const exists = await checkIfUserExists(email);
       setUserExists(!!exists);
-      
-      if (exists) {
-        // Usuario existente - mostrar campo de contraseña / enviar magic link
-        setFlow('login');
-        setStep('password');
-      } else {
-        // Email no encontrado: no crear cuenta desde aquí
-        // Los empleados deben usar su enlace de invitación
-        // Los nuevos dueños de org deben registrarse en /register
-        setError('No encontramos esta cuenta. ¿Eres nuevo? Crea tu organización desde la página de inicio. ¿Eres empleado? Usa el enlace de invitación que recibiste por email.');
-      }
+
+      // Siempre avanzar al paso de contraseña.
+      // Usuarios pueden existir en auth.users sin tener profile/colaborador aún
+      // (ej: empleados recién invitados). Supabase Auth validará las credenciales.
+      setFlow('login');
+      setStep('password');
     } catch (error: any) {
       console.error('Error:', error);
       setError('Error inesperado. Inténtalo de nuevo.');
@@ -685,14 +680,14 @@ export default function Auth() {
 
         <div className="text-center text-sm text-gray-500">
           <p>
-            Este formulario es para <strong>nuevas organizaciones</strong>. <br />
-            Si ya tienes cuenta o te invitaron, usa{" "}
-            <Link 
-              to="/auth" 
-              className="text-blue-600 hover:underline" 
-              data-testid="link-login"
+            Ingresa tu email para acceder a tu cuenta. <br />
+            ¿Nuevo? Tu administrador debe invitarte o{" "}
+            <Link
+              to="/auth?mode=register"
+              className="text-blue-600 hover:underline"
+              data-testid="link-register"
             >
-              Iniciar sesión
+              crea tu organización
             </Link>.
           </p>
         </div>

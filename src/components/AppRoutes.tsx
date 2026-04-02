@@ -1,5 +1,5 @@
 import React, { Suspense } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 
 // Imports críticos (carga inmediata)
@@ -175,6 +175,13 @@ const PageLoader = () => (
   </div>
 );
 
+// Legacy redirect helper: reads :id param and redirects to the correct /turnosmart/collaborators/:id path
+const ColaboradorRedirect = () => {
+  const { id } = useParams();
+  const rest = window.location.pathname.split(`/${id}/`)[1] || '';
+  return <Navigate to={`/turnosmart/collaborators/${id}${rest ? '/' + rest : ''}`} replace />;
+};
+
 // Component for handling landing vs dashboard routing
 const LandingOrDashboard = () => {
   const { user, loading } = useAuth();
@@ -266,10 +273,10 @@ export const AppRoutes = () => {
           {/* Legacy redirects */}
           <Route path="/colaboradores" element={<Navigate to="/turnosmart/collaborators" replace />} />
           <Route path="/colaboradores/new" element={<Navigate to="/turnosmart/collaborators/new" replace />} />
-          <Route path="/colaboradores/:id/*" element={<Navigate to="/turnosmart/collaborators/:id" replace />} />
+          <Route path="/colaboradores/:id/*" element={<ColaboradorRedirect />} />
           <Route path="/equipo" element={<Navigate to="/turnosmart/collaborators" replace />} />
           <Route path="/equipo/new" element={<Navigate to="/turnosmart/collaborators/new" replace />} />
-          <Route path="/equipo/:id/*" element={<Navigate to="/turnosmart/collaborators/:id" replace />} />
+          <Route path="/equipo/:id/*" element={<ColaboradorRedirect />} />
           <Route path="/ausencias" element={<Navigate to="/turnosmart/absences" replace />} />
 
           {/* Colaborador detail con tabs */}
