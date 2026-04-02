@@ -114,7 +114,11 @@ function calcEquity(violations: AuditViolation[]): number {
     const match = v.description.match(/±(\d+\.?\d*)/);
     if (match) maxDev = Math.max(maxDev, parseFloat(match[1]));
   }
-  return clamp(100 - maxDev * 10);
+  // DT-2: Softened penalty — ±3 tolerance before significant impact
+  // Old: ×10 (±5 = -50 points, too harsh)
+  // New: ×5 with 3h grace (±3 = 0 penalty, ±5 = -10, ±8 = -25)
+  const effectiveDev = Math.max(0, maxDev - 3);
+  return clamp(100 - effectiveDev * 5);
 }
 
 function calcPetitions(
@@ -136,12 +140,14 @@ function calcPetitions(
 function calcErgonomics(violations: AuditViolation[]): number {
   const inverseRotations = violations.filter((v) => v.rule === "ERGONOMIC_ROTATION").length;
   const nonConsecutive = violations.filter((v) => v.rule === "CONSECUTIVE_REST").length;
-  return clamp(100 - inverseRotations * 5 - nonConsecutive * 3);
+  // DT-2: Softened — cap at -40 max, reduce per-violation impact
+  return clamp(100 - Math.min(inverseRotations * 3, 30) - Math.min(nonConsecutive * 2, 10));
 }
 
 function calcContinuity(violations: AuditViolation[]): number {
   const brokenTransitions = violations.filter((v) => v.rule === "CONTINUITY_BROKEN").length;
-  return clamp(100 - brokenTransitions * 10);
+  // DT-2: Softened — cap at -30 max (3 broken transitions = -30, not -30+)
+  return clamp(100 - Math.min(brokenTransitions * 8, 30));
 }
 
 /**
