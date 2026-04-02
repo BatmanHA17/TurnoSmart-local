@@ -1802,11 +1802,14 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     if (!colaborador) return { isExceeded: false, plannedHours: 0, contractHours: 0 };
 
     const weeklyContract = colaborador.tiempo_trabajo_semanal || 40;
-    // Scale contract hours to the number of weeks visible in the calendar
+    // Scale contract hours using actual date range span (not just days with shifts)
     const empShifts = shiftBlocks.filter(s => s.employeeId === employeeId);
-    const uniqueDays = new Set(empShifts.map(s => s.date.toISOString().slice(0, 10)));
-    const visibleDays = Math.max(uniqueDays.size, 7); // at least 1 week
-    const weeksInPeriod = Math.ceil(visibleDays / 7);
+    if (empShifts.length === 0) return { isExceeded: false, plannedHours: 0, contractHours: weeklyContract };
+    const dates = empShifts.map(s => s.date.getTime());
+    const minDate = Math.min(...dates);
+    const maxDate = Math.max(...dates);
+    const daySpan = Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24)) + 1;
+    const weeksInPeriod = Math.max(1, Math.ceil(daySpan / 7));
     const contractHours = weeklyContract * weeksInPeriod;
     const isExceeded = plannedHours > contractHours;
 

@@ -91,9 +91,10 @@ export function usePetitions({
         const colab = row.colaboradores;
         const nombre = colab?.nombre ?? '';
         const apellidos = colab?.apellidos ?? '';
+        const fullName = nombre ? `${nombre}${apellidos ? ' ' + apellidos : ''}` : null;
         return {
           ...row,
-          employee_name: nombre ? `${nombre}${apellidos ? ' ' + apellidos : ''}` : undefined,
+          employee_name: fullName || `Empleado ${(row.employee_id || '').slice(0, 8)}`,
           colaboradores: undefined, // clean up joined field
         };
       });
