@@ -234,7 +234,8 @@ Copilot chat NLP completo, NLP en notas, Unificar roles/seniority, Eliminar expo
 | F20 | **Q7** Audit "Exceso horas 152h/40h" falso positivo | Usar rango real de fechas para calcular semanas, no solo días con turnos | `134b2a4` |
 | F21 | **Q1** Favoritos desaparecen al navegar | useLocalStorageCleanup no borra favorites + filtro absence relajado + showFavorites persiste | `a92a69b` |
 | F22 | **P_NEW_1** "Could not find 'apellidos_uso' column" — QuickCreateTeam INSERT fallaba | Eliminado campo del INSERT + añadida columna en cloud DB | `fb09b1e` |
-| F23 | **P_NEW_2** "Could not find 'apellidos_nacimiento' column" — formulario individual INSERT fallaba | 22 columnas faltantes añadidas al cloud DB (migración 20260402000000) | `(pending)` |
+| F23 | **P_NEW_2** "Could not find 'apellidos_nacimiento' column" — formulario individual INSERT fallaba | 22 columnas faltantes añadidas al cloud DB (migración 20260402000000) | `41b07f9` |
+| Q10 | **UX** Plantilla Excel incluye columnas "Horas" y "Tipo contrato" que se **ignoran** en el import (molde sobreescribe) — confuso para el usuario | Pendiente: o usar los valores del Excel, o quitar esas columnas de la plantilla | pendiente |
 
 ### ✅ SMOKE TEST SUPER ADMIN — VERIFICADOS OK (2026-04-02)
 Login, Calendario, Equipo, HR, Analítica, Settings, Wizard SMART, Criterios SMART,
@@ -264,7 +265,7 @@ Limpiar Turnos, Ocupación, Horarios rotativos, Balance anual (20+ secciones)
 - ✅ **Creador Rápido**: 4 colaboradores creados con molde (dpto=Recepción, 40h, Indefinido)
 - ✅ **Importar CSV**: 3 colaboradores importados desde archivo CSV (pipeline parser validado)
 - ✅ **Plantilla Excel**: descarga correcta (18.6KB, 2 hojas)
-- ⚠️ **Importar Excel**: no testado end-to-end (CORS + base64 limits en test automation), pipeline compartido con CSV → asumido OK
+- ✅ **Importar Excel**: 3 colaboradores (Laura/Marcos/Elena) importados desde xlsx generado dinámicamente — verified en cloud DB
 - ✅ **Formulario individual** (`/turnosmart/collaborators/new`): "Vera Santos Ríos" creada OK
 
 ### 🔲 PENDIENTE DE PROBAR
