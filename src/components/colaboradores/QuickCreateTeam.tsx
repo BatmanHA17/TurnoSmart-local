@@ -117,7 +117,6 @@ export function QuickCreateTeam() {
         const { error } = await supabase.from("colaboradores").insert({
           nombre: row.nombre.trim(),
           apellidos: row.apellidos.trim(),
-          apellidos_uso: `${row.nombre.trim()} ${row.apellidos.trim().charAt(0)}.`.trim(),
           email: row.email.trim(),
           org_id: orgId,
           fecha_inicio_contrato: fechaInicio || null,
@@ -253,7 +252,6 @@ export function QuickCreateTeam() {
         const { error } = await supabase.from("colaboradores").insert({
           nombre: row.nombre,
           apellidos: row.apellidos,
-          apellidos_uso: `${row.nombre} ${row.apellidos.charAt(0)}.`.trim(),
           email: row.email || `${row.nombre.toLowerCase().replace(/\s/g, ".")}@pendiente.com`,
           org_id: orgId,
           tipo_contrato: tipoContrato,
