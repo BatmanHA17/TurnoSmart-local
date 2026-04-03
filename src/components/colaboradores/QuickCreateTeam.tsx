@@ -39,6 +39,9 @@ interface TeamRow {
   nombre: string;
   apellidos: string;
   email: string;
+  horasSemanales?: number;
+  tipoContrato?: string;
+  fechaInicio?: string;
 }
 
 export function QuickCreateTeam() {
@@ -230,8 +233,19 @@ export function QuickCreateTeam() {
       const nombre = String(row[0] ?? "").trim();
       const apellidos = String(row[1] ?? "").trim();
       const email = String(row[2] ?? "").trim();
+      // Optional columns: Horas semanales (col 3), Tipo contrato (col 4), Fecha inicio (col 5)
+      const horasRaw = row[3] != null ? Number(row[3]) : undefined;
+      const tipoRaw = row[4] != null ? String(row[4]).trim() : undefined;
+      const fechaRaw = row[5] != null ? String(row[5]).trim() : undefined;
       if (nombre) {
-        parsed.push({ nombre, apellidos, email });
+        parsed.push({
+          nombre,
+          apellidos,
+          email,
+          horasSemanales: horasRaw && !isNaN(horasRaw) && horasRaw > 0 ? horasRaw : undefined,
+          tipoContrato: tipoRaw || undefined,
+          fechaInicio: fechaRaw || undefined,
+        });
       }
     }
     if (parsed.length === 0) {
@@ -254,9 +268,9 @@ export function QuickCreateTeam() {
           apellidos: row.apellidos,
           email: row.email || `${row.nombre.toLowerCase().replace(/\s/g, ".")}@pendiente.com`,
           org_id: orgId,
-          tipo_contrato: tipoContrato,
-          tiempo_trabajo_semanal: horasSemanales,
-          fecha_inicio_contrato: fechaInicio || null,
+          tipo_contrato: row.tipoContrato || tipoContrato,
+          tiempo_trabajo_semanal: row.horasSemanales || horasSemanales,
+          fecha_inicio_contrato: row.fechaInicio || fechaInicio || null,
           status: "activo",
         });
         if (!error) {
