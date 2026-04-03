@@ -3374,9 +3374,10 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
                                  <Button
                                    variant={showFavorites ? "default" : "outline"}
                                    size="sm"
+                                   data-tour="favorites-toggle"
                                    className={`h-6 w-6 p-0 transition-all duration-200 ${
-                                     showFavorites 
-                                       ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100' 
+                                     showFavorites
+                                       ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
                                        : 'hover:bg-muted'
                                    }`}
                                    onClick={() => { const next = !showFavorites; setShowFavorites(next); try { localStorage.setItem('turnosmart-show-favorites', String(next)); } catch {} }}

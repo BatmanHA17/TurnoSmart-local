@@ -39,14 +39,12 @@ const TOUR_STEPS: TourStep[] = [
     placement: "right",
     onBeforeStep: () => {
       // Open favorites panel if closed
-      const btn = document.querySelector('[data-tour="favorites-area"]');
-      if (btn && btn.clientHeight < 50) {
-        // Panel is collapsed — try clicking the star toggle
-        const starBtn = document.querySelector('button[title*="Favoritos"], button[aria-label*="Favoritos"]');
-        if (starBtn) (starBtn as HTMLElement).click();
+      const area = document.querySelector('[data-tour="favorites-area"]');
+      if (area && area.clientHeight < 50) {
+        // Panel is collapsed — click the star toggle button
+        const starBtn = document.querySelector('[data-tour="favorites-toggle"]') as HTMLElement;
+        if (starBtn) starBtn.click();
       }
-      // Fallback: set localStorage to ensure it opens
-      try { localStorage.setItem('turnosmart-show-favorites', 'true'); } catch {}
     },
   },
   {
@@ -115,55 +113,68 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
   // Position tooltip relative to target element
   const positionTooltip = useCallback(() => {
     if (!currentStep) return;
-    // Run pre-step action (e.g., open favorites panel)
-    currentStep.onBeforeStep?.();
-    const el = document.querySelector(currentStep.target);
-    if (!el) {
-      // Target not found — skip to next or end
-      if (!isLast) setStep((s) => s + 1);
-      else onComplete();
-      return;
+
+    const doPosition = () => {
+      const el = document.querySelector(currentStep.target);
+      if (!el || el.clientHeight < 10) {
+        // Target not found or still collapsed — skip to next or end
+        if (!isLast) setStep((s) => s + 1);
+        else onComplete();
+        return;
+      }
+
+      const rect = el.getBoundingClientRect();
+      const tooltipW = 320;
+      const tooltipH = 180;
+      const gap = 12;
+
+      let top = 0;
+      let left = 0;
+
+      switch (currentStep.placement) {
+        case "bottom":
+          top = rect.bottom + gap;
+          left = rect.left + rect.width / 2 - tooltipW / 2;
+          break;
+        case "top":
+          top = rect.top - tooltipH - gap;
+          left = rect.left + rect.width / 2 - tooltipW / 2;
+          break;
+        case "right":
+          top = rect.top + rect.height / 2 - tooltipH / 2;
+          left = rect.right + gap;
+          break;
+        case "left":
+          top = rect.top + rect.height / 2 - tooltipH / 2;
+          left = rect.left - tooltipW - gap;
+          break;
+      }
+
+      // Clamp to viewport
+      left = Math.max(16, Math.min(left, window.innerWidth - tooltipW - 16));
+      top = Math.max(16, Math.min(top, window.innerHeight - tooltipH - 16));
+
+      setTooltipStyle({ top, left, width: tooltipW });
+
+      // Scroll target into view & highlight
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      el.classList.add("ring-2", "ring-primary", "ring-offset-2", "z-[9999]", "relative");
+    };
+
+    // Run pre-step action (e.g., open favorites panel) then wait for React re-render
+    if (currentStep.onBeforeStep) {
+      currentStep.onBeforeStep();
+      // Give React time to re-render after state change (e.g., expanding favorites panel)
+      setTimeout(doPosition, 300);
+    } else {
+      doPosition();
     }
-
-    const rect = el.getBoundingClientRect();
-    const tooltipW = 320;
-    const tooltipH = 180;
-    const gap = 12;
-
-    let top = 0;
-    let left = 0;
-
-    switch (currentStep.placement) {
-      case "bottom":
-        top = rect.bottom + gap;
-        left = rect.left + rect.width / 2 - tooltipW / 2;
-        break;
-      case "top":
-        top = rect.top - tooltipH - gap;
-        left = rect.left + rect.width / 2 - tooltipW / 2;
-        break;
-      case "right":
-        top = rect.top + rect.height / 2 - tooltipH / 2;
-        left = rect.right + gap;
-        break;
-      case "left":
-        top = rect.top + rect.height / 2 - tooltipH / 2;
-        left = rect.left - tooltipW - gap;
-        break;
-    }
-
-    // Clamp to viewport
-    left = Math.max(16, Math.min(left, window.innerWidth - tooltipW - 16));
-    top = Math.max(16, Math.min(top, window.innerHeight - tooltipH - 16));
-
-    setTooltipStyle({ top, left, width: tooltipW });
-
-    // Scroll target into view & highlight
-    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    el.classList.add("ring-2", "ring-primary", "ring-offset-2", "z-[9999]", "relative");
 
     return () => {
-      el.classList.remove("ring-2", "ring-primary", "ring-offset-2", "z-[9999]", "relative");
+      const el = document.querySelector(currentStep.target);
+      if (el) {
+        el.classList.remove("ring-2", "ring-primary", "ring-offset-2", "z-[9999]", "relative");
+      }
     };
   }, [currentStep, isLast, onComplete]);
 
