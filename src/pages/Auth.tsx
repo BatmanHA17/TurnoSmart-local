@@ -139,7 +139,7 @@ export default function Auth() {
         email: email.toLowerCase().trim(),
         options: {
           shouldCreateUser: true,
-          emailRedirectTo: `${window.location.origin}/onboarding/wizard`,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
             first_name: firstName?.trim() || '',
             last_name: lastName?.trim() || '',
@@ -180,9 +180,7 @@ export default function Auth() {
 
     try {
       
-      const redirectTo = flow === 'login' 
-        ? `${window.location.origin}/auth/callback`
-        : `${window.location.origin}/onboarding/wizard`;
+      const redirectTo = `${window.location.origin}/auth/callback`;
 
       const { error } = await supabase.auth.signInWithOtp({
         email: email.toLowerCase().trim(),
@@ -299,7 +297,7 @@ export default function Auth() {
         email: email.toLowerCase().trim(),
         options: {
           shouldCreateUser: true,
-          emailRedirectTo: `${window.location.origin}/onboarding/wizard`
+          emailRedirectTo: `${window.location.origin}/auth/callback`
         }
       });
 
@@ -348,7 +346,7 @@ export default function Auth() {
         email: email.toLowerCase().trim(),
         options: {
           shouldCreateUser: true,
-          emailRedirectTo: `${window.location.origin}/onboarding/wizard`,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
             first_name: firstName.trim(),
             last_name: lastName.trim(),

@@ -188,7 +188,7 @@ const LandingOrDashboard = () => {
   const { user, loading } = useAuth();
 
   if (loading) return <PageLoader />;
-  if (user) return <Navigate to="/turnosmart/day" replace />;
+  if (user) return <Navigate to="/dashboard" replace />;
   return <TurnoSmartLanding />;
 };
 
