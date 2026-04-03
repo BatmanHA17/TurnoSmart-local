@@ -11,7 +11,7 @@ Stack: Vite + React 18 + TypeScript + Supabase + shadcn/ui + Tailwind.
 - **Dominio:** `turnosmart.app` → redirect 307 → `www.turnosmart.app` (IONOS DNS → Vercel, SSL activo)
 - **Admin:** goturnosmart@gmail.com / TurnoSmart2026! (super_admin)
 - **Manager:** jmgalvan@telefonica.net / TurnoSmart2026! (fom)
-- **Org cloud:** "Recepción" (`99c21a44-a760-4fc2-a0ad-152cf5d3d77f`)
+- **Org cloud:** "Hotel Atlántico" (`99c21a44-a760-4fc2-a0ad-152cf5d3d77f`)
 
 ## Comandos esenciales
 ```bash
@@ -235,7 +235,7 @@ Copilot chat NLP completo, NLP en notas, Unificar roles/seniority, Eliminar expo
 | F21 | **Q1** Favoritos desaparecen al navegar | useLocalStorageCleanup no borra favorites + filtro absence relajado + showFavorites persiste | `a92a69b` |
 | F22 | **P_NEW_1** "Could not find 'apellidos_uso' column" — QuickCreateTeam INSERT fallaba | Eliminado campo del INSERT + añadida columna en cloud DB | `fb09b1e` |
 | F23 | **P_NEW_2** "Could not find 'apellidos_nacimiento' column" — formulario individual INSERT fallaba | 22 columnas faltantes añadidas al cloud DB (migración 20260402000000) | `41b07f9` |
-| Q10 | **UX** Plantilla Excel incluye columnas "Horas" y "Tipo contrato" que se **ignoran** en el import (molde sobreescribe) — confuso para el usuario | Pendiente: o usar los valores del Excel, o quitar esas columnas de la plantilla | pendiente |
+| Q10 | ~~**UX** Plantilla Excel incluye columnas "Horas" y "Tipo contrato" que se ignoran en el import~~ | Import ahora usa valores del archivo con fallback al molde | `fccf51f` |
 
 ### ✅ SMOKE TEST SUPER ADMIN — VERIFICADOS OK (2026-04-02)
 Login, Calendario, Equipo, HR, Analítica, Settings, Wizard SMART, Criterios SMART,
