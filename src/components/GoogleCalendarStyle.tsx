@@ -98,21 +98,20 @@ import {
   shouldCountHours,
   getShiftHours,
 } from "@/utils/calendarShiftUtils";
-
-interface Employee {
-  id: string;
-  name: string;
-  role: string;
-  department: string;
-  workingHours: string;
-  startDate?: string;
-  /** SMART engine role — determines rotation behavior */
-  engine_role?: string;
-}
-
-interface GoogleCalendarStyleProps {
-  approvedRequests?: ApprovedRequest[];
-}
+import type { CalendarEmployee as Employee, GoogleCalendarStyleProps } from "./calendar/calendarTypes";
+import {
+  shouldShowColaborador,
+  canAssignShiftOnDate as canAssignShiftOnDateUtil,
+  getWeeklyHoursFromColaborador as getWeeklyHoursFromColaboradorUtil,
+  getWeeklyRealHours as getWeeklyRealHoursUtil,
+  getWeeklyAbsenceHours as getWeeklyAbsenceHoursUtil,
+  calculateEmployeeHours as calculateEmployeeHoursUtil,
+  checkEmployeeHoursCompliance as checkEmployeeHoursComplianceUtil,
+  getEmployeeStats as getEmployeeStatsUtil,
+  getContractHoursLabel,
+  getShiftsForEmployeeAndDate as getShiftsForEmployeeAndDateUtil,
+  getShiftForEmployeeAndDate as getShiftForEmployeeAndDateUtil,
+} from "./calendar/calendarUtils";
 
 export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarStyleProps = {}) {
   const navigate = useNavigate();
@@ -866,176 +865,21 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     }
   };
 
-  // Función para verificar si un colaborador debe aparecer en el calendario
-  const shouldShowColaborador = (colaborador: any, weekDate: Date = new Date()): boolean => {
-    // Si no existe el colaborador, no mostrarlo
-    if (!colaborador) {
-      return false;
-    }
+  // shouldShowColaborador — extracted to calendar/calendarUtils.ts
 
-    // Si el colaborador está marcado como inactivo, no mostrarlo
-    if (colaborador.status === 'inactivo') {
-      return false;
-    }
-
-    // Si no tiene fecha de inicio, mostrarlo por defecto
-    if (!colaborador.fecha_inicio_contrato) {
-      return true;
-    }
-
-    // ✅ CRITICAL FIX #2: Use TODAY's date for contract check, not the week start date
-    // This way employees appear if their contract is ACTIVE TODAY, regardless of when the week starts
-    // BEFORE: Would compare against week start (e.g., March 23) and hide employees starting March 25
-    // NOW: Compares against today's actual date
-    const today = new Date();
-    const startDate = new Date(colaborador.fecha_inicio_contrato);
-    const checkDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const contractStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-
-    // ✅ Verificar fecha de fin de contrato
-    if (colaborador.fecha_fin_contrato) {
-      const endDate = new Date(colaborador.fecha_fin_contrato);
-      const contractEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-
-      // El colaborador debe aparecer solo si su contrato está activo HOY
-      return contractStart <= checkDate && checkDate <= contractEnd;
-    }
-
-    // Si no tiene fecha de fin, solo verificar que haya empezado HOY O ANTES
-    return contractStart <= checkDate;
-  };
-
-  // Función para verificar si se puede asignar turno en una fecha específica
+  // canAssignShiftOnDate — wrapper over extracted util
   const canAssignShiftOnDate = (employeeId: string, targetDate: Date, isFirstDayShift: boolean = false): boolean => {
     const colaborador = colaboradores.find(c => c.id === employeeId);
-    
-    // Si no existe el colaborador, no permitir
-    if (!colaborador) {
-      return false;
-    }
-    
-    // Si está inactivo, no permitir asignación
-    if (colaborador.status === 'inactivo') {
-      return false;
-    }
-    
-    // Si no tiene fecha de inicio, permitir por defecto
-    if (!colaborador.fecha_inicio_contrato) {
-      return true;
-    }
-    
-    const startDate = new Date(colaborador.fecha_inicio_contrato);
-    const target = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
-    const contractStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-    
-    // ✅ Verificar fecha de fin de contrato
-    if (colaborador.fecha_fin_contrato) {
-      const endDate = new Date(colaborador.fecha_fin_contrato);
-      const contractEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-      
-      // Permitir turnos "Primer día" exactamente en la fecha de inicio
-      if (isFirstDayShift && target.getTime() === contractStart.getTime()) {
-        return true;
-      }
-      
-      // Solo permitir asignación si la fecha está dentro del rango del contrato
-      return contractStart <= target && target <= contractEnd;
-    }
-    
-    // Si no tiene fecha de fin, solo verificar que no sea antes del inicio
-    // Permitir turnos "Primer día" exactamente en la fecha de inicio
-    if (isFirstDayShift && target.getTime() === contractStart.getTime()) {
-      return true;
-    }
-    
-    return contractStart <= target;
+    return canAssignShiftOnDateUtil(colaborador, targetDate, isFirstDayShift);
   };
 
-  // Función para obtener horas semanales de un empleado desde colaboradores
-  const getWeeklyHoursFromColaborador = (employeeName: string): number => {
-    const colaborador = colaboradores.find(col => 
-      `${col.nombre}${col.apellidos ? ' ' + col.apellidos : ''}`.toLowerCase().includes(employeeName.toLowerCase()) ||
-      employeeName.toLowerCase().includes(`${col.nombre}${col.apellidos ? ' ' + col.apellidos : ''}`.toLowerCase())
-    );
-    
-    return colaborador?.tiempo_trabajo_semanal || 0;
-  };
-
-  // Función para calcular horas reales de la semana para un empleado
-  const getWeeklyRealHours = (employeeId: string): number => {
-    const currentWeekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Lunes
-    const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
-    
-    let totalHours = 0;
-    
-    // Buscar todos los turnos del empleado en la semana actual (excluyendo ausencias)
-    const employeeShifts = shiftBlocks.filter(shift => 
-      shift.employeeId === employeeId &&
-      weekDays.some(day => isSameDay(shift.date, day)) &&
-      !isAbsenceType(shift)
-    );
-    
-    employeeShifts.forEach(shift => {
-      if (shift.startTime && shift.endTime) {
-        // Calcular horas del turno
-        const [startHour, startMinute] = shift.startTime.split(':').map(Number);
-        const [endHour, endMinute] = shift.endTime.split(':').map(Number);
-        
-        const startTotalMinutes = startHour * 60 + startMinute;
-        let endTotalMinutes = endHour * 60 + endMinute;
-        
-        // Manejar turnos que cruzan medianoche
-        if (endTotalMinutes < startTotalMinutes) {
-          endTotalMinutes += 24 * 60;
-        }
-        
-        const durationMinutes = endTotalMinutes - startTotalMinutes;
-        const hours = durationMinutes / 60;
-        
-        totalHours += hours;
-      }
-    });
-    
-    return Math.round(totalHours * 10) / 10; // Redondear a 1 decimal
-  };
-
-  // Función para calcular ausencias realizadas de la semana para un empleado
-  const getWeeklyAbsenceHours = (employeeId: string): number => {
-    const currentWeekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Lunes
-    const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
-    
-    let totalAbsenceHours = 0;
-    
-    // Buscar todos los turnos de ausencia del empleado en la semana actual
-    const employeeAbsences = shiftBlocks.filter(shift => 
-      shift.employeeId === employeeId &&
-      weekDays.some(day => isSameDay(shift.date, day)) &&
-      isAbsenceType(shift)
-    );
-    
-    employeeAbsences.forEach(shift => {
-      if (shift.startTime && shift.endTime) {
-        // Calcular horas de la ausencia
-        const [startHour, startMinute] = shift.startTime.split(':').map(Number);
-        const [endHour, endMinute] = shift.endTime.split(':').map(Number);
-        
-        const startTotalMinutes = startHour * 60 + startMinute;
-        let endTotalMinutes = endHour * 60 + endMinute;
-        
-        // Manejar ausencias que cruzan medianoche
-        if (endTotalMinutes < startTotalMinutes) {
-          endTotalMinutes += 24 * 60;
-        }
-        
-        const durationMinutes = endTotalMinutes - startTotalMinutes;
-        const hours = durationMinutes / 60;
-        
-        totalAbsenceHours += hours;
-      }
-    });
-    
-    return Math.round(totalAbsenceHours * 10) / 10; // Redondear a 1 decimal
-  };
+  // Hours helpers — delegated to calendar/calendarUtils.ts
+  const getWeeklyHoursFromColaborador = (employeeName: string) =>
+    getWeeklyHoursFromColaboradorUtil(employeeName, colaboradores);
+  const getWeeklyRealHours = (employeeId: string) =>
+    getWeeklyRealHoursUtil(employeeId, currentWeek, shiftBlocks);
+  const getWeeklyAbsenceHours = (employeeId: string) =>
+    getWeeklyAbsenceHoursUtil(employeeId, currentWeek, shiftBlocks);
   
   // Función para navegar al perfil del colaborador
   const navigateToColaborador = (employeeName: string) => {
@@ -1059,7 +903,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       }
     }
     
-    navigate(`/colaboradores/${colaborador.id}/profile`);
+    navigate(`/equipo/${colaborador.id}/profile`);
   };
 
   // Función para adaptar horarios de turnos favoritos según el contrato del empleado
@@ -1756,129 +1600,21 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   // DISABLED: Sincronización automática en tiempo real eliminada para evitar modificaciones automáticas
   // Esta función estaba causando cambios automáticos cuando había modificaciones en la tabla colaboradores
 
-  // Calculate hours for each employee across the week
-  const calculateEmployeeHours = (employeeId: string) => {
-    // Convertir ambos IDs a string para comparación consistente
-    const shifts = shiftBlocks.filter(shift => String(shift.employeeId) === String(employeeId));
-    
-    // DEBUG para varios empleados (removed hardcoded IDs)
-    const isDebugEmployee = false; // Disabled debug mode
-    
-    if (isDebugEmployee) {
-      
-      shifts.forEach((shift, index) => {
-      });
-    }
-    
-    const totalHours = shifts.reduce((total, shift) => {
-      const shiftHours = getShiftHours(shift);
-      if (employeeId === "2") {
-      }
-      return total + shiftHours;
-    }, 0);
-    
-    if (employeeId === "2") {
-    }
-    
-    return totalHours;
-  };
+  // calculateEmployeeHours — delegated to calendarUtils
+  const calculateEmployeeHours = (employeeId: string) =>
+    calculateEmployeeHoursUtil(employeeId, shiftBlocks);
 
-  // Mock employees with contract hours for calculations
-  const mockEmployees = [
-    { id: "1", name: "Bruce Wayne", role: "Manager", department: "Bares", contractHours: 40 },
-    { id: "2", name: "Daniela Banda", role: "Camarera", department: "Bares", contractHours: 40 },
-    { id: "3", name: "Joker As", role: "Recepcionista", department: "Recepción", contractHours: 30 },
-    { id: "4", name: "Sergio Mateo", role: "Ayudante", department: "Cocina", contractHours: 40 },
-    { id: "5", name: "María García", role: "Jefe de Sector", department: "Bares", contractHours: 40 },
-    { id: "6", name: "Carlos López", role: "Camarero", department: "Restaurante", contractHours: 40 },
-    { id: "7", name: "Ana Ruiz", role: "Recepcionista", department: "Recepción", contractHours: 30 },
-    { id: "8", name: "Pedro Sánchez", role: "Ayudante", department: "Bares", contractHours: 20 },
-  ];
-
-  // Mock shifts data with hours information - SIMPLIFICADO
-  const mockShifts = shiftBlocks.map(shift => ({
-    ...shift,
-    hours: getShiftHours(shift)
-  }));
-
-  // Function to check if employee exceeds weekly hours (scaled to visible period)
-  const checkEmployeeHoursCompliance = (employeeId: string): { isExceeded: boolean, plannedHours: number, contractHours: number } => {
-    const plannedHours = calculateEmployeeHours(employeeId);
-    const colaborador = colaboradores.find(c => c.id === employeeId);
-    if (!colaborador) return { isExceeded: false, plannedHours: 0, contractHours: 0 };
-
-    const weeklyContract = colaborador.tiempo_trabajo_semanal || 40;
-    // Scale contract hours using actual date range span (not just days with shifts)
-    const empShifts = shiftBlocks.filter(s => s.employeeId === employeeId);
-    if (empShifts.length === 0) return { isExceeded: false, plannedHours: 0, contractHours: weeklyContract };
-    const dates = empShifts.map(s => s.date.getTime());
-    const minDate = Math.min(...dates);
-    const maxDate = Math.max(...dates);
-    const daySpan = Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24)) + 1;
-    const weeksInPeriod = Math.max(1, Math.ceil(daySpan / 7));
-    const contractHours = weeklyContract * weeksInPeriod;
-    const isExceeded = plannedHours > contractHours;
-
-    return { isExceeded, plannedHours, contractHours };
-  };
-
-  // Calculate planned hours, hours to plan, and hour bank for each employee
-  const getEmployeeStats = (employeeId: string) => {
-    const colaborador = colaboradores.find(c => c.id === employeeId);
-    if (!colaborador) return { plannedHours: 0, hoursToPlanned: 0, hourBank: 0, contractMonths: 0 };
-
-    const plannedHours = calculateEmployeeHours(employeeId);
-    const contractHours = colaborador.tiempo_trabajo_semanal || 40;
-    
-    // Si no tiene horarios asignados, devolver 0h
-    const shiftsForEmployee = shiftBlocks.filter(shift => shift.employeeId === employeeId);
-    if (shiftsForEmployee.length === 0) {
-      return { 
-        plannedHours: 0, 
-        hoursToPlanned: contractHours, 
-        hourBank: 0, 
-        contractMonths: 9 
-      };
-    }
-    
-    const hoursToPlanned = Math.max(0, contractHours - plannedHours);
-    
-    // DEBUG GENERALIZADO para empleados con turnos
-    
-    // Simulate contract months remaining (in a real app this would come from contract data)
-    const contractMonths = 9; // "9m" as shown in TurnoSmart example
-    
-    // Hour bank will be implemented later as mentioned in the Scribehow
-    const hourBank = 0;
-    
-    return { plannedHours, hoursToPlanned, hourBank, contractMonths };
-  };
-
-  // Función para mostrar las horas contractuales base
-  const getContractHours = (employeeId: string) => {
-    const employee = employees.find(emp => emp.id === employeeId);
-    
-    
-    // Extraer las horas semanales del workingHours (formato: "0h/40h")
-    const workingHours = employee?.workingHours || "0h/40h";
-    const weeklyHours = workingHours.split('/')[1] || "40h";
-    const weeklyHoursNumber = parseInt(weeklyHours.replace('h', ''));
-    
-    
-    return `${weeklyHoursNumber}h semanales`;
-  };
-
-  // Helper function to get shifts for employee and date (support multiple shifts)
-  const getShiftsForEmployeeAndDate = (employeeId: string, date: Date): ShiftBlock[] => {
-    return shiftBlocks.filter(shift => 
-      shift.employeeId === employeeId && isSameDay(shift.date, date)
-    );
-  };
-
-  const getShiftForEmployeeAndDate = (employeeId: string, date: Date) => {
-    const shifts = getShiftsForEmployeeAndDate(employeeId, date);
-    return shifts.length > 0 ? shifts[0] : undefined;
-  };
+  // Hours compliance + stats + shift lookup — delegated to calendarUtils
+  const checkEmployeeHoursCompliance = (employeeId: string) =>
+    checkEmployeeHoursComplianceUtil(employeeId, shiftBlocks, colaboradores);
+  const getEmployeeStats = (employeeId: string) =>
+    getEmployeeStatsUtil(employeeId, shiftBlocks, colaboradores);
+  const getContractHours = (employeeId: string) =>
+    getContractHoursLabel(employeeId, employees);
+  const getShiftsForEmployeeAndDate = (employeeId: string, date: Date) =>
+    getShiftsForEmployeeAndDateUtil(employeeId, date, shiftBlocks);
+  const getShiftForEmployeeAndDate = (employeeId: string, date: Date) =>
+    getShiftForEmployeeAndDateUtil(employeeId, date, shiftBlocks);
 
   /** Bloquea o desbloquea un turno con clic derecho. Solo managers. */
   const handleToggleLock = (shift: ShiftBlock, event: React.MouseEvent) => {
