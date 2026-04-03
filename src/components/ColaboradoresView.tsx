@@ -173,11 +173,13 @@ export const ColaboradoresView = () => {
       if (jobIds.length > 0) {
         const { data: jobsData } = await supabase
           .from('jobs')
-          .select('id, title')
+          .select('id, job_title_id, job_titles(name)')
           .in('id', jobIds);
 
         if (jobsData) {
-          jobsMap = Object.fromEntries(jobsData.map(j => [j.id, j.title]));
+          jobsMap = Object.fromEntries(
+            jobsData.map((j: any) => [j.id, j.job_titles?.name || ''])
+          );
         }
       }
 

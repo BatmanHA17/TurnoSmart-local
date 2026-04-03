@@ -112,156 +112,105 @@ serve(async (req) => {
 
     console.log("Membership created for user as OWNER");
 
-    // 3. Update user profile with primary org
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .update({
-        primary_org_id: orgId,
-        onboarding_completed: true,
-      })
-      .eq("id", user.id);
+    // 3. Update user profile (non-critical — profile may not exist yet for OTP users)
+    try {
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .upsert({
+          id: user.id,
+          primary_org_id: orgId,
+          onboarding_completed: true,
+          display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'Usuario',
+          first_name: user.user_metadata?.first_name || '',
+          last_name: user.user_metadata?.last_name || '',
+        }, { onConflict: "id" });
 
-    if (profileError) {
-      console.error("Error updating profile:", profileError);
-      // Non-critical, continue
+      if (profileError) {
+        console.error("Error upserting profile (non-critical):", profileError);
+      }
+    } catch (e) {
+      console.error("Profile upsert failed (non-critical):", e);
     }
 
-    // 4. Update user role to OWNER
-    const { error: roleError } = await supabase
-      .from("user_roles")
-      .upsert({
-        user_id: user.id,
-        role: "super_admin",
-        role_canonical: "OWNER",
-      }, {
-        onConflict: "user_id,role",
-      });
-
-    if (roleError) {
-      console.error("Error updating user role:", roleError);
-      // Non-critical, continue
-    }
-
-    // 5. Create departments (teams)
+    // 4. Create departments in job_departments table
+    // Schema: job_departments(id, name, org_id, created_at)
     const deptIdMap: Record<string, string> = {};
-    
+
     for (const dept of departments) {
-      const { data: teamData, error: teamError } = await supabase
-        .from("teams")
+      const { data: deptData, error: deptError } = await supabase
+        .from("job_departments")
         .insert({
           name: dept.name,
-          description: `Departamento: ${dept.name}`,
           org_id: orgId,
-          is_active: true,
         })
-        .select()
+        .select("id")
         .single();
 
-      if (teamError) {
-        console.error(`Error creating team ${dept.name}:`, teamError);
+      if (deptError) {
+        console.error(`Error creating department ${dept.name}:`, deptError);
         continue;
       }
 
-      deptIdMap[dept.id] = teamData.id;
-      console.log(`Team created: ${dept.name} -> ${teamData.id}`);
-
-      // Also create job_department entry
-      const { error: jobDeptError } = await supabase
-        .from("job_departments")
-        .insert({
-          name: dept.name,
-          org_id: orgId,
-        });
-
-      if (jobDeptError) {
-        console.error(`Error creating job_department ${dept.name}:`, jobDeptError);
-      }
+      deptIdMap[dept.id] = deptData.id;
+      console.log(`Department created: ${dept.name} -> ${deptData.id}`);
     }
 
-    // 6. Create jobs and collect IDs for colaborador creation
-    const createdJobs: Array<{ jobId: string; job: JobData; teamId: string | null }> = [];
+    // 5. Create job_titles and placeholder colaboradores
+    // Schema: job_titles(id, name, seniority_level, department_id, org_id)
+    // Schema: jobs(id, colaborador_id, job_title_id, org_id, start_date, end_date, status)
+    // Schema: colaboradores(id, nombre, apellidos, email, department, status, org_id, job_id→jobs.id, ...)
+    let colaboradoresCreated = 0;
+    let jobTitlesCreated = 0;
+    const timestamp = Date.now();
 
     for (const job of jobs) {
-      // Get the department_id from job_departments
-      const { data: deptData } = await supabase
-        .from("job_departments")
-        .select("id")
-        .eq("value", job.departmentName)
-        .eq("org_id", orgId)
-        .single();
+      // Find the department_id we just created
+      const departmentId = deptIdMap[job.departmentId] || null;
 
-      const { data: jobData, error: jobError } = await supabase
-        .from("jobs")
+      // Create job_title
+      const { data: jobTitleData, error: jobTitleError } = await supabase
+        .from("job_titles")
         .insert({
-          title: job.title,
-          department: job.departmentName,
-          department_id: deptData?.id || null,
-          hours: job.hours,
-          headcount: job.headcount || 1,
+          name: job.title,
+          department_id: departmentId,
           org_id: orgId,
-          created_by: user.id,
+          seniority_level: 1,
         })
         .select("id")
         .single();
 
-      if (jobError) {
-        // If headcount column doesn't exist yet, retry without it
-        if (jobError.message?.includes('headcount')) {
-          const { data: retryData, error: retryError } = await supabase
-            .from("jobs")
-            .insert({
-              title: job.title,
-              department: job.departmentName,
-              department_id: deptData?.id || null,
-              hours: job.hours,
-              org_id: orgId,
-              created_by: user.id,
-            })
-            .select("id")
-            .single();
-          if (retryError || !retryData) {
-            console.error(`Error creating job ${job.title}:`, retryError);
-            continue;
-          }
-          createdJobs.push({ jobId: retryData.id, job, teamId: deptIdMap[job.departmentId] || null });
-        } else {
-          console.error(`Error creating job ${job.title}:`, jobError);
-          continue;
-        }
-      } else if (jobData) {
-        createdJobs.push({ jobId: jobData.id, job, teamId: deptIdMap[job.departmentId] || null });
-        console.log(`Job created: ${job.title} (headcount: ${job.headcount || 1})`);
+      if (jobTitleError) {
+        console.error(`Error creating job_title ${job.title}:`, jobTitleError);
+        continue;
       }
-    }
 
-    // 7. Create placeholder colaboradores based on headcount
-    let colaboradoresCreated = 0;
-    const timestamp = Date.now();
+      jobTitlesCreated++;
+      console.log(`Job title created: ${job.title} -> ${jobTitleData.id}`);
 
-    for (const { jobId, job, teamId } of createdJobs) {
+      // Create placeholder colaboradores based on headcount
       const headcount = job.headcount || 1;
-      const slug = job.title.toLowerCase()
-        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // strip accents
+      const titleSlug = job.title.toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
         .replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
 
       for (let i = 1; i <= headcount; i++) {
         const empleadoId = `SETUP-${timestamp}-${colaboradoresCreated + 1}`;
-        const placeholderEmail = `${slug}-${i}-${timestamp}@setup.turnosmart.app`;
+        const placeholderEmail = `${titleSlug}-${i}-${timestamp}@setup.turnosmart.app`;
 
+        // Step A: Create colaborador WITHOUT job_id (FK points to jobs table, not job_titles)
         const { data: colabData, error: colabError } = await supabase
           .from("colaboradores")
           .insert({
             nombre: job.title,
             apellidos: headcount > 1 ? `#${i}` : "(pendiente)",
-            apellidos_uso: headcount > 1 ? `${job.title} #${i}` : job.title,
             empleado_id: empleadoId,
             email: placeholderEmail,
+            department: job.departmentName,
             org_id: orgId,
-            job_id: jobId,
             status: "activo",
             tipo_contrato: "Sin especificar",
             fecha_inicio_contrato: new Date().toISOString().split("T")[0],
-            tiempo_trabajo_semanal: job.hours * 5, // Convert daily hours to weekly (assuming 5-day work week)
+            tiempo_trabajo_semanal: job.hours * 5, // daily hours → weekly (5-day week)
           })
           .select("id")
           .single();
@@ -271,76 +220,83 @@ serve(async (req) => {
           continue;
         }
 
-        colaboradoresCreated++;
+        // Step B: Create jobs assignment record (links colaborador to job_title)
+        const { data: jobAssignment, error: jobAssignError } = await supabase
+          .from("jobs")
+          .insert({
+            colaborador_id: colabData.id,
+            job_title_id: jobTitleData.id,
+            org_id: orgId,
+            start_date: new Date().toISOString().split("T")[0],
+            status: "active",
+          })
+          .select("id")
+          .single();
 
-        // Link colaborador to their team/department
-        if (teamId && colabData) {
-          const { error: linkError } = await supabase
-            .from("colaborador_departments")
-            .insert({
-              colaborador_id: colabData.id,
-              department_id: teamId,
-              org_id: orgId,
-              assigned_by: user.id,
-              is_active: true,
-            });
+        if (jobAssignError) {
+          console.error(`Error creating job assignment for ${job.title} #${i}:`, jobAssignError);
+        } else {
+          // Step C: Update colaborador.job_id to point to the jobs record
+          const { error: updateError } = await supabase
+            .from("colaboradores")
+            .update({ job_id: jobAssignment.id })
+            .eq("id", colabData.id);
 
-          if (linkError) {
-            console.error(`Error linking ${job.title} #${i} to team:`, linkError);
+          if (updateError) {
+            console.error(`Error updating job_id for ${job.title} #${i}:`, updateError);
           }
         }
+
+        colaboradoresCreated++;
       }
     }
 
-    console.log(`Created ${colaboradoresCreated} placeholder colaboradores`);
+    console.log(`Created ${jobTitlesCreated} job titles, ${colaboradoresCreated} placeholder colaboradores`);
 
-    // 8. Crear kit de horarios por defecto (M/T/N/11x19/9x17/12x20/G)
-    // C10: Paleta progresiva CLARO→OSCURO (amanecer → atardecer → noche)
+    // 6. Create default shift templates (M/T/N/11x19/9x17/12x20/G)
     const DEFAULT_SHIFTS = [
-      { name: "Mañana",      start_time: "07:00", end_time: "15:00", color: "#fbbf24", has_break: true,  total_break_time: 30 }, // amber-400 (sunrise)
-      { name: "Tarde",       start_time: "15:00", end_time: "23:00", color: "#f97316", has_break: true,  total_break_time: 30 }, // orange-500 (sunset)
-      { name: "Noche",       start_time: "23:00", end_time: "07:00", color: "#6366f1", has_break: true,  total_break_time: 30 }, // indigo-500 (night)
-      { name: "Transición",  start_time: "11:00", end_time: "19:00", color: "#fb923c", has_break: true,  total_break_time: 30 }, // orange-400 (midday)
-      { name: "GEX Mañana",  start_time: "09:00", end_time: "17:00", color: "#fcd34d", has_break: true,  total_break_time: 30 }, // amber-300 (mid-morning)
-      { name: "GEX Tarde",   start_time: "12:00", end_time: "20:00", color: "#fdba74", has_break: true,  total_break_time: 30 }, // orange-300 (afternoon)
-      { name: "Guardia",     start_time: "09:00", end_time: "21:00", color: "#f87171", has_break: false, total_break_time: 0  }, // red-400 (alert)
+      { name: "Mañana",      start_time: "07:00", end_time: "15:00", color: "#fbbf24", has_break: true,  total_break_time: 30 },
+      { name: "Tarde",       start_time: "15:00", end_time: "23:00", color: "#f97316", has_break: true,  total_break_time: 30 },
+      { name: "Noche",       start_time: "23:00", end_time: "07:00", color: "#6366f1", has_break: true,  total_break_time: 30 },
+      { name: "Transición",  start_time: "11:00", end_time: "19:00", color: "#fb923c", has_break: true,  total_break_time: 30 },
+      { name: "GEX Mañana",  start_time: "09:00", end_time: "17:00", color: "#fcd34d", has_break: true,  total_break_time: 30 },
+      { name: "GEX Tarde",   start_time: "12:00", end_time: "20:00", color: "#fdba74", has_break: true,  total_break_time: 30 },
+      { name: "Guardia",     start_time: "09:00", end_time: "21:00", color: "#f87171", has_break: false, total_break_time: 0  },
     ];
 
     try {
-      const shiftRows = DEFAULT_SHIFTS.map((s) => ({
-        name: s.name,
-        start_time: s.start_time,
-        end_time: s.end_time,
-        color: s.color,
-        access_type: "company",
-        break_type: s.has_break ? "meal" : null,
-        break_duration: s.has_break ? "30" : "0",
-        has_break: s.has_break,
-        total_break_time: s.total_break_time,
-        org_id: orgId,
-        is_additional_time: false,
-      }));
-
-      // Solo insertar si la org no tiene horarios previos
       const { count: existingCount } = await supabase
         .from("saved_shifts")
         .select("id", { count: "exact", head: true })
         .eq("org_id", orgId);
 
-      const { error: shiftsError } = existingCount === 0
-        ? await supabase.from("saved_shifts").insert(shiftRows)
-        : { error: null };
+      if (existingCount === 0) {
+        const shiftRows = DEFAULT_SHIFTS.map((s) => ({
+          name: s.name,
+          start_time: s.start_time,
+          end_time: s.end_time,
+          color: s.color,
+          access_type: "company",
+          break_type: s.has_break ? "meal" : null,
+          break_duration: s.has_break ? "30" : "0",
+          has_break: s.has_break,
+          total_break_time: s.total_break_time,
+          org_id: orgId,
+          is_additional_time: false,
+        }));
 
-      if (shiftsError) {
-        console.error("Error creating default shifts (non-critical):", shiftsError);
-      } else {
-        console.log(`Created ${shiftRows.length} default shift templates`);
+        const { error: shiftsError } = await supabase.from("saved_shifts").insert(shiftRows);
+        if (shiftsError) {
+          console.error("Error creating default shifts (non-critical):", shiftsError);
+        } else {
+          console.log(`Created ${shiftRows.length} default shift templates`);
+        }
       }
     } catch (shiftsErr) {
       console.error("Error creating default shifts (non-critical):", shiftsErr);
     }
 
-    // 9. Log activity
+    // 7. Log activity (non-critical)
     try {
       await supabase.rpc("log_activity", {
         _user_name: user.email || "Usuario",
@@ -351,20 +307,20 @@ serve(async (req) => {
         _details: {
           departments_count: departments.length,
           jobs_count: jobs.length,
+          colaboradores_count: colaboradoresCreated,
           industry: organization.industry,
         },
       });
     } catch (logError) {
-      console.error("Error logging activity:", logError);
-      // Non-critical
+      console.error("Error logging activity (non-critical):", logError);
     }
 
     console.log("Onboarding completed successfully");
 
-    // Notificar al admin — fire & forget, no bloquea la respuesta
+    // 8. Notify admin (fire & forget)
     try {
       const notifyUrl = `${supabaseUrl}/functions/v1/notify-admin-signup`;
-      await fetch(notifyUrl, {
+      fetch(notifyUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -382,17 +338,15 @@ serve(async (req) => {
             jobs: jobs.length,
           },
         }),
-      });
-    } catch (notifyError) {
-      console.error("Error notifying admin (non-critical):", notifyError);
-    }
+      }).catch(() => {}); // fire & forget
+    } catch (_) {}
 
     return new Response(
       JSON.stringify({
         success: true,
         organization_id: orgId,
         departments_created: Object.keys(deptIdMap).length,
-        jobs_created: createdJobs.length,
+        job_titles_created: jobTitlesCreated,
         colaboradores_created: colaboradoresCreated,
       }),
       {
