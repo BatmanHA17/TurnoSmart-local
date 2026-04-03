@@ -1,10 +1,5 @@
-import { UserInfoDashboard } from "@/components/UserInfoDashboard";
-import { MainLayout } from "@/components/MainLayout";
+import DashboardOwner from "@/components/DashboardOwner";
 
 export default function DashboardOwnerPage() {
-  return (
-    <MainLayout>
-      <UserInfoDashboard />
-    </MainLayout>
-  );
+  return <DashboardOwner />;
 }
