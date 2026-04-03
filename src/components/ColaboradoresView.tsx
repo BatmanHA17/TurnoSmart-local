@@ -171,15 +171,31 @@ export const ColaboradoresView = () => {
 
       let jobsMap: Record<string, string> = {};
       if (jobIds.length > 0) {
+        // Step 1: Get jobs with their job_title_id
         const { data: jobsData } = await supabase
           .from('jobs')
-          .select('id, job_title_id, job_titles(name)')
+          .select('id, job_title_id')
           .in('id', jobIds);
 
-        if (jobsData) {
-          jobsMap = Object.fromEntries(
-            jobsData.map((j: any) => [j.id, j.job_titles?.name || ''])
-          );
+        if (jobsData && jobsData.length > 0) {
+          // Step 2: Get the actual title names from job_titles
+          const titleIds = [...new Set(jobsData.map((j: any) => j.job_title_id).filter(Boolean))];
+          const { data: titlesData } = await supabase
+            .from('job_titles')
+            .select('id, name')
+            .in('id', titleIds);
+
+          const titlesMap: Record<string, string> = {};
+          if (titlesData) {
+            for (const t of titlesData) {
+              titlesMap[t.id] = t.name;
+            }
+          }
+
+          // Step 3: Map job.id → job_title name
+          for (const j of jobsData as any[]) {
+            jobsMap[j.id] = titlesMap[j.job_title_id] || '';
+          }
         }
       }
 
