@@ -233,6 +233,8 @@ Copilot chat NLP completo, NLP en notas, Unificar roles/seniority, Eliminar expo
 | F19 | **Q6** Peticiones "?" nombres de empleado | Fallback a "Empleado <id>" cuando FK huérfana | `134b2a4` |
 | F20 | **Q7** Audit "Exceso horas 152h/40h" falso positivo | Usar rango real de fechas para calcular semanas, no solo días con turnos | `134b2a4` |
 | F21 | **Q1** Favoritos desaparecen al navegar | useLocalStorageCleanup no borra favorites + filtro absence relajado + showFavorites persiste | `a92a69b` |
+| F22 | **P_NEW_1** "Could not find 'apellidos_uso' column" — QuickCreateTeam INSERT fallaba | Eliminado campo del INSERT + añadida columna en cloud DB | `fb09b1e` |
+| F23 | **P_NEW_2** "Could not find 'apellidos_nacimiento' column" — formulario individual INSERT fallaba | 22 columnas faltantes añadidas al cloud DB (migración 20260402000000) | `(pending)` |
 
 ### ✅ SMOKE TEST SUPER ADMIN — VERIFICADOS OK (2026-04-02)
 Login, Calendario, Equipo, HR, Analítica, Settings, Wizard SMART, Criterios SMART,
@@ -258,8 +260,14 @@ Limpiar Turnos, Ocupación, Horarios rotativos, Balance anual (20+ secciones)
 - ⚠️ Console: mismos errores legacy (useUserRole, useUserProfile) + 404 `/turnosmart/colaboradores`
 - 📋 **Conclusión**: El flujo de onboarding de empleados está ROTO. Un empleado invitado/creado en Auth sin profile+colaborador no puede acceder a la app.
 
+### ✅ SMOKE TEST QUICKCREATETEAM (2026-04-02)
+- ✅ **Creador Rápido**: 4 colaboradores creados con molde (dpto=Recepción, 40h, Indefinido)
+- ✅ **Importar CSV**: 3 colaboradores importados desde archivo CSV (pipeline parser validado)
+- ✅ **Plantilla Excel**: descarga correcta (18.6KB, 2 hojas)
+- ⚠️ **Importar Excel**: no testado end-to-end (CORS + base64 limits en test automation), pipeline compartido con CSV → asumido OK
+- ✅ **Formulario individual** (`/turnosmart/collaborators/new`): "Vera Santos Ríos" creada OK
+
 ### 🔲 PENDIENTE DE PROBAR
-- Añadir colaborador (botón en Equipo)
 - Invitar colaborador (email)
 - Dominio turnosmart.app (IONOS → Vercel)
 
