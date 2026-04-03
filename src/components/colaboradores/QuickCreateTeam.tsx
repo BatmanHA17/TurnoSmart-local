@@ -101,12 +101,17 @@ export function QuickCreateTeam() {
       toast({ title: "Sin datos", description: "Rellena al menos nombre y email", variant: "destructive" });
       return;
     }
-    if (!org?.id) return;
+    const orgId = org?.id || (org as any)?.org_id;
+    if (!orgId) {
+      toast({ title: "Error", description: "No se encontró la organización. Recarga la página.", variant: "destructive" });
+      return;
+    }
 
     setSaving(true);
     setSavedCount(0);
 
     let count = 0;
+    let lastError = "";
     for (const row of validRows) {
       try {
         const { error } = await supabase.from("colaboradores").insert({
@@ -114,7 +119,7 @@ export function QuickCreateTeam() {
           apellidos: row.apellidos.trim(),
           apellidos_uso: `${row.nombre.trim()} ${row.apellidos.trim().charAt(0)}.`.trim(),
           email: row.email.trim(),
-          org_id: org.id,
+          org_id: orgId,
           fecha_inicio_contrato: fechaInicio || null,
           tipo_contrato: tipoContrato,
           tiempo_trabajo_semanal: horasSemanales,
@@ -123,9 +128,13 @@ export function QuickCreateTeam() {
         if (!error) {
           count++;
           setSavedCount(count);
+        } else {
+          lastError = error.message;
+          console.error("Insert error:", error);
         }
-      } catch {
-        // continue with next
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : "Error desconocido";
+        console.error("Insert exception:", err);
       }
     }
 
@@ -135,7 +144,7 @@ export function QuickCreateTeam() {
       toast({ title: `${count} colaboradores creados`, description: "Ahora puedes añadirlos al calendario." });
       navigate("/turnosmart/collaborators");
     } else {
-      toast({ title: "Error", description: "No se pudo crear ningún colaborador", variant: "destructive" });
+      toast({ title: "Error", description: lastError || "No se pudo crear ningún colaborador. Verifica los datos.", variant: "destructive" });
     }
   };
 
@@ -234,7 +243,8 @@ export function QuickCreateTeam() {
   };
 
   const handleImportSave = async () => {
-    if (!importPreview || !org?.id) return;
+    const orgId = org?.id || (org as any)?.org_id;
+    if (!importPreview || !orgId) return;
     setSaving(true);
     setSavedCount(0);
     let count = 0;
@@ -245,7 +255,7 @@ export function QuickCreateTeam() {
           apellidos: row.apellidos,
           apellidos_uso: `${row.nombre} ${row.apellidos.charAt(0)}.`.trim(),
           email: row.email || `${row.nombre.toLowerCase().replace(/\s/g, ".")}@pendiente.com`,
-          org_id: org.id,
+          org_id: orgId,
           tipo_contrato: tipoContrato,
           tiempo_trabajo_semanal: horasSemanales,
           fecha_inicio_contrato: fechaInicio || null,
