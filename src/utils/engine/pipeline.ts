@@ -93,8 +93,8 @@ export function runPipeline(input: EngineInput): EngineOutput {
 
   const durationMs = Math.round(performance.now() - startTime);
 
-  // Extraer score del contexto
-  const scoreBreakdown: ScoreBreakdown = (ctx as any)._score ?? {
+  // Extraer score del contexto (tipado correctamente en PipelineContext._score)
+  const scoreBreakdown: ScoreBreakdown = ctx._score ?? {
     legal: 100,
     coverage: 100,
     equity: 100,

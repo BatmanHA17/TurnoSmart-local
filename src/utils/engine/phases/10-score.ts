@@ -82,8 +82,8 @@ export function score(ctx: PipelineContext): PipelineContext {
     trafficLight,
   };
 
-  // Guardar en ctx para que pipeline lo recoja
-  (ctx as any)._score = scoreBreakdown;
+  // Guardar en ctx para que pipeline lo recoja (tipado en PipelineContext._score)
+  ctx._score = scoreBreakdown;
 
   return ctx;
 }

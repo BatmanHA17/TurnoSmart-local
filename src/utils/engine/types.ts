@@ -458,6 +458,8 @@ export interface PipelineContext {
   dgAccumulated: Record<string, number>;
   /** Metadata temporal */
   _startTime: number;
+  /** Score calculado por Phase 10 — tipado para evitar (ctx as any)._score */
+  _score?: ScoreBreakdown;
 }
 
 /** Firma de una fase del pipeline */

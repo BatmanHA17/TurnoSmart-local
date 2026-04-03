@@ -22,9 +22,9 @@ export const INDUSTRIES: Record<string, IndustryTemplate> = {
     ],
     jobs: [
       // Recepción
-      { id: 'job-jefe-recepcion', title: 'Jefe/a de Recepción', departmentId: 'dept-frontdesk', departmentName: 'Recepción', hours: 8, headcount: 1, selected: true },
-      { id: 'job-recepcionista', title: 'Recepcionista', departmentId: 'dept-frontdesk', departmentName: 'Recepción', hours: 8, headcount: 2, selected: true },
-      { id: 'job-aux-recepcion', title: 'Auxiliar de Recepción', departmentId: 'dept-frontdesk', departmentName: 'Recepción', hours: 6, headcount: 1, selected: false },
+      { id: 'job-jefe-recepcion', title: 'Jefe/a de Recepción', departmentId: 'dept-frontdesk', departmentName: 'Recepción', hours: 8, headcount: 1, selected: true, engine_role: 'FOM' },
+      { id: 'job-recepcionista', title: 'Recepcionista', departmentId: 'dept-frontdesk', departmentName: 'Recepción', hours: 8, headcount: 2, selected: true, engine_role: 'FRONT_DESK_AGENT' },
+      { id: 'job-aux-recepcion', title: 'Auxiliar de Recepción', departmentId: 'dept-frontdesk', departmentName: 'Recepción', hours: 6, headcount: 1, selected: false, engine_role: 'FRONT_DESK_AGENT' },
       // Bar
       { id: 'job-jefe-bares', title: 'Jefe/a de Bar', departmentId: 'dept-bar', departmentName: 'Bar', hours: 8, headcount: 1, selected: true },
       { id: 'job-barman', title: 'Barman / Barmaid', departmentId: 'dept-bar', departmentName: 'Bar', hours: 8, headcount: 2, selected: true },

@@ -32,10 +32,13 @@ import {
 } from "../helpers";
 import { ERGONOMIC_SEQUENCE, SHIFT_UNDESIRABILITY, TRANSITION_SHIFT, SPAIN_LABOR_LAW } from "../constants";
 
-/** Turnos que rotan los FDA — solo M y T.
- *  N lo cubre el Night Agent (FIJO_NOCHE).
- *  Refuerzo nocturno solo si occupancy lo exige o FOM lo fuerza. */
-const ROTATION_SHIFTS: ShiftCode[] = ["M", "T"];
+/** Turnos base que rotan los FDA.
+ *  V3 FIX: N incluido en la rotación completa (coverageShifts) cuando:
+ *    - No hay Night Agent (multi-sector), o
+ *    - Min coverage N > 1 (need extra FDA on N beyond Night Agent)
+ *  Pass 0 still handles Night Agent rest day coverage separately. */
+const ROTATION_SHIFTS_BASE: ShiftCode[] = ["M", "T"];
+const ROTATION_SHIFTS_FULL: ShiftCode[] = ["M", "T", "N"];
 
 export function assignRotating(ctx: PipelineContext): PipelineContext {
   const { grid, input, roleGroups, currentEquity } = ctx;
@@ -54,11 +57,17 @@ export function assignRotating(ctx: PipelineContext): PipelineContext {
   );
 
   // Determinar qué turnos necesitan cobertura FDA
-  // N ya cubierto por Night Agent (FIJO_NO_ROTA con fixedShift=N) → solo refuerzo si occupancy lo pide
+  // V3 FIX: N is always part of coverage check. When there's a Night Agent,
+  // Pass 0 covers their rest days, but FDAs may still need to rotate into N
+  // if minCoverageN > 1 or for equitable distribution.
   const hasNightAgent = roleGroups.FIJO_NO_ROTA?.some(
     (e) => e.fixedShift === "N" || e.role === "NIGHT_SHIFT_AGENT"
   ) ?? false;
-  const coverageShifts: ShiftCode[] = hasNightAgent ? ["M", "T"] : ["M", "T", "N"];
+  const minCoverageN = constraints.minCoveragePerShift.N ?? 1;
+  // Include N in coverage if: no Night Agent, or Night Agent covers 1 but we need more
+  const coverageShifts: ShiftCode[] = hasNightAgent && minCoverageN <= 1
+    ? ["M", "T"]
+    : ["M", "T", "N"];
 
   // ===================================================================
   // PASS 0 — NIGHT AGENT REST COVERAGE (Seniority-Rotation Model)
@@ -368,7 +377,7 @@ function pickBestShiftForDay(
   weights: WeightProfile,
   ergonomic: boolean,
   period: { year: number; month: number },
-  allowedShifts: ShiftCode[] = ROTATION_SHIFTS,
+  allowedShifts: ShiftCode[] = ROTATION_SHIFTS_BASE,
   fomIds: Set<string> = new Set()
 ): ShiftCode | string | null {
   let bestShift: ShiftCode | string | null = null;

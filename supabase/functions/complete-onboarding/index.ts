@@ -198,6 +198,7 @@ serve(async (req) => {
         const placeholderEmail = `${titleSlug}-${i}-${timestamp}@setup.turnosmart.app`;
 
         // Step A: Create colaborador WITHOUT job_id (FK points to jobs table, not job_titles)
+        // V3: Include engine_role from template (defaults to ROTA_COMPLETO in DB)
         const { data: colabData, error: colabError } = await supabase
           .from("colaboradores")
           .insert({
@@ -211,6 +212,7 @@ serve(async (req) => {
             tipo_contrato: "Sin especificar",
             fecha_inicio_contrato: new Date().toISOString().split("T")[0],
             tiempo_trabajo_semanal: job.hours * 5, // daily hours → weekly (5-day week)
+            ...(job.engine_role ? { engine_role: job.engine_role } : {}),
           })
           .select("id")
           .single();

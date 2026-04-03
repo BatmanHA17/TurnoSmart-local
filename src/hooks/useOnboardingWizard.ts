@@ -20,6 +20,8 @@ export interface JobData {
   hours: number;
   headcount: number;
   selected: boolean;
+  /** SMART engine role for shift generation (default: ROTA_COMPLETO) */
+  engine_role?: string;
 }
 
 export interface OnboardingState {

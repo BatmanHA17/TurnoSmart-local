@@ -44,6 +44,8 @@ interface CalendarEmployee {
   workingHours: string;
   seniority_level?: number;
   job_title?: string;
+  /** SMART engine role from DB — replaces broken mapRole() string matching */
+  engine_role?: string;
 }
 
 interface UseSmartGenerateV2Props {
@@ -113,20 +115,58 @@ const SHIFT_TYPE_MAP: Record<string, ShiftBlock["type"]> = {
 // ROLE MAPPING (v1 role → v2 EmployeeRoleV2)
 // ---------------------------------------------------------------------------
 
-function mapRole(calEmp: CalendarEmployee): EmployeeRoleV2 {
-  // Buscar en job_title Y en nombre del empleado (permite seed con nombres de rol)
+/**
+ * Resolves the EmployeeRoleV2 for the SMART engine.
+ *
+ * V3 FIX: Reads `engine_role` directly from the DB (colaboradores.engine_role).
+ * This replaces the old mapRole() that did broken string matching in English
+ * ("FOM", "NIGHT AGENT") against Spanish job titles from onboarding.
+ *
+ * Mapping:
+ *   DB engine_role value → EmployeeRoleV2
+ *   "FOM"                → "FOM"
+ *   "AFOM"               → "AFOM"
+ *   "NIGHT_SHIFT_AGENT"  → "NIGHT_SHIFT_AGENT"
+ *   "GEX"                → "GEX"
+ *   "FRONT_DESK_AGENT"   → "FRONT_DESK_AGENT"
+ *   "FIJO_NO_ROTA"       → "FRONT_DESK_AGENT" (generic fixed — needs seniority context)
+ *   "ROTA_COMPLETO"      → "FRONT_DESK_AGENT" (default rotation)
+ *   "ROTA_PARCIAL"       → "GEX" (partial rotation)
+ *   "COBERTURA"          → "AFOM" (coverage role)
+ *   null/undefined       → falls back to legacy name matching
+ */
+const ENGINE_ROLE_MAP: Record<string, EmployeeRoleV2> = {
+  FOM: "FOM",
+  AFOM: "AFOM",
+  NIGHT_SHIFT_AGENT: "NIGHT_SHIFT_AGENT",
+  GEX: "GEX",
+  FRONT_DESK_AGENT: "FRONT_DESK_AGENT",
+  // Generic rotation types → map to closest role
+  FIJO_NO_ROTA: "FRONT_DESK_AGENT",  // caller should set FOM/NIGHT explicitly
+  ROTA_COMPLETO: "FRONT_DESK_AGENT",
+  ROTA_PARCIAL: "GEX",
+  COBERTURA: "AFOM",
+};
+
+function resolveEngineRole(calEmp: CalendarEmployee): EmployeeRoleV2 {
+  // V3: Read engine_role directly from DB
+  if (calEmp.engine_role) {
+    const mapped = ENGINE_ROLE_MAP[calEmp.engine_role];
+    if (mapped) return mapped;
+  }
+
+  // Legacy fallback: string matching (only for employees without engine_role set)
+  // This will be removed once all existing colaboradores have engine_role populated.
   const jt = calEmp.job_title?.toUpperCase() ?? "";
   const nm = calEmp.name?.toUpperCase() ?? "";
   const combined = `${jt} ${nm}`;
 
-  // AFOM must be checked BEFORE FOM (because "AFOM" contains "FOM")
   if (combined.includes("AFOM") || combined.includes("ASSISTANT FRONT OFFICE")) return "AFOM";
   if (combined.includes("FOM") || combined.includes("FRONT OFFICE MANAGER")) return "FOM";
   if (combined.includes("NIGHT") || combined.includes("NOCTURNO")) return "NIGHT_SHIFT_AGENT";
   if (combined.includes("GEX") || combined.includes("GUEST EXPERIENCE")) return "GEX";
   if (combined.includes("FRONT DESK") || combined.includes("FDA")) return "FRONT_DESK_AGENT";
 
-  // Fallback por role del v1
   if (calEmp.role === "manager") return "FOM";
   if (calEmp.role === "gex") return "GEX";
   return "FRONT_DESK_AGENT";
@@ -334,7 +374,7 @@ export function useSmartGenerateV2({
         }
 
         const engineEmployees: EngineEmployee[] = calEmployees.map((ce) => {
-          const role = mapRole(ce);
+          const role = resolveEngineRole(ce);
           const config = ROLE_CONFIGS[role];
           const wh = parseWeeklyHours(ce.workingHours);
           const prevEquity = equityByEmployee.get(ce.id);
