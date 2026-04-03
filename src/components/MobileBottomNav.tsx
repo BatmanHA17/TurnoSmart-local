@@ -22,6 +22,7 @@ export function MobileBottomNav() {
 
   const isManager = role === "OWNER" || role === "ADMIN" || role === "MANAGER" || role === "DIRECTOR";
 
+  // V3: simplified mobile nav (4 tabs, no messaging)
   const tabs: NavTab[] = [
     {
       label: "Inicio",
@@ -30,22 +31,16 @@ export function MobileBottomNav() {
       matchPrefix: "/dashboard",
     },
     {
-      label: isManager ? "Calendario" : "Mis Turnos",
+      label: "Turnos",
       icon: Calendar,
-      path: isManager ? "/turnosmart/biweekly" : "/turnosmart/week",
-      matchPrefix: "/turnosmart",
+      path: "/turnos",
+      matchPrefix: "/turnos",
     },
     {
-      label: isManager ? "Solicitudes" : "Peticiones",
-      icon: isManager ? Inbox : Send,
-      path: isManager ? "/turnosmart/absence-requests" : "/turnosmart/peticiones",
-      matchPrefix: isManager ? "/turnosmart/absence-requests" : "/turnosmart/peticiones",
-    },
-    {
-      label: "Mensajes",
-      icon: MessageSquare,
-      path: "/turnosmart/mensajes",
-      matchPrefix: "/turnosmart/mensajes",
+      label: "Peticiones",
+      icon: Send,
+      path: "/peticiones",
+      matchPrefix: "/peticiones",
     },
     {
       label: "Perfil",
@@ -71,7 +66,7 @@ export function MobileBottomNav() {
       className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="grid grid-cols-5 h-16">
+      <div className="grid grid-cols-4 h-16">
         {tabs.map((tab) => {
           const active = isActive(tab);
           const Icon = tab.icon;

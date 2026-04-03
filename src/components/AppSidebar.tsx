@@ -17,30 +17,25 @@ import { useTurnoSmartRole } from "@/hooks/useTurnoSmartRole";
 
 // ── Items por nivel de acceso ──────────────────────────────────────
 
+// V3 routes — simplified navigation
+
 // Empleado: ve su horario y puede hacer peticiones
 const empleadoNavItems = [
-  { title: "Mi Horario", url: "/turnosmart/create-shift", icon: Calendar },
-  { title: "Mis Peticiones", url: "/turnosmart/peticiones", icon: Send },
+  { title: "Mi Horario", url: "/turnos", icon: Calendar },
+  { title: "Mis Peticiones", url: "/peticiones", icon: Send },
 ];
 
 // FOM/AFOM: gestión completa del cuadrante
 const fomNavItems = [
-  { title: "Calendario", url: "/turnosmart/create-shift", icon: Calendar },
-  { title: "Cuadrante", url: "/cuadrante", icon: CalendarDays },
-  { title: "Colaboradores", url: "/turnosmart/collaborators", icon: Users },
-  { title: "Horarios Guardados", url: "/turnos/guardados", icon: RotateCcw },
+  { title: "Turnos", url: "/turnos", icon: Calendar },
+  { title: "Equipo", url: "/equipo", icon: Users },
+  { title: "Peticiones", url: "/peticiones", icon: Send },
+  { title: "Configuración", url: "/config", icon: Settings },
 ];
 
 // Super-Admin: administración
 const adminNavItems = [
-  { title: "Panel de Super Admin", url: "/perfil-admin", icon: Crown },
-  { title: "Actividad", url: "/activity", icon: Activity },
-  { title: "Configuración", url: "/configuracion-legacy", icon: Settings },
-];
-
-const helpNavItems = [
-  { title: "Centro de Ayuda", url: "/ayuda", icon: HelpCircle },
-  { title: "Preguntas Frecuentes", url: "/faq", icon: FileText },
+  { title: "Admin", url: "/admin", icon: Crown },
 ];
 
 export function AppSidebar() {
@@ -123,7 +118,7 @@ export function AppSidebar() {
             <SidebarSection label="Administración" items={adminNavItems} />
           )}
 
-          <SidebarSection label="Ayuda" items={helpNavItems} />
+          {/* Ayuda eliminada en V3 — funcionalidad se integra en el flujo */}
         </div>
 
         {/* User Info Section */}

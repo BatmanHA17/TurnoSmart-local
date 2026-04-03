@@ -28,12 +28,11 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
+// V3 routes — simplified
 const mainNavItems = [
-  { title: "Analítica", url: "/mi-actividad" },
-  { title: "Turnos", url: "/turnosmart" },
-  { title: "Peticiones", url: "/turnosmart/peticiones" },
-  { title: "Equipo", url: "/colaboradores" },
-  { title: "HR", url: "/hr" },
+  { title: "Turnos", url: "/turnos" },
+  { title: "Equipo", url: "/equipo" },
+  { title: "Peticiones", url: "/peticiones" },
 ];
 
 export function HorizontalNav() {
@@ -51,10 +50,10 @@ export function HorizontalNav() {
   // Filter navigation items based on TurnoSmart role
   // Mientras carga el rol, mostrar todos para evitar flash de navbar vacío
   const filteredNavItems = mainNavItems.filter(item => {
-    if (tsRoleLoading) return true; // No filtrar mientras carga
-    // Empleados solo ven "Turnos" (su horario)
+    if (tsRoleLoading) return true;
+    // Empleados solo ven "Turnos" y "Peticiones"
     if (isEmpleado) {
-      return item.url === "/turnosmart" || item.url === "/turnosmart/peticiones";
+      return item.url === "/turnos" || item.url === "/peticiones";
     }
     return true;
   });
@@ -94,7 +93,7 @@ export function HorizontalNav() {
           description: "Error al obtener tu perfil",
           variant: "destructive"
         });
-        navigate('/turnosmart/collaborators');
+        navigate('/equipo');
         return;
       }
 
@@ -106,7 +105,7 @@ export function HorizontalNav() {
           description: "No se encontró email en tu perfil",
           variant: "destructive"
         });
-        navigate('/turnosmart/collaborators');
+        navigate('/equipo');
         return;
       }
 
@@ -124,7 +123,7 @@ export function HorizontalNav() {
           description: "Error al buscar tu perfil de colaborador",
           variant: "destructive"
         });
-        navigate('/turnosmart/collaborators');
+        navigate('/equipo');
         return;
       }
 
@@ -133,7 +132,7 @@ export function HorizontalNav() {
         return;
       }
 
-      navigate(`/turnosmart/collaborators/${colaborador.id}/profile`);
+      navigate(`/equipo/${colaborador.id}/profile`);
       
     } catch (error) {
       console.error('💥 Error inesperado:', error);
@@ -142,7 +141,7 @@ export function HorizontalNav() {
         description: "Ocurrió un error al acceder a tu perfil",
         variant: "destructive"
       });
-      navigate('/turnosmart/collaborators');
+      navigate('/equipo');
     }
   };
 
@@ -210,126 +209,27 @@ export function HorizontalNav() {
                   opacity: 1
                 }}
               >
-                {/* Main menu items */}
-                <div className="py-2">
-                  {/* Show all options for admin roles, only "Mis preferencias" for employees */}
-                  {(!isEmpleado || tsRoleLoading) && (
-                    <DropdownMenuItem 
-                      className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
-                      onClick={() => navigate("/solicitudes-ausencia")}
-                    >
-                      Solicitudes de Ausencia
-                    </DropdownMenuItem>
-                  )}
-                  
-                  <DropdownMenuItem 
-                    className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
-                    onClick={() => navigate("/mis-preferencias")}
-                  >
-                    Mis preferencias
-                  </DropdownMenuItem>
-                  
-                  {(!isEmpleado || tsRoleLoading) && (
-                    <>
-                      <DropdownMenuItem 
-                        className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
-                        onClick={() => navigate("/settings/locations")}
-                      >
-                        Configuración
-                      </DropdownMenuItem>
-                      
-                      <DropdownMenuItem className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
-                        Suscripción
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </div>
-                
+                {/* V3: simplified menu */}
                 {(!isEmpleado || tsRoleLoading) && (
-                  <>
-                    <DropdownMenuSeparator className="border-gray-200" />
-                    
-                    {/* Sidebar Old - Accesos Adicionales */}
-                    <div className="py-2">
-                      <div className="px-4 py-2">
-                        <span className="text-xs text-gray-400 font-medium">Accesos adicionales</span>
-                      </div>
-                      
-                      {/* Gestión */}
-                      <DropdownMenuItem 
-                        className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
-                        onClick={() => navigate("/cuadrante")}
-                      >
-                        <Calendar className="h-4 w-4 mr-2" />
-                        Cuadrante
-                      </DropdownMenuItem>
-                      
-                      {/* Configuración */}
-                      <DropdownMenuItem 
-                        className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
-                        onClick={() => navigate("/configuracion-legacy")}
-                      >
-                        <Settings className="h-4 w-4 mr-2" />
-                        Configuration Hub (Legacy)
-                      </DropdownMenuItem>
-                      
-                      <DropdownMenuItem 
-                        className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
-                        onClick={() => navigate("/turnos/guardados")}
-                      >
-                        <RotateCcw className="h-4 w-4 mr-2" />
-                        Horarios Guardados
-                      </DropdownMenuItem>
-                      
-                      <DropdownMenuItem 
-                        className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
-                        onClick={() => navigate("/old-turnosmart")}
-                      >
-                        <Calendar className="h-4 w-4 mr-2" />
-                        Old-Turnosmart.app
-                      </DropdownMenuItem>
-                      
-                      {/* Admin - Solo para Super Admin */}
-                      {isSuperAdmin && (
-                        <>
-                          <DropdownMenuItem
-                            className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
-                            onClick={() => navigate("/perfil-admin")}
-                          >
-                            <Crown className="h-4 w-4 mr-2" />
-                            Panel de Super Admin
-                          </DropdownMenuItem>
+                  <div className="py-2">
+                    <DropdownMenuItem
+                      className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => navigate("/config")}
+                    >
+                      <Settings className="h-4 w-4 mr-2" />
+                      Configuración
+                    </DropdownMenuItem>
 
-                          <DropdownMenuItem
-                            className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
-                            onClick={() => navigate("/activity")}
-                          >
-                            <Activity className="h-4 w-4 mr-2" />
-                            Actividad
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                      
-                      {/* Ayuda */}
-                      <DropdownMenuItem 
-                        className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
-                        onClick={() => navigate("/ayuda")}
+                    {isSuperAdmin && (
+                      <DropdownMenuItem
+                        className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+                        onClick={() => navigate("/admin")}
                       >
-                        <HelpCircle className="h-4 w-4 mr-2" />
-                        Centro de Ayuda
+                        <Crown className="h-4 w-4 mr-2" />
+                        Panel Admin
                       </DropdownMenuItem>
-                      
-                      <DropdownMenuItem 
-                        className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
-                        onClick={() => navigate("/faq")}
-                      >
-                        <FileText className="h-4 w-4 mr-2" />
-                        Preguntas Frecuentes
-                      </DropdownMenuItem>
-                    </div>
-                    
-                    <DropdownMenuSeparator className="border-gray-200" />
-                  </>
+                    )}
+                  </div>
                 )}
                 
                 {/* Account section */}
