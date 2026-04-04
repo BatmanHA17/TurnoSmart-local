@@ -145,7 +145,9 @@ function anchorFixed(state: SolverState): void {
 function anchorFOM(state: SolverState, fom: EngineEmployee): void {
   const totalDays = state.input.period.totalDays;
   const guardiaDays = new Set(state.input.fomGuardiaDays ?? []);
+  const weeks = getWeeks(totalDays);
 
+  // First pass: assign weekends (G or D) and weekday M
   for (let d = 1; d <= totalDays; d++) {
     if (state.grid[fom.id][d].locked) continue;
 
@@ -158,10 +160,14 @@ function anchorFOM(state: SolverState, fom: EngineEmployee): void {
         assignCell(state, fom.id, d, "D", "engine", true);
       }
     } else {
-      // Weekday: M
       assignCell(state, fom.id, d, "M", "engine", false);
     }
   }
+
+  // No compensatory weekday rest for guardia weeks.
+  // G days (12h each) accumulate DG (Día Debido Guardia) in the output.
+  // The FOM uses DG at their discretion — the engine does NOT auto-assign rest.
+  // DG accumulation is handled by stateToOutput in solver.ts.
 }
 
 function anchorAFOM(state: SolverState, fom: EngineEmployee, afom: EngineEmployee): void {
@@ -205,20 +211,54 @@ function assignRestDays(state: SolverState): void {
 
 function assignWeeklyRest(state: SolverState, emp: EngineEmployee, weekDays: number[]): void {
   const schedule = state.grid[emp.id];
+  const isRotaCompleto = emp.rotationType === "ROTA_COMPLETO";
 
   // Count existing rest/absence days in this week
-  const existingRests = weekDays.filter(d => {
+  const existingLockedRests = weekDays.filter(d => {
     const c = schedule[d]?.code;
-    return c === "D" || c === "V" || c === "E" || c === "PM" || c === "PC" || c === "DB" || c === "DG";
+    if (!c) return false;
+    const isRest = c === "D" || c === "V" || c === "E" || c === "PM" || c === "PC" || c === "DB" || c === "DG";
+    return isRest && schedule[d]?.locked;
   });
 
-  if (existingRests.length >= 2) return; // Already has enough rest
+  // ROTA_COMPLETO: only pre-assign 1 rest (N→D provides the 2nd)
+  // Others: assign 2 consecutive rest days as before
+  const target = isRotaCompleto ? 1 : 2;
 
-  const needed = 2 - existingRests.filter(d => schedule[d]?.locked).length;
+  if (existingLockedRests.length >= target) return;
+  const needed = target - existingLockedRests.length;
   if (needed <= 0) return;
 
-  // Score each consecutive pair of days
-  const candidates: Array<{ days: number[]; score: number }> = [];
+  if (isRotaCompleto) {
+    // Assign 1 staggered rest day (N→D will provide the 2nd)
+    const candidates: Array<{ day: number; score: number }> = [];
+    for (const d of weekDays) {
+      if (schedule[d].locked) continue;
+      let score = 0;
+      // Stagger: penalize days where others rest
+      for (const [id, grid] of Object.entries(state.grid)) {
+        if (id === emp.id) continue;
+        if (grid[d]?.code === "D") score -= 10;
+      }
+      // Avoid days with soft petitions (type B)
+      const hasPetition = emp.petitions.some(p =>
+        p.type === "B" && p.status !== "rejected" && p.days.includes(d)
+      );
+      if (hasPetition) score -= 50;
+      // Slight weekend variety preference
+      const dow = periodDayOfWeekISO(state.input.period.startDate, d);
+      if (dow === 5 || dow === 6) score += 3;
+      candidates.push({ day: d, score });
+    }
+    candidates.sort((a, b) => b.score - a.score);
+    if (candidates.length > 0) {
+      assignCell(state, emp.id, candidates[0].day, "D", "engine", true);
+    }
+    return;
+  }
+
+  // Non-ROTA_COMPLETO: assign 2 consecutive rest days
+  const pairCandidates: Array<{ days: number[]; score: number }> = [];
 
   for (let i = 0; i < weekDays.length - 1; i++) {
     const d1 = weekDays[i];
@@ -226,35 +266,28 @@ function assignWeeklyRest(state: SolverState, emp: EngineEmployee, weekDays: num
     if (schedule[d1].locked && schedule[d1].code !== "D") continue;
     if (schedule[d2].locked && schedule[d2].code !== "D") continue;
 
-    // Score: prefer days where others are NOT resting (staggering)
     let score = 0;
     for (const [id, grid] of Object.entries(state.grid)) {
       if (id === emp.id) continue;
       if (grid[d1]?.code === "D") score -= 10;
       if (grid[d2]?.code === "D") score -= 10;
     }
-
-    // Bonus for weekend rest for non-fixed roles
     const dow1 = periodDayOfWeekISO(state.input.period.startDate, d1);
-    if (dow1 === 5 || dow1 === 6) score += 3; // slight weekend preference variety
-
-    candidates.push({ days: [d1, d2], score });
+    if (dow1 === 5 || dow1 === 6) score += 3;
+    pairCandidates.push({ days: [d1, d2], score });
   }
 
-  // Also allow single days if no consecutive pair works
-  if (candidates.length === 0) {
+  if (pairCandidates.length === 0) {
     for (const d of weekDays) {
       if (!schedule[d].locked || schedule[d].code === "D") {
-        candidates.push({ days: [d], score: -50 }); // penalty for non-consecutive
+        pairCandidates.push({ days: [d], score: -50 });
       }
     }
   }
 
-  candidates.sort((a, b) => b.score - a.score);
-
-  if (candidates.length > 0) {
-    const best = candidates[0];
-    for (const d of best.days) {
+  pairCandidates.sort((a, b) => b.score - a.score);
+  if (pairCandidates.length > 0) {
+    for (const d of pairCandidates[0].days) {
       if (!schedule[d].locked) {
         assignCell(state, emp.id, d, "D", "engine", true);
       }
@@ -417,6 +450,135 @@ function ensureCoverage(
 }
 
 // ---------------------------------------------------------------------------
+// PHASE 6: Consolidate rest days (make consecutive for ROTA_COMPLETO)
+// ---------------------------------------------------------------------------
+
+/**
+ * After fillRemaining, ROTA_COMPLETO employees may have non-consecutive rest:
+ * - 1 pre-assigned rest (from phase 2)
+ * - 1+ forced rest from N→D pattern
+ *
+ * This phase:
+ * 1. Ensures ≥2 rest days per week (adds if N→D didn't create enough)
+ * 2. Tries to make rest days consecutive by swapping shifts within the week
+ */
+function consolidateRest(
+  state: SolverState,
+  hardConstraints: HardConstraint[],
+): void {
+  const weeks = getWeeks(state.input.period.totalDays);
+  const rotaEmps = state.input.employees.filter(e => e.rotationType === "ROTA_COMPLETO");
+
+  for (const emp of rotaEmps) {
+    for (const week of weeks) {
+      // Step 1: Ensure at least 2 rest days
+      ensureMinimumRest(state, emp.id, week);
+      // Step 2: Try to make them consecutive
+      makeRestConsecutive(state, emp.id, week, hardConstraints);
+    }
+  }
+}
+
+function isRestCode(code: string): boolean {
+  return !isWorkingShift(code);
+}
+
+function ensureMinimumRest(state: SolverState, empId: string, weekDays: number[]): void {
+  const schedule = state.grid[empId];
+  const restDays = weekDays.filter(d => isRestCode(schedule[d]?.code));
+
+  if (restDays.length >= 2) return;
+
+  // Need to add rest days — pick unlocked work days with lowest coverage impact
+  const workDays = weekDays
+    .filter(d => isWorkingShift(schedule[d]?.code) && !schedule[d]?.locked)
+    .map(d => {
+      // Score: prefer days where coverage is over-staffed and others are working
+      let score = 0;
+      for (const [id, grid] of Object.entries(state.grid)) {
+        if (id === empId) continue;
+        if (isRestCode(grid[d]?.code)) score -= 10; // others resting → bad to also rest
+      }
+      // Bonus for adjacency to existing rest
+      for (const r of restDays) {
+        if (Math.abs(d - r) === 1) score += 25;
+      }
+      return { day: d, score };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const needed = 2 - restDays.length;
+  for (let i = 0; i < Math.min(needed, workDays.length); i++) {
+    assignCell(state, empId, workDays[i].day, "D", "engine", false);
+  }
+}
+
+function makeRestConsecutive(
+  state: SolverState,
+  empId: string,
+  weekDays: number[],
+  hardConstraints: HardConstraint[],
+): void {
+  const schedule = state.grid[empId];
+  const restDays = weekDays.filter(d => isRestCode(schedule[d]?.code));
+
+  if (restDays.length < 2) return;
+
+  // Already consecutive?
+  for (let i = 0; i < restDays.length - 1; i++) {
+    if (restDays[i + 1] - restDays[i] === 1) return;
+  }
+
+  // Strategy: pick a rest day (preferring movable ones), find a work day
+  // adjacent to another rest day, and swap them.
+  //
+  // Example: rest on days [4, 7], work on day 5
+  // Swap: day 5 → D, day 7 → day5's old shift
+  // Result: rest on [4, 5] consecutive!
+
+  for (const anchorRest of restDays) {
+    // Find work days adjacent to this rest (potential new rest positions)
+    const adjacentWork = [anchorRest - 1, anchorRest + 1].filter(d =>
+      weekDays.includes(d) &&
+      isWorkingShift(schedule[d]?.code) &&
+      !schedule[d]?.locked
+    );
+
+    for (const newRestDay of adjacentWork) {
+      const shiftToMove = schedule[newRestDay].code;
+
+      // Find a non-adjacent rest day to receive this shift
+      const otherRests = restDays.filter(r =>
+        r !== anchorRest &&
+        Math.abs(r - anchorRest) > 1 && // not already adjacent
+        !schedule[r]?.locked
+      );
+
+      for (const targetDay of otherRests) {
+        // Check if shiftToMove is feasible at targetDay
+        // Temporarily unlock targetDay for the check
+        const wasLocked = schedule[targetDay].locked;
+        schedule[targetDay].locked = false;
+
+        const feasible = hardConstraints.every(hc =>
+          hc.isFeasible(state, empId, targetDay, shiftToMove)
+        );
+
+        if (!feasible) {
+          schedule[targetDay].locked = wasLocked;
+          continue;
+        }
+
+        // Do the swap: move shift from newRestDay → targetDay, make newRestDay rest
+        assignCell(state, empId, targetDay, shiftToMove, "engine");
+        assignCell(state, empId, newRestDay, "D", "engine", false);
+        return; // done for this week
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // PUBLIC: Build initial solution
 // ---------------------------------------------------------------------------
 
@@ -430,7 +592,7 @@ export function buildInitialSolution(
   // Phase 1: Anchor fixed roles + absences + hard petitions
   anchorFixed(state);
 
-  // Phase 2: Assign rest days (2 consecutive per week)
+  // Phase 2: Assign rest days (1 staggered for ROTA_COMPLETO, 2 consecutive for others)
   assignRestDays(state);
 
   // Phase 3a: GEX by occupancy
@@ -439,7 +601,10 @@ export function buildInitialSolution(
   // Phase 3b: Fill remaining with best feasible shift
   fillRemaining(state, hardConstraints, softConstraints);
 
-  // Phase 4: Ensure minimum coverage
+  // Phase 4: Consolidate rest (make consecutive for ROTA_COMPLETO)
+  consolidateRest(state, hardConstraints);
+
+  // Phase 5: Ensure minimum coverage
   ensureCoverage(state, hardConstraints, softConstraints);
 
   return state;

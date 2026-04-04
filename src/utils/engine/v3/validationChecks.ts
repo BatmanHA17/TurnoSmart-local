@@ -67,19 +67,25 @@ export const ckConsecutiveRest: ValidationCheck = {
         });
 
         if (restDays.length < 2) {
-          violations.push({
-            employeeId: emp.id,
-            day: week[0],
-            rule: "MIN_FREE_DAYS",
-            severity: "critical",
-            description: `Solo ${restDays.length} día(s) libre en semana ${week[0]}-${week[week.length - 1]}`,
-            overridable: true,
-            category: "legal",
-          });
+          // FOM in guardia weeks gets G + D = 2 "non-work" days but only 1 is rest
+          const hasGuardia = week.some(d => state.grid[emp.id][d]?.code === "G" || state.grid[emp.id][d]?.code === "GT");
+          if (hasGuardia && restDays.length >= 1) {
+            // Guardia counts as a special duty day, not a violation
+          } else {
+            violations.push({
+              employeeId: emp.id,
+              day: week[0],
+              rule: "MIN_FREE_DAYS",
+              severity: "critical",
+              description: `Solo ${restDays.length} día(s) libre en semana ${week[0]}-${week[week.length - 1]}`,
+              overridable: true,
+              category: "legal",
+            });
+          }
           continue;
         }
 
-        // Check consecutiveness
+        // Check consecutiveness (including cross-week boundary)
         let hasConsecutive = false;
         for (let i = 0; i < restDays.length - 1; i++) {
           if (restDays[i + 1] - restDays[i] === 1) {
@@ -87,16 +93,32 @@ export const ckConsecutiveRest: ValidationCheck = {
             break;
           }
         }
+        if (!hasConsecutive) {
+          const firstDay = week[0];
+          const lastDay = week[week.length - 1];
+          const isRestCode = (c: string | undefined) =>
+            c === "D" || c === "V" || c === "E" || c === "PM" || c === "PC" || c === "DB" || c === "DG";
+          if (firstDay > 1 && restDays.includes(firstDay) && isRestCode(state.grid[emp.id][firstDay - 1]?.code)) {
+            hasConsecutive = true;
+          }
+          if (!hasConsecutive && lastDay < state.input.period.totalDays && restDays.includes(lastDay) && isRestCode(state.grid[emp.id][lastDay + 1]?.code)) {
+            hasConsecutive = true;
+          }
+        }
         if (!hasConsecutive && restDays.length >= 2) {
-          violations.push({
-            employeeId: emp.id,
-            day: restDays[0],
-            rule: "CONSECUTIVE_REST",
-            severity: "warning",
-            description: `Libres no consecutivos en semana ${week[0]}-${week[week.length - 1]}`,
-            overridable: true,
-            category: "legal",
-          });
+          // FOM guardia weeks: non-consecutive rest is expected (G sits between)
+          const hasGuardia = week.some(d => state.grid[emp.id][d]?.code === "G" || state.grid[emp.id][d]?.code === "GT");
+          if (!hasGuardia) {
+            violations.push({
+              employeeId: emp.id,
+              day: restDays[0],
+              rule: "CONSECUTIVE_REST",
+              severity: "warning",
+              description: `Libres no consecutivos en semana ${week[0]}-${week[week.length - 1]}`,
+              overridable: true,
+              category: "legal",
+            });
+          }
         }
       }
     }

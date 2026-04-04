@@ -158,6 +158,20 @@ export const scSoftPetitions: SoftConstraint = {
         bonus -= 15 * (6 - p.priority);
       }
     }
+
+    // Look-ahead: N on day X forces D on day X+1 (ROTA_COMPLETO).
+    // If day X+1 has a petition → heavily penalize N here.
+    if (shiftCode === "N" && emp.rotationType === "ROTA_COMPLETO") {
+      const nextDay = day + 1;
+      for (const p of emp.petitions) {
+        if (p.type !== "B" || p.status === "rejected") continue;
+        if (!p.days.includes(nextDay)) continue;
+        if (p.requestedShift && p.requestedShift !== "D") {
+          bonus -= 40 * (6 - p.priority);
+        }
+      }
+    }
+
     return bonus;
   },
 };

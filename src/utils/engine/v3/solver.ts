@@ -167,16 +167,17 @@ function stateToOutput(
     }
   }
 
-  // DG accumulated
+  // DG accumulated: every 2 guardia days (12h+12h=24h) = 1 DG owed
   const dgAccumulated: Record<string, number> = {};
   for (const emp of state.input.employees) {
     if (emp.role !== "FOM") continue;
-    let dg = 0;
+    let guardiaCount = 0;
     for (let d = 1; d <= state.input.period.totalDays; d++) {
       if (state.grid[emp.id][d]?.code === "G" || state.grid[emp.id][d]?.code === "GT") {
-        dg++;
+        guardiaCount++;
       }
     }
+    const dg = Math.floor(guardiaCount / 2);
     if (dg > 0) dgAccumulated[emp.id] = dg;
   }
 

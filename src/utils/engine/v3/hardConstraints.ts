@@ -32,10 +32,10 @@ export const hc12hRest: HardConstraint = {
         if (violates12hRest(prev.code, shiftCode)) return false;
       }
     }
-    // Check next day (if already assigned)
+    // Check next day (if already assigned a working shift)
     if (day < state.input.period.totalDays) {
       const next = schedule[day + 1];
-      if (next && isWorkingShift(next.code) && next.locked) {
+      if (next && isWorkingShift(next.code)) {
         if (violates12hRest(shiftCode, next.code)) return false;
       }
     }
