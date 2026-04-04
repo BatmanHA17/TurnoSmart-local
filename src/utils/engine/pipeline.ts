@@ -1,8 +1,8 @@
 /**
- * TurnoSmart® — SMART Engine v2.0 — Pipeline
+ * TurnoSmart® — SMART Engine Pipeline
  *
- * Orquestador: ejecuta las 10 fases en secuencia.
- * Todas las 10 fases implementadas.
+ * v3.0: Constraint-based solver (default)
+ * v2.0: Legacy 10-phase pipeline (fallback)
  */
 
 import type {
@@ -12,6 +12,7 @@ import type {
   ScoreBreakdown,
 } from "./types";
 import { ENGINE_VERSION } from "./constants";
+import { runSolverV3 } from "./v3";
 
 // Phases
 import { resolveRoles } from "./phases/01-resolveRoles";
@@ -51,10 +52,19 @@ function lockSurvivingFixedShifts(ctx: PipelineContext): void {
 }
 
 /**
- * Ejecuta el pipeline completo del motor SMART v2.0.
- * Input → 10 fases → Output con schedules, violations, score.
+ * Ejecuta el motor SMART.
+ * v3.0: Constraint-based solver (default)
+ * v2.0: Legacy pipeline (fallback si useV3=false)
  */
-export function runPipeline(input: EngineInput): EngineOutput {
+export function runPipeline(input: EngineInput, useV3 = true): EngineOutput {
+  if (useV3) {
+    return runSolverV3(input);
+  }
+  return runPipelineV2(input);
+}
+
+/** Legacy v2.0 pipeline — 10 fases secuenciales */
+function runPipelineV2(input: EngineInput): EngineOutput {
   const startTime = performance.now();
 
   // Inicializar contexto
