@@ -235,10 +235,10 @@ function assignWeeklyRest(state: SolverState, emp: EngineEmployee, weekDays: num
     for (const d of weekDays) {
       if (schedule[d].locked) continue;
       let score = 0;
-      // Stagger: penalize days where others rest
+      // Stagger: penalize days where others have LOCKED rest (not init D)
       for (const [id, grid] of Object.entries(state.grid)) {
         if (id === emp.id) continue;
-        if (grid[d]?.code === "D") score -= 10;
+        if (grid[d]?.code === "D" && grid[d]?.locked) score -= 10;
       }
       // Avoid days with soft petitions (type B)
       const hasPetition = emp.petitions.some(p =>
@@ -269,8 +269,8 @@ function assignWeeklyRest(state: SolverState, emp: EngineEmployee, weekDays: num
     let score = 0;
     for (const [id, grid] of Object.entries(state.grid)) {
       if (id === emp.id) continue;
-      if (grid[d1]?.code === "D") score -= 10;
-      if (grid[d2]?.code === "D") score -= 10;
+      if (grid[d1]?.code === "D" && grid[d1]?.locked) score -= 10;
+      if (grid[d2]?.code === "D" && grid[d2]?.locked) score -= 10;
     }
     const dow1 = periodDayOfWeekISO(state.input.period.startDate, d1);
     if (dow1 === 5 || dow1 === 6) score += 3;
@@ -296,6 +296,132 @@ function assignWeeklyRest(state: SolverState, emp: EngineEmployee, weekDays: num
 }
 
 // ---------------------------------------------------------------------------
+// PHASE 2b: Night coverage rotation (seniority-based)
+// When Night Agent rests, assign those nights to ROTA_COMPLETO by seniority.
+// After 2 nights, the covering employee gets rest days (N→D hard constraint).
+// Rotates each week to the next employee by seniority for equity.
+// ---------------------------------------------------------------------------
+
+function assignNightCoverage(state: SolverState): void {
+  const weeks = getWeeks(state.input.period.totalDays);
+
+  // Find Night Agent
+  const nightAgent = state.input.employees.find(e => e.role === "NIGHT_SHIFT_AGENT");
+  if (!nightAgent) return;
+
+  // Get ROTA_COMPLETO employees sorted by seniority descending (highest first)
+  // Exclude FOM (never covers nights)
+  const rotaEmps = state.input.employees
+    .filter(e => e.rotationType === "ROTA_COMPLETO")
+    .sort((a, b) => b.seniorityLevel - a.seniorityLevel);
+
+  if (rotaEmps.length === 0) return;
+
+  // Track night coverage equity across the period
+  const nightCoverageCount = new Map<string, number>();
+  for (const emp of rotaEmps) nightCoverageCount.set(emp.id, 0);
+
+  for (const week of weeks) {
+    // Find days where Night Agent rests in this week
+    const nightAgentRestDays = week.filter(d => {
+      const code = state.grid[nightAgent.id][d]?.code;
+      return code === "D" || code === "V" || code === "E";
+    });
+
+    if (nightAgentRestDays.length === 0) continue;
+
+    // Pick the covering employee: round-robin by seniority, prefer who has
+    // done the fewest night coverages so far (breaks ties by seniority)
+    const sorted = [...rotaEmps].sort((a, b) => {
+      const aCov = nightCoverageCount.get(a.id) ?? 0;
+      const bCov = nightCoverageCount.get(b.id) ?? 0;
+      if (aCov !== bCov) return aCov - bCov; // fewer coverages first
+      return b.seniorityLevel - a.seniorityLevel; // higher seniority first
+    });
+
+    // Find an employee who can work these nights.
+    // Check sequentially (each N is checked after previous ones are assigned).
+    let assigned = false;
+    for (const emp of sorted) {
+      // Pre-check: no locked cells on coverage days
+      const daysBlocked = nightAgentRestDays.some(d => state.grid[emp.id][d].locked);
+      if (daysBlocked) continue;
+
+      // Pre-check: don't assign if forced rest after last N would override a petition
+      const lastCoverageNight = nightAgentRestDays[nightAgentRestDays.length - 1];
+      const restAfterDay = lastCoverageNight + 1;
+      if (restAfterDay <= state.input.period.totalDays) {
+        const hasPetitionOnRestDay = emp.petitions.some(p =>
+          p.status !== "rejected" && p.days.includes(restAfterDay) &&
+          p.requestedShift && p.requestedShift !== "D"
+        );
+        if (hasPetitionOnRestDay) continue;
+      }
+
+      // Try assigning N on each Night Agent rest day sequentially
+      const assignedDays: number[] = [];
+      let allFeasible = true;
+      for (const d of nightAgentRestDays) {
+        const feasible = ALL_HARD_CONSTRAINTS.every(hc => hc.isFeasible(state, emp.id, d, "N"));
+        if (!feasible) { allFeasible = false; break; }
+        assignCell(state, emp.id, d, "N", "engine", true);
+        assignedDays.push(d);
+      }
+
+      if (!allFeasible) {
+        // Rollback: undo partial assignments
+        for (const d of assignedDays) {
+          state.grid[emp.id][d] = {
+            code: "D", startTime: "00:00", endTime: "00:00",
+            hours: 0, locked: false, source: "engine",
+          };
+        }
+        continue;
+      }
+
+      // Assign rest day after the LAST night (N→non-N must be rest)
+      // N→N is allowed, so only the day after the last N needs forced rest
+      const lastNight = nightAgentRestDays[nightAgentRestDays.length - 1];
+      const restDay = lastNight + 1;
+      if (restDay <= state.input.period.totalDays && !state.grid[emp.id][restDay].locked) {
+        assignCell(state, emp.id, restDay, "D", "engine", true);
+      }
+
+      // Update night coverage equity
+      nightCoverageCount.set(emp.id, (nightCoverageCount.get(emp.id) ?? 0) + nightAgentRestDays.length);
+      const eq = state.equity.get(emp.id);
+      if (eq) eq.nightCoverage += nightAgentRestDays.length;
+
+      assigned = true;
+      break;
+    }
+
+    // If no single employee can cover all nights, split across employees
+    if (!assigned) {
+      for (const d of nightAgentRestDays) {
+        for (const emp of sorted) {
+          const cell = state.grid[emp.id][d];
+          if (cell.locked) continue;
+          const feasible = ALL_HARD_CONSTRAINTS.every(hc => hc.isFeasible(state, emp.id, d, "N"));
+          if (!feasible) continue;
+
+          assignCell(state, emp.id, d, "N", "engine", true);
+          // Rest after this single N
+          const nextDay = d + 1;
+          if (nextDay <= state.input.period.totalDays && !state.grid[emp.id][nextDay].locked) {
+            assignCell(state, emp.id, nextDay, "D", "engine", true);
+          }
+          nightCoverageCount.set(emp.id, (nightCoverageCount.get(emp.id) ?? 0) + 1);
+          const eq = state.equity.get(emp.id);
+          if (eq) eq.nightCoverage++;
+          break;
+        }
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // PHASE 3: Fill remaining cells with best feasible shift
 // ---------------------------------------------------------------------------
 
@@ -313,13 +439,23 @@ function fillRemaining(
 
   // Day-first loop: ensures coverage state is up-to-date when scoring each employee
   for (let d = 1; d <= totalDays; d++) {
+    // Pre-compute N coverage for this day — don't pile extra Ns when already met
+    const nCoverage = countCoverageOnDay(state.grid, d, "N");
+    const nNeeded = state.input.constraints.minCoveragePerShift.N ?? 1;
+
     for (const emp of fillableEmps) {
       const cell = state.grid[emp.id][d];
       if (cell.locked) continue;
       if (isWorkingShift(cell.code)) continue; // already assigned a working shift
 
       // Get candidate shifts for this role
-      const candidates = getCandidateShifts(emp);
+      let candidates = getCandidateShifts(emp);
+
+      // Filter out N when night coverage is already met (night rotation handles N assignments)
+      if (nCoverage >= nNeeded) {
+        candidates = candidates.filter(c => c !== "N");
+      }
+
       const best = pickBestShift(state, emp.id, d, candidates, hardConstraints, softConstraints);
 
       if (best) {
@@ -418,22 +554,24 @@ function ensureCoverage(
 ): void {
   const totalDays = state.input.period.totalDays;
   const minCov = state.input.constraints.minCoveragePerShift;
+  const absenceCodes = new Set(["V", "E", "PM", "PC", "DB", "DG", "F"]);
 
   for (let d = 1; d <= totalDays; d++) {
     for (const shift of ["M", "T", "N"] as const) {
       const needed = minCov[shift] ?? 1;
-      const current = countCoverageOnDay(state.grid, d, shift);
+      let current = countCoverageOnDay(state.grid, d, shift);
 
       if (current >= needed) continue;
 
-      // Find employees who can fill this gap
       const gap = needed - current;
+
+      // Pass 1: try unlocked rest cells
       const candidates = state.input.employees
         .filter(e => {
           if (e.role === "FOM" || e.role === "AFOM" || e.role === "NIGHT_SHIFT_AGENT" || e.role === "GEX") return false;
           const cell = state.grid[e.id][d];
           if (cell.locked) return false;
-          if (isWorkingShift(cell.code)) return false; // already working another shift
+          if (isWorkingShift(cell.code)) return false;
           return hardConstraints.every(hc => hc.isFeasible(state, e.id, d, shift));
         })
         .map(e => ({
@@ -442,8 +580,39 @@ function ensureCoverage(
         }))
         .sort((a, b) => b.score - a.score);
 
+      let filled = 0;
       for (let i = 0; i < Math.min(gap, candidates.length); i++) {
         assignCell(state, candidates[i].id, d, shift, "coverage");
+        filled++;
+      }
+
+      // Pass 2: if still short, try locked REST days (not absences/night coverage)
+      if (filled < gap) {
+        const remaining = gap - filled;
+        const lockedCandidates = state.input.employees
+          .filter(e => {
+            if (e.role === "FOM" || e.role === "AFOM" || e.role === "NIGHT_SHIFT_AGENT" || e.role === "GEX") return false;
+            const cell = state.grid[e.id][d];
+            if (!cell.locked) return false; // already tried unlocked
+            if (absenceCodes.has(cell.code)) return false; // don't override absences
+            if (cell.code !== "D") return false; // only override rest days
+            if (cell.source === "petition_a") return false; // don't override hard petitions
+            // Temporarily unlock for feasibility check
+            cell.locked = false;
+            const feasible = hardConstraints.every(hc => hc.isFeasible(state, e.id, d, shift));
+            cell.locked = true;
+            return feasible;
+          })
+          .map(e => ({
+            id: e.id,
+            score: softConstraints.reduce((s, sc) => s + sc.score(state, e.id, d, shift) * sc.weight, 0),
+          }))
+          .sort((a, b) => b.score - a.score);
+
+        for (let i = 0; i < Math.min(remaining, lockedCandidates.length); i++) {
+          state.grid[lockedCandidates[i].id][d].locked = false;
+          assignCell(state, lockedCandidates[i].id, d, shift, "coverage");
+        }
       }
     }
   }
@@ -489,15 +658,26 @@ function ensureMinimumRest(state: SolverState, empId: string, weekDays: number[]
 
   if (restDays.length >= 2) return;
 
+  const minCov = state.input.constraints.minCoveragePerShift;
+
   // Need to add rest days — pick unlocked work days with lowest coverage impact
   const workDays = weekDays
     .filter(d => isWorkingShift(schedule[d]?.code) && !schedule[d]?.locked)
     .map(d => {
-      // Score: prefer days where coverage is over-staffed and others are working
       let score = 0;
+      // Heavy penalty for days where removing this employee drops below minimum coverage
+      const shiftCat = schedule[d]?.code === "M" || schedule[d]?.code === "9x17" || schedule[d]?.code === "11x19" ? "M"
+        : schedule[d]?.code === "T" || schedule[d]?.code === "12x20" ? "T"
+        : schedule[d]?.code === "N" ? "N" : null;
+      if (shiftCat) {
+        const current = countCoverageOnDay(state.grid, d, shiftCat as "M" | "T" | "N");
+        const needed = minCov[shiftCat as "M" | "T" | "N"] ?? 1;
+        if (current <= needed) score -= 50; // at or below minimum → very bad to remove
+      }
+      // Prefer days where others are working (not resting)
       for (const [id, grid] of Object.entries(state.grid)) {
         if (id === empId) continue;
-        if (isRestCode(grid[d]?.code)) score -= 10; // others resting → bad to also rest
+        if (isRestCode(grid[d]?.code)) score -= 10;
       }
       // Bonus for adjacency to existing rest
       for (const r of restDays) {
@@ -536,6 +716,8 @@ function makeRestConsecutive(
   // Swap: day 5 → D, day 7 → day5's old shift
   // Result: rest on [4, 5] consecutive!
 
+  const minCov = state.input.constraints.minCoveragePerShift;
+
   for (const anchorRest of restDays) {
     // Find work days adjacent to this rest (potential new rest positions)
     const adjacentWork = [anchorRest - 1, anchorRest + 1].filter(d =>
@@ -547,6 +729,16 @@ function makeRestConsecutive(
     for (const newRestDay of adjacentWork) {
       const shiftToMove = schedule[newRestDay].code;
 
+      // Don't remove this shift if coverage would drop below minimum
+      const shiftCat = shiftToMove === "M" || shiftToMove === "9x17" || shiftToMove === "11x19" ? "M"
+        : shiftToMove === "T" || shiftToMove === "12x20" ? "T"
+        : shiftToMove === "N" ? "N" : null;
+      if (shiftCat) {
+        const current = countCoverageOnDay(state.grid, newRestDay, shiftCat as "M" | "T" | "N");
+        const needed = minCov[shiftCat as "M" | "T" | "N"] ?? 1;
+        if (current <= needed) continue; // would create coverage gap
+      }
+
       // Find a non-adjacent rest day to receive this shift
       const otherRests = restDays.filter(r =>
         r !== anchorRest &&
@@ -556,7 +748,6 @@ function makeRestConsecutive(
 
       for (const targetDay of otherRests) {
         // Check if shiftToMove is feasible at targetDay
-        // Temporarily unlock targetDay for the check
         const wasLocked = schedule[targetDay].locked;
         schedule[targetDay].locked = false;
 
@@ -594,6 +785,9 @@ export function buildInitialSolution(
 
   // Phase 2: Assign rest days (1 staggered for ROTA_COMPLETO, 2 consecutive for others)
   assignRestDays(state);
+
+  // Phase 2b: Night coverage rotation (seniority-based)
+  assignNightCoverage(state);
 
   // Phase 3a: GEX by occupancy
   assignGEX(state);

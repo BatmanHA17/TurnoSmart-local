@@ -39,7 +39,7 @@ const employees: EngineEmployee[] = [
   },
   {
     id: "fda-1", name: "FDA 1", role: "FRONT_DESK_AGENT", rotationType: "ROTA_COMPLETO",
-    seniorityLevel: 1, weeklyHours: 40, contractUnits: 1,
+    seniorityLevel: 3, weeklyHours: 40, contractUnits: 1,
     absences: [], petitions: [
       { id: "p1", employeeId: "fda-1", type: "B", days: [5], requestedShift: "M", status: "approved", priority: 2 },
     ],
@@ -47,7 +47,7 @@ const employees: EngineEmployee[] = [
   },
   {
     id: "fda-2", name: "FDA 2", role: "FRONT_DESK_AGENT", rotationType: "ROTA_COMPLETO",
-    seniorityLevel: 1, weeklyHours: 40, contractUnits: 1,
+    seniorityLevel: 2, weeklyHours: 40, contractUnits: 1,
     absences: [{ day: 10, code: "V" }, { day: 11, code: "V" }],
     petitions: [],
     equityBalance: { ...emptyEquity },

@@ -13,7 +13,7 @@ import {
   SHIFT_UNDESIRABILITY, ERGONOMIC_SEQUENCE, FOM_AFOM_MIRROR,
 } from "../constants";
 import {
-  isWorkingShift, periodDayOfWeekISO,
+  isWorkingShift, periodDayOfWeekISO, violates12hRest,
 } from "../helpers";
 import { countCoverageOnDay, shiftToCoverageCategory } from "./coverageHelper";
 
@@ -99,10 +99,10 @@ export const scCoverageBonus: SoftConstraint = {
 
     // Under minimum → strong bonus
     if (current < needed) return 25;
-    // At minimum → small bonus
-    if (current === needed) return 5;
-    // Over minimum → no bonus (maybe slight penalty for overcoverage)
-    return -2;
+    // At minimum → neutral for N (night rotation handles it), small bonus for M/T
+    if (current === needed) return coverageShift === "N" ? 0 : 5;
+    // Over minimum → penalty (stronger for N to protect seniority rotation)
+    return coverageShift === "N" ? -25 : -2;
   },
 };
 
@@ -140,7 +140,7 @@ export const scWeekendEquity: SoftConstraint = {
 export const scSoftPetitions: SoftConstraint = {
   id: "SC_PETITIONS",
   name: "Peticiones blandas",
-  weight: 1,
+  weight: 2,
   score(state, empId, day, shiftCode) {
     const emp = state.employees.get(empId);
     if (!emp) return 0;
@@ -159,14 +159,20 @@ export const scSoftPetitions: SoftConstraint = {
       }
     }
 
-    // Look-ahead: N on day X forces D on day X+1 (ROTA_COMPLETO).
-    // If day X+1 has a petition → heavily penalize N here.
-    if (shiftCode === "N" && emp.rotationType === "ROTA_COMPLETO") {
+    // Look-ahead: penalize shifts that would block a petition on the next day.
+    // T→M violates 12h rest, N forces rest day — detect all such conflicts.
+    if (isWorkingShift(shiftCode) && emp.rotationType === "ROTA_COMPLETO") {
       const nextDay = day + 1;
       for (const p of emp.petitions) {
         if (p.type !== "B" || p.status === "rejected") continue;
         if (!p.days.includes(nextDay)) continue;
-        if (p.requestedShift && p.requestedShift !== "D") {
+        if (!p.requestedShift) continue;
+        // N forces rest → any non-D petition is blocked
+        if (shiftCode === "N" && p.requestedShift !== "D") {
+          bonus -= 40 * (6 - p.priority);
+        }
+        // Any shift that violates 12h rest with tomorrow's petition
+        else if (p.requestedShift !== "D" && violates12hRest(shiftCode, p.requestedShift)) {
           bonus -= 40 * (6 - p.priority);
         }
       }

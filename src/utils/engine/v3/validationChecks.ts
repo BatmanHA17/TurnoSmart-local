@@ -207,7 +207,8 @@ export const ckNightRest: ValidationCheck = {
       for (let d = 1; d < total; d++) {
         if (state.grid[emp.id][d]?.code === "N") {
           const next = state.grid[emp.id][d + 1]?.code;
-          if (next && isWorkingShift(next)) {
+          // N→N is allowed (16h gap), only N→M/T/etc is a violation
+          if (next && isWorkingShift(next) && next !== "N") {
             violations.push({
               employeeId: emp.id,
               day: d,

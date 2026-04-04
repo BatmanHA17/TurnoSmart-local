@@ -55,16 +55,32 @@ export const hcNightThenRest: HardConstraint = {
 
     const schedule = state.grid[empId];
 
-    // If assigning N: check that next day is not already a working shift
+    // If assigning N: check that next day is not already a non-N working shift
+    // N→N is allowed (16h gap between 07:00 end and 23:00 start)
     if (shiftCode === "N" && day < state.input.period.totalDays) {
       const next = schedule[day + 1];
-      if (next && isWorkingShift(next.code)) return false;
+      if (next && isWorkingShift(next.code) && next.code !== "N") return false;
     }
 
-    // If assigning a working shift (including N): check that previous day was not N
-    if (isWorkingShift(shiftCode) && day > 1) {
+    // If assigning a non-N working shift: check that previous day was not N
+    // N→N is allowed, but N→M/T/etc is not
+    if (isWorkingShift(shiftCode) && shiftCode !== "N" && day > 1) {
       const prev = schedule[day - 1];
       if (prev && prev.code === "N") return false;
+    }
+
+    // Max 2 consecutive Ns for ROTA_COMPLETO (night coverage block only)
+    if (shiftCode === "N" && emp.rotationType === "ROTA_COMPLETO") {
+      let consec = 1; // counting this assignment
+      for (let d = day - 1; d >= 1; d--) {
+        if (schedule[d]?.code === "N") consec++;
+        else break;
+      }
+      for (let d = day + 1; d <= state.input.period.totalDays; d++) {
+        if (schedule[d]?.code === "N") consec++;
+        else break;
+      }
+      if (consec > 2) return false;
     }
 
     return true;
