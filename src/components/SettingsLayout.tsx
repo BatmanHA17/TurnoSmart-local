@@ -3,7 +3,8 @@ import { MainLayout } from "@/components/MainLayout";
 import {
   Briefcase,
   FileText,
-  Building2
+  Building2,
+  Brain
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,12 @@ const settingsNavigation = [
         label: "Convenio colectivo",
         icon: FileText,
         path: "/config/convenio"
+      },
+      {
+        id: "criterios",
+        label: "Criterios SMART",
+        icon: Brain,
+        path: "/config/criterios"
       }
     ]
   }

@@ -76,48 +76,9 @@ export function runPipeline(input: EngineInput): EngineOutput {
 
   // Ejecutar las 10 fases en secuencia
   ctx = resolveRoles(ctx);      // 01
-
-  // DEBUG: Role groups after Phase 01
-  console.log("[SMART DEBUG] === Phase 01 resolveRoles ===");
-  console.log(`[SMART DEBUG] FIJO_NO_ROTA: ${ctx.roleGroups.FIJO_NO_ROTA.map(e => `${e.name}(${e.role})`).join(", ")}`);
-  console.log(`[SMART DEBUG] COBERTURA: ${ctx.roleGroups.COBERTURA.map(e => `${e.name}(${e.role})`).join(", ")}`);
-  console.log(`[SMART DEBUG] ROTA_PARCIAL: ${ctx.roleGroups.ROTA_PARCIAL.map(e => `${e.name}(${e.role})`).join(", ")}`);
-  console.log(`[SMART DEBUG] ROTA_COMPLETO: ${ctx.roleGroups.ROTA_COMPLETO.map(e => `${e.name}(${e.role})`).join(", ")}`);
-
   ctx = loadContinuity(ctx);    // 02
   ctx = anchorFixed(ctx);       // 03
-
-  // DEBUG: Night Agent after Phase 03
-  for (const na of ctx.roleGroups.FIJO_NO_ROTA.filter(e => e.role === "NIGHT_SHIFT_AGENT")) {
-    const shifts = Object.entries(ctx.grid[na.id] || {}).map(([d, cell]) => `d${d}:${cell.code}${cell.locked ? "🔒" : ""}`).join(" ");
-    console.log(`[SMART DEBUG] Night Agent ${na.name} after Phase 03: ${shifts}`);
-  }
-
   ctx = assignRestDays(ctx);    // 04
-
-  // DEBUG: Rest days per week after Phase 04
-  console.log("[SMART DEBUG] === Phase 04 assignRestDays ===");
-  for (const emp of input.employees) {
-    const schedule = ctx.grid[emp.id];
-    if (!schedule) continue;
-    const totalDays = input.period.totalDays;
-    for (let w = 0; w < Math.ceil(totalDays / 7); w++) {
-      const start = w * 7 + 1;
-      const end = Math.min(start + 6, totalDays);
-      let restCount = 0;
-      let workCount = 0;
-      const dayCodes: string[] = [];
-      for (let d = start; d <= end; d++) {
-        const cell = schedule[d];
-        if (cell?.code === "D" || cell?.code === "V" || cell?.code === "E") restCount++;
-        else if (cell?.code && cell.code !== "D") workCount++;
-        dayCodes.push(`${cell?.code ?? "?"}${cell?.locked ? "🔒" : ""}`);
-      }
-      if (restCount !== 2) {
-        console.log(`[SMART DEBUG] ⚠️ ${emp.name} week${w+1}: ${restCount} rests (expected 2) | ${dayCodes.join(" ")}`);
-      }
-    }
-  }
 
   // Post-Phase04: lockear turnos fijos de FOM/AFOM/Night que Phase 04 NO convirtió a D
   // Esto previene que Phase 05/06 sobreescriban turnos fijos
@@ -125,29 +86,6 @@ export function runPipeline(input: EngineInput): EngineOutput {
 
   ctx = assignGEX(ctx);         // 05
   ctx = assignRotating(ctx);    // 06
-
-  // DEBUG: Working days per week after Phase 06
-  console.log("[SMART DEBUG] === Phase 06 assignRotating ===");
-  for (const emp of input.employees) {
-    const schedule = ctx.grid[emp.id];
-    if (!schedule) continue;
-    const totalDays = input.period.totalDays;
-    for (let w = 0; w < Math.ceil(totalDays / 7); w++) {
-      const start = w * 7 + 1;
-      const end = Math.min(start + 6, totalDays);
-      let workCount = 0;
-      const dayCodes: string[] = [];
-      for (let d = start; d <= end; d++) {
-        const cell = schedule[d];
-        if (cell?.code && cell.code !== "D" && cell.code !== "V" && cell.code !== "E") workCount++;
-        dayCodes.push(`${cell?.code ?? "?"}${cell?.locked ? "🔒" : ""}`);
-      }
-      if (workCount < 5) {
-        console.log(`[SMART DEBUG] ⚠️ ${emp.name} week${w+1}: only ${workCount} work days | ${dayCodes.join(" ")}`);
-      }
-    }
-  }
-
   ctx = ensureCoverage(ctx);    // 07
   ctx = applyPetitions(ctx);    // 08 (no-op MVP)
   ctx = audit(ctx);             // 09

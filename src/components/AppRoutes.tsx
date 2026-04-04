@@ -63,6 +63,7 @@ const SettingsLayout = React.lazy(() =>
 );
 const JobsSettings = React.lazy(() => import("@/pages/JobsSettings"));
 const CollectiveAgreementSettings = React.lazy(() => import("@/pages/CollectiveAgreementSettings"));
+const CriteriosSmartPage = React.lazy(() => import("@/pages/CriteriosSmartPage"));
 
 // Admin
 const AdminDashboard = React.lazy(() => import("@/pages/AdminDashboard"));
@@ -169,6 +170,7 @@ export const AppRoutes = () => {
             <Route index element={<Navigate to="/config/jobs" replace />} />
             <Route path="jobs" element={<JobsSettings />} />
             <Route path="convenio" element={<CollectiveAgreementSettings />} />
+            <Route path="criterios" element={<CriteriosSmartPage />} />
           </Route>
 
           {/* ═══ 9. Admin ═══ */}
