@@ -1482,7 +1482,7 @@ export function BiWeeklyCalendarView({ approvedRequests = [] }: BiWeeklyCalendar
                           <div className="space-y-0">
                             <div 
                               className="text-[10px] sm:text-[11px] font-medium text-foreground truncate cursor-pointer hover:text-primary"
-                              onClick={() => navigate(`/colaboradores/${employee.id}/profile`)}
+                              onClick={() => navigate(`/equipo/${employee.id}/profile`)}
                             >
                               {employee.name}
                             </div>

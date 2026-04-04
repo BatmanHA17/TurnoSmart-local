@@ -30,7 +30,7 @@ export default function LegacyTabRedirect() {
 
   if (!tab) {
     // No tab param, redirect to default profile
-    return <Navigate to={`/colaboradores/${id}/profile`} replace />;
+    return <Navigate to={`/equipo/${id}/profile`} replace />;
   }
 
   const canonicalRoute = tabMapping[tab] || 'profile';
@@ -39,5 +39,5 @@ export default function LegacyTabRedirect() {
   useEffect(() => {
   }, [tab, id, canonicalRoute]);
 
-  return <Navigate to={`/colaboradores/${id}/${canonicalRoute}`} replace />;
+  return <Navigate to={`/equipo/${id}/${canonicalRoute}`} replace />;
 }

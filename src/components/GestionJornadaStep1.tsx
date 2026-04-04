@@ -1159,7 +1159,7 @@ export const GestionJornadaStep1 = ({ onClose, editMode = false, existingPeriod 
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <button
-                                    onClick={() => navigate(`/colaboradores/${employeeId}`)}
+                                    onClick={() => navigate(`/equipo/${employeeId}`)}
                                     className="text-orange-600 hover:text-orange-800 hover:underline text-sm font-medium"
                                   >
                                     {employeeId}

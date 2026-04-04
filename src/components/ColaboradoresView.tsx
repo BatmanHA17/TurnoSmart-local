@@ -551,7 +551,7 @@ export const ColaboradoresView = () => {
           )}
           {canEdit && (
             <Button
-              onClick={() => navigate('/colaboradores/new')}
+              onClick={() => navigate('/equipo/new')}
               className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
             >
               <Plus className="h-4 w-4" />
@@ -761,7 +761,7 @@ export const ColaboradoresView = () => {
                               return;
                             }
                           }
-                          navigate(`/colaboradores/${colaborador.id}`);
+                          navigate(`/equipo/${colaborador.id}`);
                         }}
                       >
                         {colaborador.nombre} {colaborador.apellidos}

@@ -119,7 +119,7 @@ export function DayEmployeeList({
                       }`}
                       onClick={() => {
                         if (canEdit || (employee.email === user?.email)) {
-                          navigate(`/colaboradores/${employee.id}`);
+                          navigate(`/equipo/${employee.id}`);
                         }
                       }}
                       title={canEdit ? "Ver perfil del colaborador" : ""}
@@ -191,7 +191,7 @@ export function DayEmployeeList({
                         return;
                       }
                       
-                      navigate(`/colaboradores/${employee.id}/absences`);
+                      navigate(`/equipo/${employee.id}/absences`);
                     }}
                     title={canEdit || employee.email === user?.email 
                       ? "Ver compensación de horas extras" 

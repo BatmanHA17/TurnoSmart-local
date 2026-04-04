@@ -259,11 +259,11 @@ export function EmployeeScheduleView() {
   };
 
   const navigateToColaborador = (employeeId: string) => {
-    navigate(`/colaboradores/${employeeId}`);
+    navigate(`/equipo/${employeeId}`);
   };
 
   const navigateToAbsences = (employeeId: string) => {
-    navigate(`/colaboradores/${employeeId}/absences`);
+    navigate(`/equipo/${employeeId}/absences`);
   };
 
   const removeEmployee = (employeeId: string, employeeName: string) => {

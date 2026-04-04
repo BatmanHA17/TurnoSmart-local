@@ -381,7 +381,7 @@ export function AttendanceCalendarView() {
                           className="text-[10px] sm:text-[11px] font-medium text-foreground truncate cursor-pointer hover:text-primary"
                           onClick={() =>
                             navigate(
-                              `/colaboradores/${employee.id}/profile`
+                              `/equipo/${employee.id}/profile`
                             )
                           }
                         >

@@ -3348,7 +3348,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
                                  }
                                  
                                  // Navegar directamente a la página del colaborador, tab de vacaciones-ausencias usando navigate
-                                 navigate(`/colaboradores/${employee.id}/absences`);
+                                 navigate(`/equipo/${employee.id}/absences`);
                                }}
                                title={canEdit || colaboradores.find(c => c.id === employee.id)?.email === user?.email 
                                  ? "Ver compensación de horas extras" 

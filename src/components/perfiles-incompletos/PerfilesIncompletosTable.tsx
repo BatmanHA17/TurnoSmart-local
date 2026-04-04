@@ -127,7 +127,7 @@ export function PerfilesIncompletosTable({ className }: PerfilesIncompletosTable
   }, [colaboradores, sortField, sortDirection]);
 
   const handleColaboradorClick = (colaboradorId: string) => {
-    navigate(`/colaboradores/${colaboradorId}`);
+    navigate(`/equipo/${colaboradorId}`);
   };
 
   const formatDate = (dateString: string | null) => {

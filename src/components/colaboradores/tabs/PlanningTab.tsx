@@ -332,7 +332,7 @@ export default function PlanningTab() {
                   variant="ghost"
                   size="sm"
                   className="text-primary hover:text-primary/80"
-                  onClick={() => navigate(`/colaboradores/${colaborador?.id}/tiempo-trabajo`)}
+                  onClick={() => navigate(`/equipo/${colaborador?.id}/tiempo-trabajo`)}
                 >
                   <FileText className="w-4 h-4 mr-1" />
                   Ver Historial

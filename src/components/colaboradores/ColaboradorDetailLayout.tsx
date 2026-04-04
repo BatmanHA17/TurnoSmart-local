@@ -153,13 +153,10 @@ export default function ColaboradorDetailLayout() {
               { to: 'contract', label: 'Contratos' },
               { to: 'planning', label: 'Tiempo y planificación' },
               { to: 'absences', label: 'Vacaciones y Ausencias' },
-              { to: 'permissions', label: 'Rol y Permisos' },
-              { to: 'nominas', label: 'Nóminas' },
-              ...(isAdmin ? [{ to: 'system', label: 'Sistema & Usuarios' }] : []),
             ].map(tab => (
               <NavLink
                 key={tab.to}
-                to={`/colaboradores/${id}/${tab.to}`}
+                to={`/equipo/${id}/${tab.to}`}
                 className={({ isActive }) =>
                   `shrink-0 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                     isActive

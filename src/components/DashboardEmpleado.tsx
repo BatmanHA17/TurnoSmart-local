@@ -56,7 +56,7 @@ export const DashboardEmpleado = () => {
         return;
       }
 
-      navigate(`/colaboradores/${colaborador.id}/profile`);
+      navigate(`/equipo/${colaborador.id}/profile`);
     } catch (error) {
       toast({
         title: "Error inesperado",
