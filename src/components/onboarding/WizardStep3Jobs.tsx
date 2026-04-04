@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Briefcase, Plus, Trash2, Clock, Users, ChevronDown, ChevronUp } from 'lucide-react';
+import { Briefcase, Plus, Trash2, Clock, Users, ChevronDown, ChevronUp, Cog } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -10,8 +10,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { JobData, DepartmentData } from '@/hooks/useOnboardingWizard';
 import { CONTRACT_HOURS } from './wizardTemplates';
+
+const ENGINE_ROLE_OPTIONS = [
+  { value: 'ROTA_COMPLETO', label: 'Rotación', shortLabel: 'Rota', description: 'Rota entre todos los turnos' },
+  { value: 'ROTA_PARCIAL', label: 'Parcial', shortLabel: 'Parc', description: 'Solo rota en ciertos turnos' },
+  { value: 'FIJO_NO_ROTA', label: 'Fijo', shortLabel: 'Fijo', description: 'Turno fijo, no rota' },
+  { value: 'COBERTURA', label: 'Cobertura', shortLabel: 'Cob', description: 'Cubre ausencias de otros' },
+  { value: 'CUSTOM', label: 'Custom', shortLabel: 'Cust', description: 'Configuración personalizada' },
+] as const;
 
 interface WizardStep3JobsProps {
   jobs: JobData[];
@@ -21,6 +30,7 @@ interface WizardStep3JobsProps {
   onRemove: (id: string) => void;
   onUpdateHours: (id: string, hours: number) => void;
   onUpdateHeadcount: (id: string, headcount: number) => void;
+  onUpdateEngineRole?: (id: string, engineRole: string) => void;
   onNext: () => void;
   onBack: () => void;
 }
@@ -33,6 +43,7 @@ export const WizardStep3Jobs: React.FC<WizardStep3JobsProps> = ({
   onRemove,
   onUpdateHours,
   onUpdateHeadcount,
+  onUpdateEngineRole,
   onNext,
   onBack,
 }) => {
@@ -170,6 +181,39 @@ export const WizardStep3Jobs: React.FC<WizardStep3JobsProps> = ({
                           </SelectContent>
                         </Select>
                       </div>
+
+                      {/* Engine Role */}
+                      {onUpdateEngineRole && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-1">
+                                <Cog className="w-3.5 h-3.5 text-muted-foreground" />
+                                <Select
+                                  value={job.engine_role || 'ROTA_COMPLETO'}
+                                  onValueChange={(value) => onUpdateEngineRole(job.id, value)}
+                                >
+                                  <SelectTrigger className="w-[90px] h-7 text-xs px-2">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {ENGINE_ROLE_OPTIONS.map((opt) => (
+                                      <SelectItem key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                              <p className="text-xs">
+                                {ENGINE_ROLE_OPTIONS.find(o => o.value === (job.engine_role || 'ROTA_COMPLETO'))?.description || 'Tipo de rotación en turnos'}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                     </>
                   )}
 

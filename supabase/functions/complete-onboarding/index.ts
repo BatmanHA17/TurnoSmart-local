@@ -22,6 +22,7 @@ interface JobData {
   hours: number;
   headcount: number;
   selected: boolean;
+  engine_role?: string;
 }
 
 serve(async (req) => {

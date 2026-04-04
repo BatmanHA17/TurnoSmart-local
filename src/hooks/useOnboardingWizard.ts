@@ -155,6 +155,15 @@ export const useOnboardingWizard = () => {
     }));
   }, []);
 
+  const updateJobEngineRole = useCallback((id: string, engine_role: string) => {
+    setState(prev => ({
+      ...prev,
+      jobs: prev.jobs.map(job =>
+        job.id === id ? { ...job, engine_role } : job
+      ),
+    }));
+  }, []);
+
   const removeJob = useCallback((id: string) => {
     setState(prev => ({
       ...prev,
@@ -202,6 +211,7 @@ export const useOnboardingWizard = () => {
     updateJobHours,
     removeJob,
     updateJobHeadcount,
+    updateJobEngineRole,
     setLoading,
     setError,
     setComplete,

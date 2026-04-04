@@ -32,6 +32,7 @@ const OnboardingWizard: React.FC = () => {
     updateJobHours,
     updateJobHeadcount,
     removeJob,
+    updateJobEngineRole,
     setLoading,
     setError,
     getSelectedDepartments,
@@ -156,6 +157,7 @@ const OnboardingWizard: React.FC = () => {
               onRemove={removeJob}
               onUpdateHours={updateJobHours}
               onUpdateHeadcount={updateJobHeadcount}
+              onUpdateEngineRole={updateJobEngineRole}
               onNext={nextStep}
               onBack={prevStep}
             />
