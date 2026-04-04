@@ -1,134 +1,27 @@
 import { Outlet, useLocation, NavLink, Navigate } from "react-router-dom";
 import { MainLayout } from "@/components/MainLayout";
-import { 
-  Building2, 
-  FileText, 
-  BarChart3, 
-  FileStack, 
-  Settings as SettingsIcon, 
-  Bell, 
-  Gift, 
-  Plane, 
-  UserCheck, 
-  Clock, 
-  Zap, 
-  Shield 
+import {
+  Briefcase,
+  FileText,
+  Building2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const settingsNavigation = [
   {
-    title: "Información del establecimiento",
+    title: "Configuración",
     items: [
-      {
-        id: "contact",
-        label: "Información de la cuenta",
-        icon: Building2,
-        path: "/settings/contact"
-      },
-      {
-        id: "collective-agreement",
-        label: "Convenio colectivo",
-        icon: FileText,
-        path: "/settings/collective-agreement"
-      },
-      {
-        id: "productivity",
-        label: "Productividad",
-        icon: BarChart3,
-        path: "/settings/productivity"
-      }
-    ]
-  },
-  {
-    title: "Planificación",
-    items: [
-      {
-        id: "locations",
-        label: "Establecimientos y Rotas",
-        icon: Building2,
-        path: "/settings/locations"
-      },
-      {
-        id: "print",
-        label: "Impresión",
-        icon: FileStack,
-        path: "/settings/print"
-      },
-      {
-        id: "preferences",
-        label: "Preferencias",
-        icon: SettingsIcon,
-        path: "/settings/preferences"
-      },
-      {
-        id: "notifications",
-        label: "Notificaciones SMS",
-        icon: Bell,
-        path: "/settings/notifications"
-      }
-    ]
-  },
-  {
-    title: "Gestión",
-    items: [
-      {
-        id: "wage-analysis",
-        label: "Análisis de la Rota",
-        icon: BarChart3,
-        path: "/settings/wage-analysis"
-      },
-      {
-        id: "payment-preferences",
-        label: "Prenómina",
-        icon: Gift,
-        path: "/settings/payment-preferences"
-      },
-      {
-        id: "timeoff-rules",
-        label: "Vacaciones",
-        icon: Plane,
-        path: "/settings/timeoff-rules"
-      },
-      {
-        id: "templates-docus",
-        label: "Plantillas de documentos",
-        icon: FileStack,
-        path: "/settings/templates-docus"
-      },
       {
         id: "jobs",
-        label: "Gestión de los empleos",
-        icon: UserCheck,
-        path: "/settings/jobs"
-      }
-    ]
-  },
-  {
-    title: "Integraciones",
-    items: [
-      {
-        id: "clockin-clockout",
-        label: "Control Horario",
-        icon: Clock,
-        path: "/settings/clockin-clockout"
+        label: "Puestos de trabajo",
+        icon: Briefcase,
+        path: "/config/jobs"
       },
       {
-        id: "marketplace",
-        label: "Integración",
-        icon: Zap,
-        path: "/settings/marketplace"
-      }
-    ]
-  },
-  {
-    title: "Legal",
-    items: [
-      {
-        id: "RGPD",
-        label: "RGPD",
-        icon: Shield,
-        path: "/settings/RGPD"
+        id: "convenio",
+        label: "Convenio colectivo",
+        icon: FileText,
+        path: "/config/convenio"
       }
     ]
   }
@@ -137,23 +30,21 @@ const settingsNavigation = [
 export function SettingsLayout() {
   const location = useLocation();
 
-  const isRootSettings = location.pathname === "/settings";
+  // Redirect root /config or legacy /settings to /config/jobs
+  const isRoot = location.pathname === "/config" || location.pathname === "/settings";
 
   return (
     <MainLayout>
       <div className="min-h-screen bg-gray-50">
         <div className="flex">
           {/* Sidebar */}
-          <div className="w-64 bg-white shadow-sm min-h-screen">
+          <div className="w-56 bg-white shadow-sm min-h-screen">
             <div className="p-6">
-              <h1 className="text-xl font-semibold text-gray-900 mb-6">Configuración</h1>
-              
+              <h1 className="text-lg font-semibold text-gray-900 mb-6">Configuración</h1>
+
               <nav className="space-y-6">
                 {settingsNavigation.map((section) => (
                   <div key={section.title}>
-                    <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">
-                      {section.title}
-                    </h2>
                     <ul className="space-y-1">
                       {section.items.map((item) => (
                         <li key={item.id}>
@@ -181,8 +72,8 @@ export function SettingsLayout() {
           </div>
 
           <div className="flex-1">
-            {isRootSettings ? (
-              <Navigate to="/settings/locations" replace />
+            {isRoot ? (
+              <Navigate to="/config/jobs" replace />
             ) : (
               <Outlet />
             )}
