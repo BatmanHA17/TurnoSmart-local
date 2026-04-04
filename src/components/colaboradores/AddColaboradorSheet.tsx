@@ -495,6 +495,55 @@ export const AddColaboradorSheet = ({
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <Label className="text-sm font-medium text-foreground">
+                              Rol en el motor de turnos
+                            </Label>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="max-w-xs">Define cómo participa este colaborador en la generación automática de turnos SMART</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                          <Select value={formData.engineRole} onValueChange={(value) => setFormData(prev => ({ ...prev, engineRole: value }))}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar tipo de rotación" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ROTA_COMPLETO">Rotación completa (M/T/N)</SelectItem>
+                              <SelectItem value="ROTA_PARCIAL">Rotación parcial (solo ciertos turnos)</SelectItem>
+                              <SelectItem value="FIJO_NO_ROTA">Turno fijo (no rota)</SelectItem>
+                              <SelectItem value="COBERTURA">Cobertura (cubre ausencias)</SelectItem>
+                              <SelectItem value="FOM">FOM (Front Office Manager)</SelectItem>
+                              <SelectItem value="AFOM">AFOM (Asistente FOM)</SelectItem>
+                              <SelectItem value="NIGHT_SHIFT_AGENT">Agente nocturno fijo</SelectItem>
+                              <SelectItem value="GEX">GEX (Guest Experience)</SelectItem>
+                              <SelectItem value="FRONT_DESK_AGENT">Agente de recepción</SelectItem>
+                              <SelectItem value="CUSTOM">Personalizado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            {formData.engineRole === 'ROTA_COMPLETO' && 'Rota entre todos los turnos (M/T/N) ~5 días/semana'}
+                            {formData.engineRole === 'ROTA_PARCIAL' && 'Solo rota en turnos específicos (ej: 9x17, 12x20)'}
+                            {formData.engineRole === 'FIJO_NO_ROTA' && 'Siempre trabaja el mismo turno, no entra en rotación'}
+                            {formData.engineRole === 'COBERTURA' && 'Cubre ausencias y huecos de otros colaboradores'}
+                            {formData.engineRole === 'FOM' && 'Turno fijo M (L-V), guardias S/D, no rota'}
+                            {formData.engineRole === 'AFOM' && 'Espejo del FOM: cubre cuando FOM libra'}
+                            {formData.engineRole === 'NIGHT_SHIFT_AGENT' && 'Noche fija permanente, sus libres los cubren otros'}
+                            {formData.engineRole === 'GEX' && 'Solo turnos GEX (9x17/12x20) según ocupación'}
+                            {formData.engineRole === 'FRONT_DESK_AGENT' && 'Rotación completa M/T/N, cubre noches del nocturno'}
+                            {formData.engineRole === 'CUSTOM' && 'Configuración personalizada de turnos'}
+                          </p>
+                        </div>
+                      </FormField>
+
+                      <FormField label="">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm font-medium text-foreground">
                               Responsable directo
                             </Label>
                             <TooltipProvider>
@@ -1179,6 +1228,55 @@ export const AddColaboradorSheet = ({
                         min="1"
                         max="48"
                       />
+                    </FormField>
+
+                    <FormField label="">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm font-medium text-foreground">
+                            Rol en el motor de turnos
+                          </Label>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="max-w-xs">Define cómo participa este colaborador en la generación automática de turnos SMART</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                        <Select value={formData.engineRole} onValueChange={(value) => setFormData(prev => ({ ...prev, engineRole: value }))}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar tipo de rotación" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ROTA_COMPLETO">Rotación completa (M/T/N)</SelectItem>
+                            <SelectItem value="ROTA_PARCIAL">Rotación parcial (solo ciertos turnos)</SelectItem>
+                            <SelectItem value="FIJO_NO_ROTA">Turno fijo (no rota)</SelectItem>
+                            <SelectItem value="COBERTURA">Cobertura (cubre ausencias)</SelectItem>
+                            <SelectItem value="FOM">FOM (Front Office Manager)</SelectItem>
+                            <SelectItem value="AFOM">AFOM (Asistente FOM)</SelectItem>
+                            <SelectItem value="NIGHT_SHIFT_AGENT">Agente nocturno fijo</SelectItem>
+                            <SelectItem value="GEX">GEX (Guest Experience)</SelectItem>
+                            <SelectItem value="FRONT_DESK_AGENT">Agente de recepción</SelectItem>
+                            <SelectItem value="CUSTOM">Personalizado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          {formData.engineRole === 'ROTA_COMPLETO' && 'Rota entre todos los turnos (M/T/N) ~5 días/semana'}
+                          {formData.engineRole === 'ROTA_PARCIAL' && 'Solo rota en turnos específicos (ej: 9x17, 12x20)'}
+                          {formData.engineRole === 'FIJO_NO_ROTA' && 'Siempre trabaja el mismo turno, no entra en rotación'}
+                          {formData.engineRole === 'COBERTURA' && 'Cubre ausencias y huecos de otros colaboradores'}
+                          {formData.engineRole === 'FOM' && 'Turno fijo M (L-V), guardias S/D, no rota'}
+                          {formData.engineRole === 'AFOM' && 'Espejo del FOM: cubre cuando FOM libra'}
+                          {formData.engineRole === 'NIGHT_SHIFT_AGENT' && 'Noche fija permanente, sus libres los cubren otros'}
+                          {formData.engineRole === 'GEX' && 'Solo turnos GEX (9x17/12x20) según ocupación'}
+                          {formData.engineRole === 'FRONT_DESK_AGENT' && 'Rotación completa M/T/N, cubre noches del nocturno'}
+                          {formData.engineRole === 'CUSTOM' && 'Configuración personalizada de turnos'}
+                        </p>
+                      </div>
                     </FormField>
 
                     <FormField label="">

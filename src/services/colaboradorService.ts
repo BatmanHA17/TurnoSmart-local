@@ -69,6 +69,7 @@ export interface ColaboradorBaseData {
   numero_personas_dependientes?: number | null;
   fecha_antiguedad?: string | null;
   job_id?: string | null; // Nuevo campo para referencia al puesto de trabajo
+  engine_role?: string | null; // SMART engine rotation role
   org_id: string;
   selectedDepartments?: string[]; // For department assignments
 }
@@ -330,7 +331,8 @@ export const mapLegacyFormData = (formData: any) => {
     estado_civil: formData.estadoCivil || null,
     numero_personas_dependientes: formData.numeroPersonasDependientes ? parseInt(formData.numeroPersonasDependientes) : null,
     fecha_antiguedad: formData.fechaAntiguedad || null,
-    job_id: formData.jobId || null, // Agregar job_id
+    job_id: formData.jobId || null,
+    engine_role: formData.engineRole || 'ROTA_COMPLETO',
     org_id: '' // Will be set by the calling function
   };
 

@@ -499,6 +499,53 @@ export default function ProfileTab() {
           </NotionCard>
         )}
 
+        {/* Rol en el Motor SMART */}
+        <NotionCard className="p-6">
+          <h3 className="text-base font-semibold text-foreground mb-4">Rol en el Motor SMART</h3>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <Label className="text-sm text-muted-foreground">Tipo de rotación</Label>
+              <span className="text-sm text-foreground font-medium">
+                {(() => {
+                  const roleLabels: Record<string, string> = {
+                    'ROTA_COMPLETO': 'Rotación completa (M/T/N)',
+                    'ROTA_PARCIAL': 'Rotación parcial',
+                    'FIJO_NO_ROTA': 'Turno fijo (no rota)',
+                    'COBERTURA': 'Cobertura',
+                    'FOM': 'FOM (Front Office Manager)',
+                    'AFOM': 'AFOM (Asistente FOM)',
+                    'NIGHT_SHIFT_AGENT': 'Agente nocturno fijo',
+                    'GEX': 'GEX (Guest Experience)',
+                    'FRONT_DESK_AGENT': 'Agente de recepción',
+                    'CUSTOM': 'Personalizado',
+                  };
+                  return roleLabels[colaborador.engine_role || 'ROTA_COMPLETO'] || colaborador.engine_role || 'ROTA_COMPLETO';
+                })()}
+              </span>
+            </div>
+            <div className="flex justify-between items-start">
+              <Label className="text-sm text-muted-foreground">Descripción</Label>
+              <span className="text-xs text-muted-foreground text-right max-w-[60%]">
+                {(() => {
+                  const roleDescriptions: Record<string, string> = {
+                    'ROTA_COMPLETO': 'Rota entre todos los turnos (M/T/N) ~5 días/semana',
+                    'ROTA_PARCIAL': 'Solo rota en turnos específicos (ej: 9x17, 12x20)',
+                    'FIJO_NO_ROTA': 'Siempre trabaja el mismo turno, no entra en rotación',
+                    'COBERTURA': 'Cubre ausencias y huecos de otros colaboradores',
+                    'FOM': 'Turno fijo M (L-V), guardias S/D, no rota',
+                    'AFOM': 'Espejo del FOM: cubre cuando FOM libra',
+                    'NIGHT_SHIFT_AGENT': 'Noche fija permanente, sus libres los cubren otros',
+                    'GEX': 'Solo turnos GEX (9x17/12x20) según ocupación',
+                    'FRONT_DESK_AGENT': 'Rotación completa M/T/N, cubre noches del nocturno',
+                    'CUSTOM': 'Configuración personalizada de turnos',
+                  };
+                  return roleDescriptions[colaborador.engine_role || 'ROTA_COMPLETO'] || '';
+                })()}
+              </span>
+            </div>
+          </div>
+        </NotionCard>
+
         {/* Información Médica */}
         <NotionCard className="p-6">
           <h3 className="text-base font-semibold text-foreground mb-4">Información Médica</h3>

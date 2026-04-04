@@ -88,6 +88,8 @@ export interface ColaboradorFormData {
   numeroPersonasDependientes: string;
   fechaAntiguedad: string;
   trabajadorExtranjeroPermiso: boolean;
+  /** SMART engine role — determines shift rotation behavior */
+  engineRole: string;
 }
 
 const EMPTY_FORM: ColaboradorFormData = {
@@ -139,6 +141,7 @@ const EMPTY_FORM: ColaboradorFormData = {
   numeroPersonasDependientes: "",
   fechaAntiguedad: "",
   trabajadorExtranjeroPermiso: false,
+  engineRole: "ROTA_COMPLETO",
 };
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
@@ -318,6 +321,7 @@ export function useAddColaboradorForm({
         numeroPersonasDependientes: colaboradorData.numero_personas_dependientes?.toString() || "",
         fechaAntiguedad: colaboradorData.fecha_antiguedad || "",
         trabajadorExtranjeroPermiso: colaboradorData.trabajador_extranjero_permiso || false,
+        engineRole: colaboradorData.engine_role || "ROTA_COMPLETO",
       });
 
       if (colaboradorData.jobs?.department) {
