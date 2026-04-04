@@ -99,6 +99,8 @@ import {
   getShiftHours,
 } from "@/utils/calendarShiftUtils";
 import type { CalendarEmployee as Employee, GoogleCalendarStyleProps } from "./calendar/calendarTypes";
+import { CalendarDayCell } from "./calendar/CalendarDayCell";
+import { EmployeeInfoCell } from "./calendar/EmployeeInfoCell";
 import {
   shouldShowColaborador,
   canAssignShiftOnDate as canAssignShiftOnDateUtil,
@@ -3222,384 +3224,83 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
                   
                   return (
                   <tr key={employee.id} className={`border-b hover:bg-muted/20 ${selectedEmployees.has(employee.id) ? "bg-muted/30" : ""} ${compliance.isExceeded ? "bg-red-50" : ""} ${hasAbsenceThisWeek ? "bg-green-50" : ""}`}>
-                  {/* Employee Info Column */}
-                  <td className="py-0.5 px-1 border-r relative group">
-                    <div className="flex items-center justify-between">
-                       <div className="space-y-0 flex-1">
-                            {/* Nickname como en la imagen de referencia */}
-                             <div className="flex items-center gap-1">
-                               <div 
-                                 className={`text-[9px] sm:text-[10px] md:text-[11px] font-medium text-gray-900 truncate transition-colors ${
-                                   canEdit || colaboradores.find(c => c.id === employee.id)?.user_id === user?.id ? 'cursor-pointer hover:text-blue-600' : ''
-                                 }`}
-                                 onClick={() => {
-                                   // Solo permitir navegación si puede editar O si es su propio perfil
-                                   const colaborador = colaboradores.find(c => c.id === employee.id);
-                                   if (canEdit || (colaborador && colaborador.user_id === user?.id)) {
-                                     navigateToColaborador(employee.name);
-                                   }
-                                 }}
-                                 title={canEdit || colaboradores.find(c => c.id === employee.id)?.user_id === user?.id ? "Ver perfil del colaborador" : ""}
-                               >
-                              {employee.name}
-                                </div>
-                                {/* Badge de violaciones de auditoría del empleado */}
-                                {(() => {
-                                  const employeeViolations = getViolationsForEmployee(employee.id);
-                                  const maxSeverity = employeeViolations.length > 0 
-                                    ? employeeViolations.reduce((max, v) => {
-                                        const order = { error: 3, warning: 2, info: 1 };
-                                        return order[v.severity] > order[max] ? v.severity : max;
-                                      }, 'info' as 'error' | 'warning' | 'info')
-                                    : null;
-                                  return maxSeverity ? (
-                                    <EmployeeViolationBadge 
-                                      count={employeeViolations.length} 
-                                      maxSeverity={maxSeverity} 
-                                    />
-                                  ) : null;
-                                })()}
-                               {/* Show absence badge if employee has approved absence */}
-                              {hasAbsenceThisWeek && employeeAbsence && (
-                                <div className="bg-green-100 text-green-700 text-[8px] px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                                  Vacaciones ({absenceDays} días)
-                                </div>
-                              )}
-                            {compliance.isExceeded && (
-                              <div 
-                                className="h-3 w-3 text-red-500 cursor-help flex-shrink-0 relative group"
-                                title={`Se han detectado posibles irregularidades en el cumplimiento de la normativa laboral. Revisa las horas planificadas de este colaborador (${compliance.plannedHours}h/${compliance.contractHours}h)`}
-                              >
-                                <Info className="h-3 w-3" />
-                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-red-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
-                                  ⚠️ Exceso de horas: {compliance.plannedHours}h/{compliance.contractHours}h
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          
-                           {/* Línea de horas exactamente como en la imagen: planificadas | reales | ausencias | diferencia */}
-                           <div className="text-[8px] sm:text-[9px] text-gray-600 whitespace-nowrap flex gap-1">
-                             <span 
-                               className="cursor-help"
-                               title="Horas contratos"
-                             >
-                               {getWeeklyHoursFromColaborador(employee.name) || compliance.plannedHours}h
-                             </span>
-                             <span>|</span>
-                             <span
-                               className="cursor-help"
-                               title="Horas reales esta semana"
-                             >
-                               {(() => {
-                                 const realH = getWeeklyRealHours(employee.id);
-                                 const wholeHours = Math.floor(realH);
-                                 const minutes = Math.round((realH - wholeHours) * 60);
-                                 return `${wholeHours}h ${minutes}'`;
-                               })()}
-                             </span>
-                             <span>|</span>
-                             <span 
-                               className="cursor-help"
-                               title="Ausencias realizadas"
-                             >
-                               {getWeeklyAbsenceHours(employee.id)}h
-                             </span>
-                             <span>|</span>
-                             <span 
-                               className="cursor-help"
-                               title="Diferencia"
-                             >
-                               {(() => {
-                                 const contractHours = getWeeklyHoursFromColaborador(employee.name) || compliance.plannedHours;
-                                 const realHours = getWeeklyRealHours(employee.id);
-                                 const difference = realHours - contractHours;
-                                 const isPositive = difference > 0;
-                                 return (
-                                   <span className={isPositive ? "text-red-500" : ""}>
-                                     {difference >= 0 ? '+' : ''}{difference}h
-                                   </span>
-                                 );
-                               })()}
-                             </span>
-                            </div>
-                             
-                              {/* Quinta información: Compensar Xh - debajo de las horas con tamaño 8px */}
-                              <div 
-                                className={`text-[8px] text-blue-600 transition-colors ${
-                                  canEdit || colaboradores.find(c => c.id === employee.id)?.email === user?.email
-                                   ? 'cursor-pointer hover:text-blue-800'
-                                   : 'cursor-not-allowed opacity-50'
-                               }`}
-                               onClick={(e) => {
-                                 e.stopPropagation();
-                                 
-                                 // Si es employee, solo puede ver su propia compensación
-                                 if (isEmployee) {
-                                   const currentUserColaborador = colaboradores.find(c => c.email === user?.email);
-                                   if (!currentUserColaborador || currentUserColaborador.id !== employee.id) {
-                                     toast({
-                                       title: "Acceso restringido",
-                                       description: "Solo puedes acceder a tu propia información",
-                                       variant: "destructive"
-                                     });
-                                     return;
-                                   }
-                                 }
-                                 
-                                 // Navegar directamente a la página del colaborador, tab de vacaciones-ausencias usando navigate
-                                 navigate(`/equipo/${employee.id}/absences`);
-                               }}
-                               title={canEdit || colaboradores.find(c => c.id === employee.id)?.email === user?.email 
-                                 ? "Ver compensación de horas extras" 
-                                 : "Solo puedes ver tu propia información"}
-                             >
-                               <EmployeeCompensatoryBalance 
-                                 colaboradorId={employee.id}
-                                 className="cursor-pointer text-[8px]"
-                               />
-                             </div>
-                        </div>
-                        {/* Controles del empleado - checkbox y botón eliminar */}
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                          <input
-                            type="checkbox"
-                            className="w-2.5 h-2.5 sm:w-3 sm:h-3 cursor-pointer accent-black"
-                           checked={selectedEmployees.has(employee.id)}
-                           onChange={() => handleEmployeeSelect(employee.id)}
-                           onClick={(e) => e.stopPropagation()}
-                         />
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeEmployeeFromCalendar(employee.id, employee.name);
-                            }}
-                            className="w-3 h-3 sm:w-4 sm:h-4 text-red-500 hover:text-red-700 transition-colors"
-                            title={`Eliminar ${employee.name} del calendario`}
-                          >
-                            <X className="w-full h-full" />
-                          </button>
-                       </div>
-                     </div>
-                     
-                   </td>
-                  
-                   {/* Day Columns */}
+                    {/* Employee Info Column — extracted component */}
+                    <EmployeeInfoCell
+                      employee={employee}
+                      compliance={compliance}
+                      hasAbsenceThisWeek={hasAbsenceThisWeek}
+                      absenceDays={absenceDays}
+                      selectedEmployees={selectedEmployees}
+                      colaboradores={colaboradores}
+                      canEdit={canEdit}
+                      isManager={isManager}
+                      isEmployee={isEmployee}
+                      userId={user?.id}
+                      employeeViolations={getViolationsForEmployee(employee.id)}
+                      weeklyContractHours={getWeeklyHoursFromColaborador(employee.name) || compliance.plannedHours}
+                      weeklyRealHours={getWeeklyRealHours(employee.id)}
+                      weeklyAbsenceHours={getWeeklyAbsenceHours(employee.id)}
+                      onNavigateToProfile={navigateToColaborador}
+                      onEmployeeSelect={handleEmployeeSelect}
+                      onRemoveEmployee={removeEmployeeFromCalendar}
+                      onNavigateToAbsences={(id) => navigate(`/equipo/${id}/absences`)}
+                    />
+
+                    {/* Day Columns — extracted component */}
                     {weekDays.map((day, dayIndex) => {
                       const shifts = getShiftsForEmployeeAndDate(employee.id, day);
                       const dayKey = format(day, "yyyy-MM-dd");
                       const isSelected = selectedDays.has(dayKey) || selectedEmployees.has(employee.id);
-                      
-                      // Check if this specific day has an approved absence
-                      const hasAbsenceToday = employeeAbsence && 
-                        day >= employeeAbsence.startDate && 
-                        day <= employeeAbsence.endDate;
-                      
-                      // Obtener violaciones de auditoría para esta celda
+                      const hasAbsenceToday = !!(employeeAbsence &&
+                        day >= employeeAbsence.startDate &&
+                        day <= employeeAbsence.endDate);
                       const cellViolations = getViolationsForCell(employee.id, dayKey);
                       const cellSeverity = getMaxSeverityForCell(employee.id, dayKey);
-                      
-                      return (
-                           <td
-                            key={dayIndex}
-                            id={`cell-${employee.id}-${dayKey}`}
-                            className={`p-0.5 sm:p-1 text-center cursor-pointer hover:bg-muted/30 relative h-14 sm:h-16 md:h-20 transition-all ${isSelected ? "bg-muted/40" : ""} ${hasAbsenceToday ? "bg-green-100" : ""} ${
-                              dragOverCell === `${employee.id}-${format(day, 'yyyy-MM-dd')}` ? 'bg-blue-100' : ''
-                            }`}
-                           onClick={(e) => {
-                             // No interferir con drag de ShiftCards
-                             const target = e.target as HTMLElement;
-                             if (target.closest('[data-shift-card]')) {
-                               return;
-                             }
-                             handleCellClick(employee, day, e);
-                           }}
-                           onMouseDown={(e) => {
-                             // Prevenir interferencia con drag de ShiftCards
-                             const target = e.target as HTMLElement;
-                             if (target.closest('[data-shift-card]')) {
-                               e.stopPropagation();
-                             }
-                           }}
-                           onDragOver={handleDragOver}
-                           onDrop={(e) => handleDrop(e, employee.id, day)}
-                            onDragEnter={() => handleDragEnter(employee.id, day)}
-                            onDragLeave={handleDragLeave}
-                        >
-                          <AuditCellHighlight severity={cellSeverity} className="h-full w-full">
-                             {/* Current time line removed from week view */}
-                            {/* Zonas de drag and drop que aparecen cuando hay dragging activo */}
-                            {(canEdit || isManager) && isDragging && dragOverCell === `${employee.id}-${format(day, "yyyy-MM-dd")}` && (
-                              <DragDropZones
-                                isActive={true}
-                                hoveredZone={hoveredZone}
-                                onMoveHover={(isHovering) => {
-                                  setHoveredZone(isHovering ? 'move' : null);
-                                }}
-                                onDuplicateHover={(isHovering) => {
-                                  setHoveredZone(isHovering ? 'duplicate' : null);
-                                }}
-                                onDragOver={(e) => {
-                                  e.preventDefault();
-                                  const target = e.target as HTMLElement;
-                                  const dropAction = target.closest('[data-drop-action]')?.getAttribute('data-drop-action');
-                                  
-                                  if (dropAction === 'move') {
-                                    setHoveredZone('move');
-                                  } else if (dropAction === 'duplicate') {
-                                    setHoveredZone('duplicate');
-                                  }
-                                  
-                                  setCurrentDropAction(dropAction as 'move' | 'duplicate' || 'move');
-                                }}
-                                onDrop={(e) => {
-                                  handleDrop(e, employee.id, day);
-                                }}
-                              />
-                            )}
-                          {shifts.length > 0 ? (
-                            <AuditViolationTooltip violations={cellViolations}>
-                            <div className="h-full w-full space-y-0.5 relative">
-                              {/* Indicador visual de violación */}
-                              {cellViolations.length > 0 && (
-                                <div className={`absolute top-0 right-0 w-2 h-2 rounded-full z-10 ${
-                                  cellSeverity === 'error' ? 'bg-destructive' :
-                                  cellSeverity === 'warning' ? 'bg-amber-500' : 'bg-primary'
-                                }`} />
-                              )}
-                              {/* Indicador de edición post-publicación */}
-                              {isPostPubEdited(employee.id, format(day, 'yyyy-MM-dd')) && (
-                                <div className="absolute top-0 left-0 w-2 h-2 rounded-full z-10 bg-blue-500" title="Editado post-publicación" />
-                              )}
-                              {/* T3-8: SMART tag indicator */}
-                              {shifts.some(s => s.notes && getTagObjects(s.notes).length > 0) && (
-                                <div
-                                  className="absolute bottom-0 left-0 z-10 flex gap-0.5 p-0.5"
-                                  title={shifts.flatMap(s => getTagObjects(s.notes).map(t => t.label)).join(' ')}
-                                >
-                                  {shifts.flatMap(s => getTagObjects(s.notes)).slice(0, 2).map((tag, i) => (
-                                    <div key={i} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tag.color }} />
-                                  ))}
-                                </div>
-                              )}
-                              {shifts.map((shift, shiftIndex) => (
-                                <div
-                                  key={shift.id}
-                                  className={`${shifts.length > 1 ? 'h-8' : 'h-full'} w-full relative`}
-                                  onContextMenu={(e) => (canEdit || isManager) ? handleToggleLock(shift, e) : e.preventDefault()}
-                                >
-                                  {/* Icono candado — overlay cuando está bloqueado */}
-                                  {shift.locked && (
-                                    <div className="absolute top-0.5 right-0.5 z-30 pointer-events-none">
-                                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 text-amber-500 drop-shadow">
-                                        <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clipRule="evenodd" />
-                                      </svg>
-                                    </div>
-                                  )}
-                                   <ShiftCard
-                                      shift={shift}
-                                      employee={employee}
-                                      shiftsCount={shifts.length}
-                                      isSelected={selectedShifts.has(shift.id)}
-                                       onSelect={handleShiftSelect}
-                                      onShowDetails={(shift) => {
-                                        // 🔒 Si está publicado y no es EMPLOYEE, bloquear edición
-                                        if (isPublished && !isEmployee) {
-                                          toast({
-                                            title: "Turno publicado. No es posible editar",
-                                            description: "Debes despublicar el calendario primero para editar turnos",
-                                            variant: "destructive",
-                                          });
-                                          return;
-                                        }
-                                        setShowTurnoSmartDetails({ shift, employee });
-                                      }}
-                                       onEdit={(shift) => {
-                                         if (isPublished) {
-                                           toast({
-                                             title: "Calendario publicado",
-                                             description: "No se pueden realizar cambios en un calendario publicado. Use el megáfono para modificar.",
-                                             variant: "destructive",
-                                           });
-                                           return;
-                                         }
-                                         setEditingShift(shift);
-                                         setShowAdvancedOptions({
-                                           employeeId: shift.employeeId,
-                                           date: new Date(shift.date)
-                                         });
-                                      }}
-                                       onDelete={(shift) => {
-                                         if (isPublished) {
-                                           toast({
-                                             title: "Calendario publicado",
-                                             description: "No se pueden realizar cambios en un calendario publicado. Use el megáfono para modificar.",
-                                             variant: "destructive",
-                                           });
-                                           return;
-                                         }
-                                         setShowDeleteConfirmation(shift);
-                                       }}
-                                       onAddShift={(canEdit || isManager) ? handleAddShift : undefined}
-                                       readOnly={(isEmployee && !isManager && !isAdmin && !isOwner) || isPublished}
-                                    />
-                                </div>
-                              ))}
-                            </div>
-                            </AuditViolationTooltip>
-            ) : (
-              <div className="h-full relative group">
-                {/* Time slot rectangles - aparecen cuando showTimeSlots está activo */}
-                {showTimeSlots && (
-                  <TimeSlotRectangles 
-                    onSlotClick={(shiftIndex, e, absenceCode) => handleTimeSlotClick(employee, day, shiftIndex, e, absenceCode)}
-                  />
-                )}
-                
-                {/* Mensaje "Primer día" separado - solo para el primer día de contrato */}
-                {(() => {
-                  const empleadoColaborador = colaboradores.find(c => c.id === employee.id);
-                  const fechaInicioContrato = empleadoColaborador?.fecha_inicio_contrato;
-                  
-                  if (fechaInicioContrato) {
-                    const fechaInicio = new Date(fechaInicioContrato);
-                    const esPrimerDia = isSameDay(day, fechaInicio);
-                    
-                    // Solo mostrar si es primer día Y no hay turnos asignados
-                    if (esPrimerDia && shifts.length === 0) {
-                      return (
-                        <div key={`primer-dia-${employee.id}-${format(day, 'yyyy-MM-dd')}`} className="absolute top-1 left-1 right-1 z-10 pointer-events-none">
-                          <div className="flex items-center gap-1.5 bg-white/90 backdrop-blur-sm rounded px-1.5 py-0.5 shadow-sm border border-gray-200">
-                            <span className="text-xs">👋</span>
-                            <span className="text-[10px] font-medium text-gray-600">Primer día</span>
-                          </div>
-                        </div>
-                      );
-                    }
-                  }
-                  return null;
-                })()}
 
-                {/* Zona hover invisible - activa al hacer hover */}
-                <div 
-                  className="absolute inset-0 cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAddShift(employee, day, e);
-                  }}
-                />
-                 {/* Símbolo + que aparece solo en hover */}
-                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                   <div className="bg-white/95 rounded-full w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center shadow-md border border-gray-200 hover:border-gray-300">
-                     <Plus className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-gray-600" />
-                   </div>
-                </div>
-              </div>
-            )}
-                          </AuditCellHighlight>
-                       </td>
-                     );
-                   })}
+                      return (
+                        <CalendarDayCell
+                          key={dayIndex}
+                          employee={employee}
+                          day={day}
+                          dayIndex={dayIndex}
+                          shifts={shifts}
+                          isSelected={isSelected}
+                          hasAbsenceToday={hasAbsenceToday}
+                          cellViolations={cellViolations}
+                          cellSeverity={cellSeverity}
+                          dragOverCell={dragOverCell}
+                          isDragging={isDragging}
+                          hoveredZone={hoveredZone}
+                          canEdit={canEdit}
+                          isManager={isManager}
+                          isAdmin={isAdmin}
+                          isOwner={isOwner}
+                          isEmployee={isEmployee}
+                          isPublished={isPublished}
+                          showTimeSlots={showTimeSlots}
+                          selectedShifts={selectedShifts}
+                          colaboradores={colaboradores}
+                          onCellClick={handleCellClick}
+                          onDragOver={handleDragOver}
+                          onDrop={handleDrop}
+                          onDragEnter={handleDragEnter}
+                          onDragLeave={handleDragLeave}
+                          onShiftSelect={handleShiftSelect}
+                          onToggleLock={handleToggleLock}
+                          onAddShift={(canEdit || isManager) ? handleAddShift : undefined}
+                          onTimeSlotClick={handleTimeSlotClick}
+                          onShowDetails={(shift, emp) => setShowTurnoSmartDetails({ shift, employee: emp })}
+                          onEditShift={(shift) => {
+                            setEditingShift(shift);
+                            setShowAdvancedOptions({ employeeId: shift.employeeId, date: new Date(shift.date) });
+                          }}
+                          onDeleteShift={(shift) => setShowDeleteConfirmation(shift)}
+                          setHoveredZone={setHoveredZone}
+                          setCurrentDropAction={setCurrentDropAction}
+                          isPostPubEdited={isPostPubEdited}
+                        />
+                      );
+                    })}
                  </tr>
                  );
                })}
