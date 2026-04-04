@@ -563,30 +563,30 @@ export default function JobsSettings() {
   };
 
   const filteredJobs = jobs.filter(job => {
-    const matchesSearch = job.title.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (job.title || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDepartment = departmentFilter === "all" || job.department === departmentFilter;
     return matchesSearch && matchesDepartment;
   });
 
   // Filter and sort categories
   const filteredCategories = professionalCategories.filter(category => {
-    const matchesSearch = category.category_name.toLowerCase().includes(categorySearchTerm.toLowerCase()) ||
+    const matchesSearch = (category.category_name || '').toLowerCase().includes(categorySearchTerm.toLowerCase()) ||
                          (category.category_code && category.category_code.toLowerCase().includes(categorySearchTerm.toLowerCase())) ||
                          (category.description && category.description.toLowerCase().includes(categorySearchTerm.toLowerCase()));
     const matchesLevel = levelFilter === "all" || category.level?.id === levelFilter;
     return matchesSearch && matchesLevel;
   }).sort((a, b) => {
-    const compare = a.category_name.localeCompare(b.category_name);
+    const compare = (a.category_name || '').localeCompare(b.category_name || '');
     return sortOrder === "asc" ? compare : -compare;
   });
 
   // Filter and sort levels
   const filteredLevels = professionalLevels.filter(level => {
-    return level.level_name.toLowerCase().includes(levelSearchTerm.toLowerCase()) ||
+    return (level.level_name || '').toLowerCase().includes(levelSearchTerm.toLowerCase()) ||
            (level.level_code && level.level_code.toLowerCase().includes(levelSearchTerm.toLowerCase())) ||
            (level.description && level.description.toLowerCase().includes(levelSearchTerm.toLowerCase()));
   }).sort((a, b) => {
-    const compare = a.level_name.localeCompare(b.level_name);
+    const compare = (a.level_name || '').localeCompare(b.level_name || '');
     return levelSortOrder === "asc" ? compare : -compare;
   });
 
