@@ -376,6 +376,8 @@ export function useSmartGenerateV2({
         const engineEmployees: EngineEmployee[] = calEmployees.map((ce) => {
           const role = resolveEngineRole(ce);
           const config = ROLE_CONFIGS[role];
+          console.log(`[SMART DEBUG] Employee: ${ce.name} | DB engine_role: ${ce.engine_role ?? "NULL"} | Resolved role: ${role} | rotationType: ${config.rotationType} | allowedShifts: ${config.allowedShifts.join(",")}`);
+
           const wh = parseWeeklyHours(ce.workingHours);
           const prevEquity = equityByEmployee.get(ce.id);
           return {
