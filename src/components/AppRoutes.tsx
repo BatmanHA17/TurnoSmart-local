@@ -50,6 +50,9 @@ const AbsencesTab = React.lazy(() => import("@/components/colaboradores/tabs/Abs
 const AddColaboradorSheetRoute = React.lazy(() =>
   import("@/components/colaboradores/AddColaboradorSheetRoute").then(m => ({ default: m.AddColaboradorSheetRoute }))
 );
+const QuickCreateTeam = React.lazy(() =>
+  import("@/components/colaboradores/QuickCreateTeam").then(m => ({ default: m.QuickCreateTeam }))
+);
 
 // Peticiones
 const EmployeePetitionsPage = React.lazy(() => import("@/pages/EmployeePetitions"));
@@ -146,6 +149,7 @@ export const AppRoutes = () => {
           <Route path="/equipo">
             <Route index element={<ProtectedRoute><RoleGuard minRole="fom"><SectionErrorBoundary label="colaboradores"><Colaboradores /></SectionErrorBoundary></RoleGuard></ProtectedRoute>} />
             <Route path="nuevo" element={<ProtectedRoute><RoleGuard minRole="fom"><AddColaboradorSheetRoute /></RoleGuard></ProtectedRoute>} />
+            <Route path="quick-create" element={<ProtectedRoute><RoleGuard minRole="fom"><SectionErrorBoundary label="quick-create"><MainLayout><QuickCreateTeam /></MainLayout></SectionErrorBoundary></RoleGuard></ProtectedRoute>} />
           </Route>
 
           {/* Equipo detail con tabs */}
@@ -199,6 +203,7 @@ export const AppRoutes = () => {
           {/* Equipo legacy */}
           <Route path="/turnosmart/collaborators" element={<Navigate to="/equipo" replace />} />
           <Route path="/turnosmart/collaborators/new" element={<Navigate to="/equipo/nuevo" replace />} />
+          <Route path="/turnosmart/collaborators/quick-create" element={<Navigate to="/equipo/quick-create" replace />} />
           <Route path="/turnosmart/collaborators/:id/*" element={<ColaboradorRedirect />} />
           <Route path="/turnosmart/colaboradores" element={<Navigate to="/equipo" replace />} />
           <Route path="/colaboradores" element={<Navigate to="/equipo" replace />} />

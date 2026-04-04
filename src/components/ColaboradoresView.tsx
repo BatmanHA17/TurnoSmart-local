@@ -542,7 +542,7 @@ export const ColaboradoresView = () => {
           {canEdit && (
             <Button
               variant="outline"
-              onClick={() => navigate('/turnosmart/collaborators/quick-create')}
+              onClick={() => navigate('/equipo/quick-create')}
               className="flex items-center gap-2"
             >
               <Users className="h-4 w-4" />
