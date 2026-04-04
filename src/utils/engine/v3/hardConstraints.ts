@@ -55,14 +55,14 @@ export const hcNightThenRest: HardConstraint = {
 
     const schedule = state.grid[empId];
 
-    // If assigning N: check that next day is not a working locked shift
+    // If assigning N: check that next day is not already a working shift
     if (shiftCode === "N" && day < state.input.period.totalDays) {
       const next = schedule[day + 1];
-      if (next && next.locked && isWorkingShift(next.code)) return false;
+      if (next && isWorkingShift(next.code)) return false;
     }
 
-    // If assigning a working shift: check that previous day was not N
-    if (isWorkingShift(shiftCode) && shiftCode !== "N" && day > 1) {
+    // If assigning a working shift (including N): check that previous day was not N
+    if (isWorkingShift(shiftCode) && day > 1) {
       const prev = schedule[day - 1];
       if (prev && prev.code === "N") return false;
     }

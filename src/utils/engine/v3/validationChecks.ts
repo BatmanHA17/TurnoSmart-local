@@ -9,9 +9,10 @@ import type { ValidationCheck, SolverState } from "./solverTypes";
 import type { AuditViolation } from "../types";
 import {
   isWorkingShift, violates12hRest, weeklyHours, getWeeks,
-  countShiftOnDay, periodDayOfWeekISO,
+  periodDayOfWeekISO,
 } from "../helpers";
 import { FOM_AFOM_MIRROR } from "../constants";
+import { countCoverageOnDay } from "./coverageHelper";
 
 // ---------------------------------------------------------------------------
 // CK-01: 12h rest
@@ -118,7 +119,7 @@ export const ckMinCoverage: ValidationCheck = {
     for (let d = 1; d <= total; d++) {
       for (const shift of ["M", "T", "N"] as const) {
         const needed = minCov[shift] ?? 1;
-        const actual = countShiftOnDay(state.grid as any, d, shift);
+        const actual = countCoverageOnDay(state.grid, d, shift);
         if (actual < needed) {
           violations.push({
             employeeId: "",

@@ -13,8 +13,9 @@ import {
   SHIFT_UNDESIRABILITY, ERGONOMIC_SEQUENCE, FOM_AFOM_MIRROR,
 } from "../constants";
 import {
-  isWorkingShift, countShiftOnDay, periodDayOfWeekISO,
+  isWorkingShift, periodDayOfWeekISO,
 } from "../helpers";
+import { countCoverageOnDay, shiftToCoverageCategory } from "./coverageHelper";
 
 // ---------------------------------------------------------------------------
 // SC-01: Ergonomic rotation M→T→N (OP-02)
@@ -89,16 +90,12 @@ export const scCoverageBonus: SoftConstraint = {
   weight: 1.5,
   score(state, _empId, day, shiftCode) {
     if (!isWorkingShift(shiftCode)) return 0;
-    // Map shift to coverage category
-    let coverageShift: "M" | "T" | "N" | null = null;
-    if (shiftCode === "M" || shiftCode === "9x17") coverageShift = "M";
-    else if (shiftCode === "T" || shiftCode === "12x20") coverageShift = "T";
-    else if (shiftCode === "N") coverageShift = "N";
+    const coverageShift = shiftToCoverageCategory(shiftCode);
     if (!coverageShift) return 0;
 
     const minCov = state.input.constraints.minCoveragePerShift;
     const needed = minCov[coverageShift] ?? 1;
-    const current = countShiftOnDay(state.grid, day, coverageShift);
+    const current = countCoverageOnDay(state.grid, day, coverageShift);
 
     // Under minimum → strong bonus
     if (current < needed) return 25;

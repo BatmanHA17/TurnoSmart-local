@@ -23,7 +23,8 @@ import { optimizeSolution } from "./optimizer";
 import { ALL_VALIDATION_CHECKS } from "./validationChecks";
 import { ALL_HARD_CONSTRAINTS } from "./hardConstraints";
 import { ALL_SOFT_CONSTRAINTS } from "./softConstraints";
-import { isWorkingShift, getWeeks, weeklyHours, countShiftOnDay } from "../helpers";
+import { isWorkingShift, getWeeks, weeklyHours } from "../helpers";
+import { countCoverageOnDay } from "./coverageHelper";
 
 const ENGINE_VERSION = "3.0";
 
@@ -37,10 +38,11 @@ function computeScore(
 ): ScoreBreakdown {
   const { input } = state;
 
-  // Legal: 100 - penalties
-  const criticalViolations = violations.filter(v => v.severity === "critical").length;
-  const warningViolations = violations.filter(v => v.severity === "warning").length;
-  const legal = Math.max(0, 100 - criticalViolations * 25 - warningViolations * 5);
+  // Legal: 100 - penalties (only legal-category violations, not coverage)
+  const legalViolations = violations.filter(v => v.category === "legal");
+  const criticalLegal = legalViolations.filter(v => v.severity === "critical").length;
+  const warningLegal = legalViolations.filter(v => v.severity === "warning").length;
+  const legal = Math.max(0, 100 - criticalLegal * 25 - warningLegal * 5);
 
   // Coverage: slots covered / total slots needed
   const totalDays = input.period.totalDays;
@@ -50,7 +52,7 @@ function computeScore(
   for (let d = 1; d <= totalDays; d++) {
     for (const shift of ["M", "T", "N"] as const) {
       const needed = minCov[shift] ?? 1;
-      const actual = countShiftOnDay(state.grid as any, d, shift);
+      const actual = countCoverageOnDay(state.grid, d, shift);
       totalSlots += needed;
       coveredSlots += Math.min(actual, needed);
     }

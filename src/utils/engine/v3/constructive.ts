@@ -23,6 +23,7 @@ import {
   isWorkingShift, makeAssignment, getWeeks,
   periodDayOfWeekISO, isPeriodWeekend,
 } from "../helpers";
+import { countCoverageOnDay } from "./coverageHelper";
 import { ALL_HARD_CONSTRAINTS } from "./hardConstraints";
 import { ALL_SOFT_CONSTRAINTS } from "./softConstraints";
 
@@ -170,7 +171,16 @@ function anchorAFOM(state: SolverState, fom: EngineEmployee, afom: EngineEmploye
     if (state.grid[afom.id][d].locked) continue;
 
     const fomCode = state.grid[fom.id][d]?.code ?? "D";
-    const mirrorCode = FOM_AFOM_MIRROR[fomCode] ?? "M";
+    let mirrorCode = FOM_AFOM_MIRROR[fomCode] ?? "M";
+
+    // Check 12h rest: if previous day AFOM had T and mirror says M → use 11x19 transition
+    if (d > 1 && mirrorCode === "M") {
+      const prevCode = state.grid[afom.id][d - 1]?.code;
+      if (prevCode === "T" || prevCode === "N") {
+        mirrorCode = "11x19"; // Transition to avoid T→M violation
+      }
+    }
+
     assignCell(state, afom.id, d, mirrorCode, "engine", false);
   }
 }
@@ -184,8 +194,8 @@ function assignRestDays(state: SolverState): void {
   const weeks = getWeeks(totalDays);
 
   for (const emp of state.input.employees) {
-    // FOM/AFOM already have rest days from anchoring
-    if (emp.role === "FOM" || emp.role === "AFOM") continue;
+    // FOM already has rest days from anchoring (S+D locked)
+    if (emp.role === "FOM") continue;
 
     for (const week of weeks) {
       assignWeeklyRest(state, emp, week);
@@ -263,19 +273,14 @@ function fillRemaining(
 ): void {
   const totalDays = state.input.period.totalDays;
 
-  // Process employees in priority order: GEX first, then ROTA_COMPLETO
-  const sortedEmps = [...state.input.employees].sort((a, b) => {
-    const order: Record<string, number> = {
-      FIJO_NO_ROTA: 0, COBERTURA: 1, ROTA_PARCIAL: 2, ROTA_COMPLETO: 3,
-    };
-    return (order[a.rotationType] ?? 9) - (order[b.rotationType] ?? 9);
-  });
+  // Filter to employees that need filling (skip fixed roles)
+  const fillableEmps = state.input.employees.filter(emp =>
+    emp.role !== "FOM" && emp.role !== "AFOM" && emp.role !== "NIGHT_SHIFT_AGENT"
+  );
 
-  for (const emp of sortedEmps) {
-    // FOM, AFOM, Night Agent already fully assigned
-    if (emp.role === "FOM" || emp.role === "AFOM" || emp.role === "NIGHT_SHIFT_AGENT") continue;
-
-    for (let d = 1; d <= totalDays; d++) {
+  // Day-first loop: ensures coverage state is up-to-date when scoring each employee
+  for (let d = 1; d <= totalDays; d++) {
+    for (const emp of fillableEmps) {
       const cell = state.grid[emp.id][d];
       if (cell.locked) continue;
       if (isWorkingShift(cell.code)) continue; // already assigned a working shift
@@ -384,7 +389,7 @@ function ensureCoverage(
   for (let d = 1; d <= totalDays; d++) {
     for (const shift of ["M", "T", "N"] as const) {
       const needed = minCov[shift] ?? 1;
-      const current = countShiftOnDay(state.grid as any, d, shift);
+      const current = countCoverageOnDay(state.grid, d, shift);
 
       if (current >= needed) continue;
 
