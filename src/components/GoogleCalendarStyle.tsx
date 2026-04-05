@@ -3297,6 +3297,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
                           onDeleteShift={(shift) => setShowDeleteConfirmation(shift)}
                           setHoveredZone={setHoveredZone}
                           setCurrentDropAction={setCurrentDropAction}
+                          onApplyFix={handleApplyAuditFix}
                           isPostPubEdited={isPostPubEdited}
                         />
                       );

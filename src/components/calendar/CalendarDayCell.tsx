@@ -14,7 +14,7 @@ import { getTagObjects } from "@/utils/engine/smartTags";
 import { toast } from "@/hooks/use-toast";
 import type { CalendarEmployee } from "./calendarTypes";
 import type { ShiftBlock } from "@/utils/calendarShiftUtils";
-import type { AuditViolation } from "@/types/audit";
+import type { AuditViolation, SuggestedFix } from "@/types/audit";
 
 export interface CalendarDayCellProps {
   employee: CalendarEmployee;
@@ -56,6 +56,8 @@ export interface CalendarDayCellProps {
   onDeleteShift: (shift: ShiftBlock) => void;
   setHoveredZone: (zone: 'move' | 'duplicate' | null) => void;
   setCurrentDropAction: (action: 'move' | 'duplicate' | null) => void;
+  // Audit fix
+  onApplyFix?: (fix: SuggestedFix, violation: AuditViolation) => void;
   // Utils
   isPostPubEdited: (employeeId: string, dateKey: string) => boolean;
 }
@@ -95,6 +97,7 @@ export const CalendarDayCell: React.FC<CalendarDayCellProps> = React.memo(({
   onDeleteShift,
   setHoveredZone,
   setCurrentDropAction,
+  onApplyFix,
   isPostPubEdited,
 }) => {
   const dayKey = format(day, "yyyy-MM-dd");
@@ -142,7 +145,7 @@ export const CalendarDayCell: React.FC<CalendarDayCellProps> = React.memo(({
         )}
 
         {shifts.length > 0 ? (
-          <AuditViolationTooltip violations={cellViolations}>
+          <AuditViolationTooltip violations={cellViolations} onApplyFix={onApplyFix}>
             <div className="h-full w-full space-y-0.5 relative">
               {/* Violation dot */}
               {cellViolations.length > 0 && (
