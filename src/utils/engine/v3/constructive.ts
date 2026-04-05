@@ -204,13 +204,13 @@ function assignRestDays(state: SolverState): void {
     // FOM already has rest days from anchoring (S+D locked)
     if (emp.role === "FOM") continue;
 
-    for (const week of weeks) {
-      assignWeeklyRest(state, emp, week);
+    for (let wi = 0; wi < weeks.length; wi++) {
+      assignWeeklyRest(state, emp, weeks[wi], wi);
     }
   }
 }
 
-function assignWeeklyRest(state: SolverState, emp: EngineEmployee, weekDays: number[]): void {
+function assignWeeklyRest(state: SolverState, emp: EngineEmployee, weekDays: number[], weekIndex = 0): void {
   const schedule = state.grid[emp.id];
   const isRotaCompleto = emp.rotationType === "ROTA_COMPLETO";
 
@@ -259,6 +259,7 @@ function assignWeeklyRest(state: SolverState, emp: EngineEmployee, weekDays: num
   }
 
   // Non-ROTA_COMPLETO: assign 2 consecutive rest days
+  // Use ROTATIVE offset so rest days advance each week (e.g., week0: M-X, week1: J-V, week2: S-D, week3: L-M)
   const pairCandidates: Array<{ days: number[]; score: number }> = [];
 
   for (let i = 0; i < weekDays.length - 1; i++) {
@@ -268,13 +269,26 @@ function assignWeeklyRest(state: SolverState, emp: EngineEmployee, weekDays: num
     if (schedule[d2].locked && schedule[d2].code !== "D") continue;
 
     let score = 0;
+    // Penalize days where others rest (coverage staggering)
     for (const [id, grid] of Object.entries(state.grid)) {
       if (id === emp.id) continue;
       if (grid[d1]?.code === "D" && grid[d1]?.locked) score -= 10;
       if (grid[d2]?.code === "D" && grid[d2]?.locked) score -= 10;
     }
-    const dow1 = periodDayOfWeekISO(state.input.period.startDate, d1);
-    if (dow1 === 5 || dow1 === 6) score += 3;
+
+    // ROTATIVE REST: strongly prefer the pair at position (weekIndex * 2) % 7
+    // This makes rest days advance by 2 days each week:
+    // Week 0: pair starting at index 0 (Mon-Tue)
+    // Week 1: pair starting at index 2 (Wed-Thu)
+    // Week 2: pair starting at index 4 (Fri-Sat)
+    // Week 3: pair starting at index 6→0 (Sun-Mon wrap)
+    const targetPairStart = (weekIndex * 2) % weekDays.length;
+    const distFromTarget = Math.min(
+      Math.abs(i - targetPairStart),
+      weekDays.length - Math.abs(i - targetPairStart)
+    );
+    score += (weekDays.length - distFromTarget) * 20; // strong rotation bonus
+
     pairCandidates.push({ days: [d1, d2], score });
   }
 
