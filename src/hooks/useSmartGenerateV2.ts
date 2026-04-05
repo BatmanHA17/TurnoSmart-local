@@ -307,6 +307,7 @@ export function useSmartGenerateV2({
         let minCoverageM = 2;
         let minCoverageT = 2;
         let minCoverageN = 1;
+        let fdsLargo = false;
         if (orgId) {
           const { data: dbCriteria } = await supabase
             .from("schedule_criteria")
@@ -329,6 +330,10 @@ export function useSmartGenerateV2({
               boost: c.boost ?? 1,
               boostNote: c.boost_note ?? undefined,
             }));
+
+          // FDS Largo: check if the criterion is enabled
+          const fdsLargoCriteria = criteriaByKey.get("FDS_LARGO");
+          fdsLargo = fdsLargoCriteria?.enabled ?? false;
         }
 
         // --- Construir continuity desde equity + últimos días del período anterior ---
@@ -412,6 +417,7 @@ export function useSmartGenerateV2({
           optionalCriteria,
           allowForceMajeureOverride: false,
           existingShiftsPolicy: "overwrite",
+          fdsLargo: fdsLargo ?? false,
         };
 
         const result = generateAlternatives({

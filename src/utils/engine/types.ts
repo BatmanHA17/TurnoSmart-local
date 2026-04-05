@@ -309,6 +309,10 @@ export interface EngineConstraints {
 
   /** Política para turnos ya existentes */
   existingShiftsPolicy: ExistingShiftsPolicy;
+
+  /** FDS Largo: 1 fin de semana largo (4 días) por empleado por mes.
+   *  Criterio personalizado, desactivado por defecto. */
+  fdsLargo?: boolean;
 }
 
 // ---------------------------------------------------------------------------

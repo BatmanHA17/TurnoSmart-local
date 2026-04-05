@@ -205,8 +205,8 @@ function assignRestDays(state: SolverState): void {
   // Each non-FOM employee gets 1 FDS Largo per month, staggered across employees
   const nonFomEmps = state.input.employees.filter(e => e.role !== "FOM");
 
-  // Assign FDS Largo first (only for months with 3+ weeks)
-  if (weeks.length >= 3) {
+  // Assign FDS Largo first (only for months with 3+ weeks, and if enabled)
+  if (weeks.length >= 3 && state.input.constraints.fdsLargo) {
     assignFdsLargo(state, nonFomEmps, weeks);
   }
 
