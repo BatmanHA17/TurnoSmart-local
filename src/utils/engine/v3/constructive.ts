@@ -200,12 +200,75 @@ function assignRestDays(state: SolverState): void {
   const totalDays = state.input.period.totalDays;
   const weeks = getWeeks(totalDays);
 
+  // Track which employees have been assigned FDS Largo and in which week pair
+  // FDS Largo = 4 consecutive days off bridging 2 weeks (e.g., S-D of week N + L-M of week N+1)
+  // Each non-FOM employee gets 1 FDS Largo per month, staggered across employees
+  const nonFomEmps = state.input.employees.filter(e => e.role !== "FOM");
+
+  // Assign FDS Largo first (only for months with 3+ weeks)
+  if (weeks.length >= 3) {
+    assignFdsLargo(state, nonFomEmps, weeks);
+  }
+
+  // Then assign remaining weekly rest (rotative for weeks without FDS Largo)
   for (const emp of state.input.employees) {
-    // FOM already has rest days from anchoring (S+D locked)
     if (emp.role === "FOM") continue;
 
     for (let wi = 0; wi < weeks.length; wi++) {
       assignWeeklyRest(state, emp, weeks[wi], wi);
+    }
+  }
+}
+
+/**
+ * FDS Largo (Fin de Semana Largo) — 4 consecutive days off bridging 2 weeks.
+ * Each employee gets 1 per month. The bridge is: S-D of week N + L-M of week N+1.
+ * Employees are staggered so not everyone has FDS Largo the same weeks.
+ */
+function assignFdsLargo(
+  state: SolverState,
+  employees: EngineEmployee[],
+  weeks: number[][],
+): void {
+  // Available bridge positions: between week i and week i+1
+  // Bridge = last 2 days of week[i] (S-D) + first 2 days of week[i+1] (L-M)
+  const bridgeSlots: number[] = []; // week indices where bridge starts
+  for (let i = 0; i < weeks.length - 1; i++) {
+    bridgeSlots.push(i);
+  }
+
+  // Distribute employees across bridge slots (round-robin)
+  for (let ei = 0; ei < employees.length; ei++) {
+    const emp = employees[ei];
+    const slotIdx = ei % bridgeSlots.length;
+    const bridgeWeek = bridgeSlots[slotIdx];
+
+    const weekA = weeks[bridgeWeek];
+    const weekB = weeks[bridgeWeek + 1];
+
+    // FDS Largo days: last 2 of weekA + first 2 of weekB
+    const fdsLargoDays = [
+      weekA[weekA.length - 2], // Saturday (or 6th day)
+      weekA[weekA.length - 1], // Sunday (or 7th day)
+      weekB[0],                // Monday (or 1st day)
+      weekB[1],                // Tuesday (or 2nd day)
+    ].filter(d => d != null && d >= 1 && d <= state.input.period.totalDays);
+
+    // Check feasibility: none of the 4 days should be locked with non-rest
+    const canAssign = fdsLargoDays.every(d => {
+      const cell = state.grid[emp.id][d];
+      if (!cell) return false;
+      if (cell.locked && cell.code !== "D") return false; // locked absence/shift blocks it
+      return true;
+    });
+
+    if (!canAssign) continue;
+
+    // Assign the 4 FDS Largo rest days
+    for (const d of fdsLargoDays) {
+      if (!state.grid[emp.id][d].locked) {
+        assignCell(state, emp.id, d, "D", "engine", true);
+      }
     }
   }
 }
