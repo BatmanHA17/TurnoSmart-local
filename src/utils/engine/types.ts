@@ -103,6 +103,9 @@ export interface EngineEmployee {
   startDay?: number;
   /** Whether this employee can cover Night Agent's rest nights (default: true for ROTA_COMPLETO) */
   canCoverNights?: boolean;
+
+  /** Vacation rest preference: rest days before vacation (exit_with_rest) or after (enter_with_rest) */
+  vacationRestPreference?: 'exit_with_rest' | 'enter_with_rest';
 }
 
 /** Ausencia pre-aprobada */

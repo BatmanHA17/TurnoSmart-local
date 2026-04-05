@@ -50,6 +50,8 @@ interface CalendarEmployee {
   fecha_antiguedad?: string | null;
   /** Whether this employee can cover night shifts */
   can_cover_nights?: boolean;
+  /** Vacation rest preference: rest before or after vacation */
+  vacation_rest_preference?: string | null;
 }
 
 interface UseSmartGenerateV2Props {
@@ -421,6 +423,13 @@ export function useSmartGenerateV2({
             const years = (Date.now() - new Date(ce.fecha_antiguedad).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
             seniorityLevel = Math.max(1, Math.round(years));
           }
+          // OP-41: map vacation rest preference
+          const vacationRestPref = (ce as any).vacation_rest_preference;
+          const vacationRestPreference: 'exit_with_rest' | 'enter_with_rest' | undefined =
+            vacationRestPref === 'exit_with_rest' || vacationRestPref === 'enter_with_rest'
+              ? vacationRestPref
+              : undefined;
+
           return {
             id: ce.id,
             name: ce.name,
@@ -432,6 +441,7 @@ export function useSmartGenerateV2({
             absences: [],
             petitions: petitionsByEmployee.get(ce.id) ?? [],
             canCoverNights,
+            vacationRestPreference,
             equityBalance: prevEquity ?? {
               morningCount: 0,
               afternoonCount: 0,

@@ -305,6 +305,84 @@ function assignFdsLargo(
   }
 }
 
+/**
+ * OP-41: Place 2 rest days adjacent to vacation block based on employee preference.
+ * - exit_with_rest: rest days IMMEDIATELY BEFORE the first V day (employee leaves for vacation resting)
+ * - enter_with_rest: rest days IMMEDIATELY AFTER the last V day (employee returns from vacation resting)
+ * Returns true if successfully placed, false if fallback to normal logic is needed.
+ */
+function placeVacationAdjacentRest(
+  state: SolverState,
+  empId: string,
+  weekDays: number[],
+  vacationDays: number[],
+  pref: "exit_with_rest" | "enter_with_rest",
+): boolean {
+  const schedule = state.grid[empId];
+  const totalDays = state.input.period.totalDays;
+  const weekSet = new Set(weekDays);
+
+  if (pref === "exit_with_rest") {
+    // Place 2D BEFORE the first V day in this week
+    const firstV = Math.min(...vacationDays);
+    const d2 = firstV - 1; // day immediately before V
+    const d1 = firstV - 2; // day before that
+    // Both days must be in the period and in this week, and not locked
+    if (
+      d1 >= 1 && d2 >= 1 &&
+      weekSet.has(d1) && weekSet.has(d2) &&
+      !schedule[d1]?.locked && !schedule[d2]?.locked
+    ) {
+      assignCell(state, empId, d1, "D", "engine", true);
+      assignCell(state, empId, d2, "D", "engine", true);
+      return true;
+    }
+    // Try just 1 day before V if d1 is outside week but d2 is valid
+    if (
+      d2 >= 1 && weekSet.has(d2) && !schedule[d2]?.locked
+    ) {
+      // Look for another unlocked day in the week to make the pair
+      const otherDay = weekDays.find(d =>
+        d !== d2 && !schedule[d]?.locked && schedule[d]?.code !== "V"
+      );
+      if (otherDay != null) {
+        assignCell(state, empId, d2, "D", "engine", true);
+        assignCell(state, empId, otherDay, "D", "engine", true);
+        return true;
+      }
+    }
+  } else {
+    // enter_with_rest: Place 2D AFTER the last V day in this week
+    const lastV = Math.max(...vacationDays);
+    const d1 = lastV + 1; // day immediately after V
+    const d2 = lastV + 2; // day after that
+    if (
+      d1 <= totalDays && d2 <= totalDays &&
+      weekSet.has(d1) && weekSet.has(d2) &&
+      !schedule[d1]?.locked && !schedule[d2]?.locked
+    ) {
+      assignCell(state, empId, d1, "D", "engine", true);
+      assignCell(state, empId, d2, "D", "engine", true);
+      return true;
+    }
+    // Try just 1 day after V if d2 is outside week but d1 is valid
+    if (
+      d1 <= totalDays && weekSet.has(d1) && !schedule[d1]?.locked
+    ) {
+      const otherDay = weekDays.find(d =>
+        d !== d1 && !schedule[d]?.locked && schedule[d]?.code !== "V"
+      );
+      if (otherDay != null) {
+        assignCell(state, empId, d1, "D", "engine", true);
+        assignCell(state, empId, otherDay, "D", "engine", true);
+        return true;
+      }
+    }
+  }
+
+  return false; // Could not place vacation-adjacent rest, fall back to normal logic
+}
+
 function assignWeeklyRest(state: SolverState, emp: EngineEmployee, weekDays: number[], weekIndex = 0, empIndex = 0): void {
   const schedule = state.grid[emp.id];
 
@@ -323,6 +401,17 @@ function assignWeeklyRest(state: SolverState, emp: EngineEmployee, weekDays: num
   if (existingRests.length >= target) return;
   const needed = target - existingRests.length;
   if (needed <= 0) return;
+
+  // OP-41: Vacation-adjacent rest placement
+  // When an employee has V (vacation) days in this week, position rest days
+  // based on their vacationRestPreference.
+  const vacationDays = weekDays.filter(d => schedule[d]?.code === "V");
+  if (vacationDays.length > 0 && needed === 2) {
+    const pref = emp.vacationRestPreference ?? "exit_with_rest";
+    const placed = placeVacationAdjacentRest(state, emp.id, weekDays, vacationDays, pref);
+    if (placed) return;
+    // Fallback: if vacation-adjacent placement failed, continue with normal logic
+  }
 
   // If 1 rest already exists, find a day adjacent to make them consecutive
   if (needed === 1 && existingRests.length === 1) {

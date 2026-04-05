@@ -14,6 +14,7 @@ import {
   detectTransitionNeeds,
   detectVacationAlerts,
   detectVacationOpportunities,
+  detectDbDgEnjoy,
 } from "@/utils/engine/smartIA";
 import type { SmartSuggestion } from "@/utils/engine/smartIA";
 
@@ -33,6 +34,13 @@ interface UseSmartSuggestionsProps {
   }>;
   /** Datos de ocupación diaria (para SM-11) */
   occupancy?: Array<{ day: number; totalMovements: number }>;
+  /** Empleados con saldo DB/DG (para SM-12) — se lee de employee_equity */
+  employeesWithBalance?: Array<{
+    id: string;
+    name: string;
+    dbBalance: number;
+    dgBalance: number;
+  }>;
 }
 
 interface UseSmartSuggestionsResult {
@@ -57,6 +65,7 @@ export function useSmartSuggestions({
   savedShiftCodes,
   employees,
   occupancy,
+  employeesWithBalance,
 }: UseSmartSuggestionsProps): UseSmartSuggestionsResult {
   const [suggestions, setSuggestions] = useState<SmartSuggestion[]>([]);
 
@@ -93,6 +102,13 @@ export function useSmartSuggestions({
         );
       }
 
+      // SM-12: Sugerir disfrute de DB/DG acumulados (OP-43)
+      if (employeesWithBalance && employeesWithBalance.length > 0) {
+        allSuggestions.push(
+          ...detectDbDgEnjoy(employeesWithBalance)
+        );
+      }
+
       setSuggestions((prev) => {
         // No duplicar sugerencias del mismo tipo
         const existingTypes = new Set(prev.map((s) => `${s.type}-${JSON.stringify(s.data)}`));
@@ -102,7 +118,7 @@ export function useSmartSuggestions({
         return [...prev, ...newOnes];
       });
     },
-    [savedShiftCodes, employees]
+    [savedShiftCodes, employees, occupancy, employeesWithBalance]
   );
 
   const acceptSuggestion = useCallback((id: string) => {

@@ -34,7 +34,8 @@ export type SuggestionType =
   | "absence_save"          // SM-08: código ausencia repetido → guardar
   | "vacation_alert"        // SM-09: 80% vacaciones consumidas
   | "transition_proposal"   // SM-10: proponer 11×19
-  | "vacation_suggestion";  // SM-11: sugerir vacaciones en baja operativa
+  | "vacation_suggestion"   // SM-11: sugerir vacaciones en baja operativa
+  | "db_dg_enjoy";          // SM-12: sugerir disfrute de DB/DG acumulados
 
 export interface SmartSuggestion {
   id: string;
@@ -255,6 +256,61 @@ export function detectVacationOpportunities(
         dismissed: false,
       });
     }
+  }
+
+  return suggestions;
+}
+
+/**
+ * SM-12: Sugerir disfrute de dias debidos (DB) y debidos guardia (DG).
+ *
+ * Cuando un empleado tiene saldo DB > 0 o DG > 0, se genera una sugerencia
+ * para que el FOM programe esos dias de descanso compensatorio.
+ *
+ * NOTA: Los campos dbBalance y dgBalance NO estan en EquityBalance del engine.
+ * Se leen desde la tabla employee_equity (columnas db_balance, dg_balance)
+ * y se pasan como parametro independiente a esta funcion.
+ * TODO: En el futuro, considerar agregar dbBalance/dgBalance a EquityBalance
+ * para que el engine tenga acceso directo sin query adicional.
+ */
+export function detectDbDgEnjoy(
+  employees: Array<{
+    id: string;
+    name: string;
+    /** Saldo de dias debidos (horas extra acumuladas, cada +8h = +1 DB) */
+    dbBalance: number;
+    /** Saldo de dias debidos por guardia (compensatorio por G trabajadas) */
+    dgBalance: number;
+  }>
+): SmartSuggestion[] {
+  const suggestions: SmartSuggestion[] = [];
+
+  for (const emp of employees) {
+    const db = emp.dbBalance ?? 0;
+    const dg = emp.dgBalance ?? 0;
+
+    if (db <= 0 && dg <= 0) continue;
+
+    const total = db + dg;
+    const parts: string[] = [];
+    if (dg > 0) parts.push(`${dg} por guardias`);
+    if (db > 0) parts.push(`${db} por festivos/horas extra`);
+
+    suggestions.push({
+      id: `sm12-dbdg-${emp.id}-${Date.now()}`,
+      type: "db_dg_enjoy",
+      title: `${emp.name} tiene ${total} dia${total !== 1 ? "s" : ""} debido${total !== 1 ? "s" : ""} pendiente${total !== 1 ? "s" : ""}`,
+      description: `El empleado ${emp.name} tiene ${total} dia${total !== 1 ? "s" : ""} debido${total !== 1 ? "s" : ""} (${parts.join(", ")}). Considere programarlos.`,
+      actionLabel: "Ver balance",
+      data: {
+        employeeId: emp.id,
+        dbBalance: db,
+        dgBalance: dg,
+        totalOwed: total,
+      },
+      createdAt: new Date().toISOString(),
+      dismissed: false,
+    });
   }
 
   return suggestions;
