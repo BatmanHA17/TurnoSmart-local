@@ -712,17 +712,26 @@ function Step5Summary({
       }
     }
 
-    // 6. Cobertura nocturna — ¿hay suficientes FDA para cubrir noches del Night Agent?
+    // 6. Staffing recommendation — ¿hay suficientes FDAs para 100% cobertura?
     if (employees && employees.length > 0) {
-      const nightAgents = employees.filter(e => e.role === 'NIGHT_SHIFT_AGENT');
       const fdas = employees.filter(e => e.role === 'FRONT_DESK_AGENT');
-      if (nightAgents.length > 0 && fdas.length < 2) {
-        items.push({
-          ok: false,
-          label: `Solo ${fdas.length} FDA para cubrir noches del Night Agent`,
-          detail: 'Se recomienda al menos 2 Front Desk Agents para repartir coberturas nocturnas equitativamente.',
-        });
-      }
+      // Simplified staffing calc (mirrors solver's calculateStaffingRecommendation)
+      // Coverage defaults M:2, T:2, N:1 — same as engine defaults
+      const mN = 2, tN = 2, nN = 1;
+      const fdaMNeeded = Math.max(0, mN * 7 - 5 - 1 - 5); // total - FOM(5) - AFOM(1 Sun M) - GEX(5)
+      const fdaTNeeded = Math.max(0, tN * 7 - 3); // total - AFOM(3 T/week)
+      const fdaNNeeded = Math.max(0, nN * 7 - 5); // total - Night Agent(5)
+      const minFDAs = Math.ceil((fdaMNeeded + fdaTNeeded + fdaNNeeded) / 5);
+      const isSufficient = fdas.length >= minFDAs;
+      items.push({
+        ok: isSufficient,
+        label: isSufficient
+          ? `${fdas.length} Front Desk Agents — plantilla suficiente para 100% cobertura`
+          : `${fdas.length} Front Desk Agents — necesitas mínimo ${minFDAs} para 100% cobertura (faltan ${minFDAs - fdas.length})`,
+        detail: !isSufficient
+          ? `Con M:${mN}, T:${tN}, N:${nN} se requieren ${minFDAs} FDAs. Añade personal o reduce cobertura mínima.`
+          : '',
+      });
     }
 
     // 7. Equidad — desequilibrio previo grande
@@ -1094,9 +1103,33 @@ function Step7Choose({
     setExpandedIdx(expandedIdx === idx ? null : idx);
   };
 
+  // Show staffing recommendation from first alternative (same for all 3)
+  const staffingRec = alternatives[0]?.output?.staffingRecommendation;
+
   return (
     <div className="space-y-3">
       <Label className="text-sm font-medium">Elige la versión a aplicar</Label>
+
+      {/* Staffing recommendation banner */}
+      {staffingRec && !staffingRec.isSufficient && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
+          <div>
+            <p className="font-medium">Plantilla insuficiente</p>
+            <p className="mt-0.5 text-amber-700">
+              Necesitas mínimo {staffingRec.minRotaCompleto} Front Desk Agents para 100% cobertura.
+              Actualmente tienes {staffingRec.currentRotaCompleto} — faltan {staffingRec.minRotaCompleto - staffingRec.currentRotaCompleto}.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {staffingRec && staffingRec.isSufficient && (
+        <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-1.5 text-xs text-green-700">
+          <CircleCheck className="h-3.5 w-3.5 shrink-0" />
+          <span>Plantilla suficiente: {staffingRec.currentRotaCompleto} FDAs cubren 100% cobertura (mín. {staffingRec.minRotaCompleto})</span>
+        </div>
+      )}
 
       {alternatives.map((alt, idx) => {
         const isRecommended = idx === recommendedIndex;
