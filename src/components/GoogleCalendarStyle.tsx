@@ -723,6 +723,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
             engine_role: (colaborador as any).engine_role || undefined,
             job_title: jobTitleName,
             can_cover_nights: (colaborador as any).can_cover_nights,
+            fecha_antiguedad: colaborador.fecha_antiguedad || null,
           };
         });
 

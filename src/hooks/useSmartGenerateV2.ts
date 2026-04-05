@@ -46,6 +46,10 @@ interface CalendarEmployee {
   job_title?: string;
   /** SMART engine role from DB — replaces broken mapRole() string matching */
   engine_role?: string;
+  /** Seniority date from DB — used to compute seniorityLevel for night coverage rotation */
+  fecha_antiguedad?: string | null;
+  /** Whether this employee can cover night shifts */
+  can_cover_nights?: boolean;
 }
 
 interface UseSmartGenerateV2Props {
@@ -408,12 +412,21 @@ export function useSmartGenerateV2({
           const canCoverNights = config.rotationType === "ROTA_COMPLETO"
             ? ((ce as any).can_cover_nights !== false)
             : false;
+          // Bug 3 fix: compute seniorityLevel from fecha_antiguedad.
+          // Earlier dates = higher seniority. Falls back to role config default.
+          let seniorityLevel = config.seniorityLevel;
+          if (ce.fecha_antiguedad) {
+            // Convert to a numeric seniority: years since fecha_antiguedad
+            // More years = higher seniority level
+            const years = (Date.now() - new Date(ce.fecha_antiguedad).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+            seniorityLevel = Math.max(1, Math.round(years));
+          }
           return {
             id: ce.id,
             name: ce.name,
             role,
             rotationType: config.rotationType,
-            seniorityLevel: config.seniorityLevel,
+            seniorityLevel,
             weeklyHours: wh,
             contractUnits: wh / 8,
             absences: [],

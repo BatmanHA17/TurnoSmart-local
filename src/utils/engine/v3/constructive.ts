@@ -213,11 +213,13 @@ function assignRestDays(state: SolverState): void {
   }
 
   // Then assign remaining weekly rest (rotative for weeks without FDS Largo)
-  for (const emp of state.input.employees) {
-    if (emp.role === "FOM") continue;
+  // Bug 4 fix: pass employee index to stagger rest pairs across employees
+  const restEmps = state.input.employees.filter(e => e.role !== "FOM");
+  for (let ei = 0; ei < restEmps.length; ei++) {
+    const emp = restEmps[ei];
 
     for (let wi = 0; wi < weeks.length; wi++) {
-      assignWeeklyRest(state, emp, weeks[wi], wi);
+      assignWeeklyRest(state, emp, weeks[wi], wi, ei);
     }
   }
 }
@@ -303,29 +305,28 @@ function assignFdsLargo(
   }
 }
 
-function assignWeeklyRest(state: SolverState, emp: EngineEmployee, weekDays: number[], weekIndex = 0): void {
+function assignWeeklyRest(state: SolverState, emp: EngineEmployee, weekDays: number[], weekIndex = 0, empIndex = 0): void {
   const schedule = state.grid[emp.id];
 
-  // Count existing rest/absence days in this week
-  const existingLockedRests = weekDays.filter(d => {
+  // Bug 2 fix: Count ALL existing rest/absence days in this week (locked OR unlocked).
+  // Post-N rest days assigned by assignNightCoverage (locked D) count toward the weekly 2D.
+  const existingRests = weekDays.filter(d => {
     const c = schedule[d]?.code;
     if (!c) return false;
-    const isRest = c === "D" || c === "V" || c === "E" || c === "PM" || c === "PC" || c === "DB" || c === "DG";
-    return isRest && schedule[d]?.locked;
+    return c === "D" || c === "V" || c === "E" || c === "PM" || c === "PC" || c === "DB" || c === "DG";
   });
 
   // ALL employees get 2 consecutive rest days per week (legal requirement).
-  // For ROTA_COMPLETO who cover nights: Phase 2b will reassign their rests
-  // to be post-N (N,N,D,D) and clear redundant Phase 2 rests.
+  // If post-N rest days from night coverage already satisfy this, skip.
   const target = 2;
 
-  if (existingLockedRests.length >= target) return;
-  const needed = target - existingLockedRests.length;
+  if (existingRests.length >= target) return;
+  const needed = target - existingRests.length;
   if (needed <= 0) return;
 
   // If 1 rest already exists, find a day adjacent to make them consecutive
-  if (needed === 1 && existingLockedRests.length === 1) {
-    const existingDay = existingLockedRests[0];
+  if (needed === 1 && existingRests.length === 1) {
+    const existingDay = existingRests[0];
     // Try day after, then day before
     const adjacentCandidates = [existingDay + 1, existingDay - 1].filter(d =>
       weekDays.includes(d) &&
@@ -358,15 +359,18 @@ function assignWeeklyRest(state: SolverState, emp: EngineEmployee, weekDays: num
     if (schedule[d2].locked && schedule[d2].code !== "D") continue;
 
     let score = 0;
-    // Penalize days where others rest (coverage staggering)
+    // Bug 4 fix: Stronger penalty for days where others rest (coverage staggering)
     for (const [id, grid] of Object.entries(state.grid)) {
       if (id === emp.id) continue;
-      if (grid[d1]?.code === "D" && grid[d1]?.locked) score -= 10;
-      if (grid[d2]?.code === "D" && grid[d2]?.locked) score -= 10;
+      const c1 = grid[d1]?.code;
+      const c2 = grid[d2]?.code;
+      if (c1 === "D" || c1 === "V" || c1 === "E") score -= 15;
+      if (c2 === "D" || c2 === "V" || c2 === "E") score -= 15;
     }
 
     // ROTATIVE REST: strongly prefer the pair at target position
-    const targetPairStart = (weekIndex * 2) % weekDays.length;
+    // Bug 4 fix: offset by both weekIndex AND empIndex to stagger across employees
+    const targetPairStart = ((weekIndex * 2) + (empIndex * 2)) % weekDays.length;
     const distFromTarget = Math.min(
       Math.abs(i - targetPairStart),
       weekDays.length - Math.abs(i - targetPairStart)
@@ -411,11 +415,52 @@ function assignNightCoverage(state: SolverState): void {
   const nightAgent = state.input.employees.find(e => e.role === "NIGHT_SHIFT_AGENT");
   if (!nightAgent) return;
 
+  // === First: assign Night Agent's own rest days (2 consecutive per week) ===
+  // After anchorFixed, the Night Agent has N on all non-locked days.
+  // We need to give him 2D/week so FDAs can cover those specific nights.
+  for (let wi = 0; wi < weeks.length; wi++) {
+    const week = weeks[wi];
+    // Count existing rest/absence days (V, E, PM, PC, etc.)
+    const existingRests = week.filter(d => {
+      const code = state.grid[nightAgent.id][d]?.code;
+      return code !== "N" && code !== undefined; // anything that's not N is rest/absence
+    });
+    const needed = 2 - existingRests.length;
+    if (needed <= 0) continue;
+
+    // Pick 2 consecutive days for rest, staggered by week index
+    const targetPairStart = (wi * 2) % week.length;
+    let bestPair: number[] | null = null;
+    let bestScore = -Infinity;
+    for (let i = 0; i < week.length - 1; i++) {
+      const d1 = week[i];
+      const d2 = week[i + 1];
+      if (state.grid[nightAgent.id][d1]?.locked) continue;
+      if (state.grid[nightAgent.id][d2]?.locked) continue;
+      // Rotation bonus
+      const dist = Math.min(Math.abs(i - targetPairStart), week.length - Math.abs(i - targetPairStart));
+      const score = (week.length - dist) * 20;
+      if (score > bestScore) { bestScore = score; bestPair = [d1, d2]; }
+    }
+    if (bestPair) {
+      for (const d of bestPair) {
+        if (!state.grid[nightAgent.id][d].locked) {
+          assignCell(state, nightAgent.id, d, "D", "engine", true);
+        }
+      }
+    }
+  }
+
   // Get ROTA_COMPLETO employees that can cover nights, sorted by seniority descending
   // canCoverNights defaults to true for ROTA_COMPLETO unless explicitly set to false
+  // Bug 3 fix: sort by seniorityLevel DESC; if all equal (default=1), fall back to name
   const rotaEmps = state.input.employees
     .filter(e => e.rotationType === "ROTA_COMPLETO" && e.canCoverNights !== false)
-    .sort((a, b) => b.seniorityLevel - a.seniorityLevel);
+    .sort((a, b) => {
+      if (b.seniorityLevel !== a.seniorityLevel) return b.seniorityLevel - a.seniorityLevel;
+      // Fallback: alphabetical by name (stable ordering when seniority is equal)
+      return a.name.localeCompare(b.name);
+    });
 
   if (rotaEmps.length === 0) return;
 
@@ -425,9 +470,11 @@ function assignNightCoverage(state: SolverState): void {
   if (rotaEmps.length > 0) roundRobinIdx = roundRobinIdx % rotaEmps.length;
 
   for (const week of weeks) {
-    // Find days where Night Agent rests in this week
+    // Bug 1 fix: ONLY identify days where the Night Agent has D (rest), NOT where he works N.
+    // The FDA covers ONLY the Night Agent's actual rest days.
     const nightAgentRestDays = week.filter(d => {
       const code = state.grid[nightAgent.id][d]?.code;
+      // Only D, V, E — these are rest/absence days where night is uncovered
       return code === "D" || code === "V" || code === "E";
     });
 
@@ -513,53 +560,8 @@ function assignNightCoverage(state: SolverState): void {
         }
       }
 
-      // Clear any Phase 2 pre-assigned rest in this week that's now redundant
-      // (the employee already has their 2 rest days post-N)
-      const weekIdx = Math.floor((lastNight - 1) / 7);
-      const thisWeek = weeks[weekIdx];
-      if (thisWeek) {
-        const postNightRestDays = new Set([restDay1, restDay2]);
-        for (const d of thisWeek) {
-          if (postNightRestDays.has(d)) continue; // keep the post-N rests
-          if (nightAgentRestDays.includes(d)) continue; // keep the N assignments
-          if (state.grid[emp.id][d].code === "D" && state.grid[emp.id][d].locked) {
-            // This is a Phase 2 rest that's now redundant — unlock it for work
-            state.grid[emp.id][d] = {
-              code: "D", startTime: "00:00", endTime: "00:00",
-              hours: 0, locked: false, source: "engine",
-            };
-          }
-        }
-      }
-      // Also check if rest days spill into next week — clear redundant Phase 2 rests there
-      if (restDay2 > 0) {
-        const restWeekIdx = Math.floor((restDay2 - 1) / 7);
-        if (restWeekIdx !== weekIdx && restWeekIdx < weeks.length) {
-          const nextWeek = weeks[restWeekIdx];
-          if (nextWeek) {
-            const postNightRestDays = new Set([restDay1, restDay2]);
-            let clearedCount = 0;
-            for (const d of nextWeek) {
-              if (postNightRestDays.has(d)) continue;
-              if (state.grid[emp.id][d].code === "D" && state.grid[emp.id][d].locked && clearedCount < 1) {
-                // Clear at most 1 redundant rest in next week (keep at least 1)
-                const totalRestsInNextWeek = nextWeek.filter(nd =>
-                  state.grid[emp.id][nd].code === "D" && state.grid[emp.id][nd].locked
-                ).length;
-                // Only clear if we have post-N rests spilling into this week
-                const spilledRests = [restDay1, restDay2].filter(rd => nextWeek.includes(rd)).length;
-                if (spilledRests > 0 && totalRestsInNextWeek > (2 - spilledRests)) {
-                  state.grid[emp.id][d] = {
-                    code: "D", startTime: "00:00", endTime: "00:00",
-                    hours: 0, locked: false, source: "engine",
-                  };
-                  clearedCount++;
-                }
-              }
-            }
-          }
-        }
-      }
+      // No need to clear Phase 2 rests — nightCoverage now runs BEFORE assignRestDays.
+      // assignRestDays will see these post-N rests and count them toward weekly 2D.
 
       // Update night coverage equity
       const eq = state.equity.get(emp.id);
@@ -1185,11 +1187,12 @@ export function buildInitialSolution(
   // Phase 1: Anchor fixed roles + absences + hard petitions
   anchorFixed(state);
 
-  // Phase 2: Assign rest days (1 staggered for ROTA_COMPLETO, 2 consecutive for others)
-  assignRestDays(state);
-
-  // Phase 2b: Night coverage rotation (seniority-based)
+  // Phase 2: Night coverage rotation (seniority-based) — MUST run BEFORE rest days
+  // so that post-N rest days count toward the weekly 2D requirement.
   assignNightCoverage(state);
+
+  // Phase 2b: Assign rest days (2 consecutive per week, counting post-N rests)
+  assignRestDays(state);
 
   // Phase 3a: GEX by occupancy
   assignGEX(state);
