@@ -4,7 +4,8 @@ import {
   Briefcase,
   FileText,
   Building2,
-  Brain
+  Brain,
+  Factory
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,12 @@ const settingsNavigation = [
         label: "Criterios SMART",
         icon: Brain,
         path: "/config/criterios"
+      },
+      {
+        id: "sector",
+        label: "Sector",
+        icon: Factory,
+        path: "/config/sector"
       }
     ]
   }
