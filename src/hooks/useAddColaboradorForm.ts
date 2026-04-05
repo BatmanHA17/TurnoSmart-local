@@ -90,6 +90,8 @@ export interface ColaboradorFormData {
   trabajadorExtranjeroPermiso: boolean;
   /** SMART engine role — determines shift rotation behavior */
   engineRole: string;
+  /** Whether this employee participates in night coverage rotation */
+  canCoverNights: boolean;
 }
 
 const EMPTY_FORM: ColaboradorFormData = {
@@ -142,6 +144,7 @@ const EMPTY_FORM: ColaboradorFormData = {
   fechaAntiguedad: "",
   trabajadorExtranjeroPermiso: false,
   engineRole: "ROTA_COMPLETO",
+  canCoverNights: true,
 };
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
@@ -322,6 +325,7 @@ export function useAddColaboradorForm({
         fechaAntiguedad: colaboradorData.fecha_antiguedad || "",
         trabajadorExtranjeroPermiso: colaboradorData.trabajador_extranjero_permiso || false,
         engineRole: colaboradorData.engine_role || "ROTA_COMPLETO",
+        canCoverNights: colaboradorData.can_cover_nights !== false,
       });
 
       if (colaboradorData.jobs?.department) {

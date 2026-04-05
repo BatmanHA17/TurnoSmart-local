@@ -612,6 +612,63 @@ export function checkMaxConsecutiveWorkDays(
 }
 
 /**
+ * CK-26: PROYECCIÓN ANUAL DE VACACIONES
+ * Alerta si un empleado no alcanzará el 90% de sus 30 días naturales antes de diciembre.
+ * Solo se activa a partir del mes 4 (abril) para tener datos significativos.
+ */
+export function checkVacationAnnualRatio(
+  shifts: ShiftForAudit[],
+  periodStart: Date,
+): AuditViolation[] {
+  const violations: AuditViolation[] = [];
+  const currentMonth = periodStart.getMonth(); // 0-11
+  const daysPerYear = 30; // días naturales de vacaciones/año en hostelería
+  const targetRatio = 0.9; // 90% debe estar disfrutado antes del 31 dic
+
+  // Solo tiene sentido a partir de abril (mes index 3)
+  const monthsElapsed = currentMonth + 1;
+  if (monthsElapsed < 4) return violations;
+
+  const yearStart = new Date(periodStart.getFullYear(), 0, 1);
+
+  // Obtener lista única de empleados del período
+  const employeeMap = new Map<string, string>();
+  for (const s of shifts) {
+    if (!employeeMap.has(s.employeeId)) {
+      employeeMap.set(s.employeeId, s.employeeName);
+    }
+  }
+
+  for (const [empId, empName] of employeeMap) {
+    // Contar días V en el año actual
+    const vDays = shifts.filter(s =>
+      s.employeeId === empId &&
+      (s.absenceCode === 'V' || s.shiftName === 'Vacaciones') &&
+      new Date(s.date) >= yearStart
+    ).length;
+
+    // Proyectar al ritmo actual: (vDays / mesesTranscurridos) * 12
+    const projectedTotal = (vDays / monthsElapsed) * 12;
+
+    if (projectedTotal < daysPerYear * targetRatio) {
+      violations.push({
+        id: generateViolationId(),
+        type: 'VACATION_RATIO_LOW',
+        severity: 'warning',
+        employeeId: empId,
+        employeeName: empName,
+        date: format(periodStart, 'yyyy-MM-dd'),
+        message: `Ratio vacaciones anual bajo para ${empName}`,
+        details: `${empName} ha disfrutado ${vDays} de ${daysPerYear} días de vacaciones. Al ritmo actual, llegará a diciembre con ~${Math.round(projectedTotal)} días (${Math.round(projectedTotal / daysPerYear * 100)}%). Objetivo: ≥90%.`,
+        suggestion: `Programa vacaciones adicionales para ${empName} antes de fin de año.`,
+      });
+    }
+  }
+
+  return violations;
+}
+
+/**
  * FUNCIÓN PRINCIPAL: Ejecutar todas las auditorías
  */
 export function runFullAudit(
@@ -688,7 +745,10 @@ export function runFullAudit(
     }
   }
   
-  // 6. Generate suggested fixes (Copilot Auditoría T2-1)
+  // 7. CK-26: Proyección anual de vacaciones por empleado
+  allViolations.push(...checkVacationAnnualRatio(shifts, options.periodStart));
+
+  // 8. Generate suggested fixes (Copilot Auditoría T2-1)
   for (const v of allViolations) {
     if (v.suggestedFix) continue; // already has one
     v.suggestedFix = generateSuggestedFix(v);

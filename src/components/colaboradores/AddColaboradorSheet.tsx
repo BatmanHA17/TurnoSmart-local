@@ -540,6 +540,23 @@ export const AddColaboradorSheet = ({
                         </div>
                       </FormField>
 
+                      {formData.engineRole === 'ROTA_COMPLETO' && (
+                        <FormField label="">
+                          <div className="flex items-center justify-between rounded-lg border p-3">
+                            <div className="space-y-0.5">
+                              <Label className="text-sm font-medium">Participa en rotación nocturna</Label>
+                              <p className="text-xs text-muted-foreground">
+                                Si está desactivado, este empleado no cubrirá las noches del Auditor de Noche
+                              </p>
+                            </div>
+                            <Switch
+                              checked={formData.canCoverNights}
+                              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, canCoverNights: checked }))}
+                            />
+                          </div>
+                        </FormField>
+                      )}
+
                       <FormField label="">
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
@@ -1278,6 +1295,23 @@ export const AddColaboradorSheet = ({
                         </p>
                       </div>
                     </FormField>
+
+                    {formData.engineRole === 'ROTA_COMPLETO' && (
+                      <FormField label="">
+                        <div className="flex items-center justify-between rounded-lg border p-3">
+                          <div className="space-y-0.5">
+                            <Label className="text-sm font-medium">Participa en rotación nocturna</Label>
+                            <p className="text-xs text-muted-foreground">
+                              Si está desactivado, este empleado no cubrirá las noches del Auditor de Noche
+                            </p>
+                          </div>
+                          <Switch
+                            checked={formData.canCoverNights}
+                            onCheckedChange={(checked) => setFormData(prev => ({ ...prev, canCoverNights: checked }))}
+                          />
+                        </div>
+                      </FormField>
+                    )}
 
                     <FormField label="">
                       <div className="space-y-2">

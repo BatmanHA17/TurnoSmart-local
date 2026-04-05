@@ -70,6 +70,7 @@ export interface ColaboradorBaseData {
   fecha_antiguedad?: string | null;
   job_id?: string | null; // Nuevo campo para referencia al puesto de trabajo
   engine_role?: string | null; // SMART engine rotation role
+  can_cover_nights?: boolean; // Whether employee participates in night coverage rotation
   org_id: string;
   selectedDepartments?: string[]; // For department assignments
 }
@@ -333,6 +334,7 @@ export const mapLegacyFormData = (formData: any) => {
     fecha_antiguedad: formData.fechaAntiguedad || null,
     job_id: formData.jobId || null,
     engine_role: formData.engineRole || 'ROTA_COMPLETO',
+    can_cover_nights: formData.canCoverNights !== false,
     org_id: '' // Will be set by the calling function
   };
 
