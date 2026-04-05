@@ -101,6 +101,8 @@ export interface EngineEmployee {
   isNewHire?: boolean;
   /** Primer día efectivo (1-based, día del mes) — si es incorporación tardía */
   startDay?: number;
+  /** Whether this employee can cover Night Agent's rest nights (default: true for ROTA_COMPLETO) */
+  canCoverNights?: boolean;
 }
 
 /** Ausencia pre-aprobada */

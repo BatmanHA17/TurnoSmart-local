@@ -374,10 +374,13 @@ function assignWeeklyRest(state: SolverState, emp: EngineEmployee, weekDays: num
 }
 
 // ---------------------------------------------------------------------------
-// PHASE 2b: Night coverage rotation (seniority-based)
-// When Night Agent rests, assign those nights to ROTA_COMPLETO by seniority.
-// After 2 nights, the covering employee gets rest days (N→D hard constraint).
-// Rotates each week to the next employee by seniority for equity.
+// PHASE 2b: Night coverage rotation (strict round-robin by seniority)
+// When Night Agent rests, assign those nights to ROTA_COMPLETO employees.
+// RULES:
+// - Strict round-robin: Week 1→FDA#1, Week 2→FDA#2, Week 3→FDA#3, etc.
+//   Sorted by seniority descending. Wraps around.
+// - After covering nights, employee gets 2 CONSECUTIVE rest days (N,N,D,D).
+// - If a candidate can't cover (locked days, petitions), skip to next in rotation.
 // ---------------------------------------------------------------------------
 
 function assignNightCoverage(state: SolverState): void {
@@ -387,17 +390,16 @@ function assignNightCoverage(state: SolverState): void {
   const nightAgent = state.input.employees.find(e => e.role === "NIGHT_SHIFT_AGENT");
   if (!nightAgent) return;
 
-  // Get ROTA_COMPLETO employees sorted by seniority descending (highest first)
-  // Exclude FOM (never covers nights)
+  // Get ROTA_COMPLETO employees that can cover nights, sorted by seniority descending
+  // canCoverNights defaults to true for ROTA_COMPLETO unless explicitly set to false
   const rotaEmps = state.input.employees
-    .filter(e => e.rotationType === "ROTA_COMPLETO")
+    .filter(e => e.rotationType === "ROTA_COMPLETO" && e.canCoverNights !== false)
     .sort((a, b) => b.seniorityLevel - a.seniorityLevel);
 
   if (rotaEmps.length === 0) return;
 
-  // Track night coverage equity across the period
-  const nightCoverageCount = new Map<string, number>();
-  for (const emp of rotaEmps) nightCoverageCount.set(emp.id, 0);
+  // Strict round-robin index: advances by 1 each week regardless of success
+  let roundRobinIdx = 0;
 
   for (const week of weeks) {
     // Find days where Night Agent rests in this week
@@ -408,35 +410,27 @@ function assignNightCoverage(state: SolverState): void {
 
     if (nightAgentRestDays.length === 0) continue;
 
-    // Pick the covering employee: round-robin by seniority, prefer who has
-    // done the fewest night coverages so far (breaks ties by seniority)
-    const sorted = [...rotaEmps].sort((a, b) => {
-      const aCov = nightCoverageCount.get(a.id) ?? 0;
-      const bCov = nightCoverageCount.get(b.id) ?? 0;
-      if (aCov !== bCov) return aCov - bCov; // fewer coverages first
-      return b.seniorityLevel - a.seniorityLevel; // higher seniority first
-    });
-
-    // Find an employee who can work these nights.
-    // Check sequentially (each N is checked after previous ones are assigned).
+    // Try candidates starting from the round-robin position
     let assigned = false;
-    for (const emp of sorted) {
-      // Pre-check: no locked cells on coverage days
-      const daysBlocked = nightAgentRestDays.some(d => state.grid[emp.id][d].locked);
-      if (daysBlocked) continue;
+    for (let attempt = 0; attempt < rotaEmps.length; attempt++) {
+      const empIdx = (roundRobinIdx + attempt) % rotaEmps.length;
+      const emp = rotaEmps[empIdx];
 
-      // Pre-check: don't assign if forced rest after last N would override a petition
-      const lastCoverageNight = nightAgentRestDays[nightAgentRestDays.length - 1];
-      const restAfterDay = lastCoverageNight + 1;
-      if (restAfterDay <= state.input.period.totalDays) {
-        const hasPetitionOnRestDay = emp.petitions.some(p =>
-          p.status !== "rejected" && p.days.includes(restAfterDay) &&
-          p.requestedShift && p.requestedShift !== "D"
-        );
-        if (hasPetitionOnRestDay) continue;
+      // Pre-check: no locked cells on coverage nights
+      if (nightAgentRestDays.some(d => state.grid[emp.id][d].locked)) continue;
+
+      // Pre-check: need room for 2 rest days after last N
+      const lastNight = nightAgentRestDays[nightAgentRestDays.length - 1];
+      const restDay1 = lastNight + 1;
+      const restDay2 = lastNight + 2;
+      // Check rest day 1 is available
+      if (restDay1 <= state.input.period.totalDays && state.grid[emp.id][restDay1].locked) {
+        // If locked with absence (V, E, etc.) that's OK for rest
+        const r1Code = state.grid[emp.id][restDay1].code;
+        if (isWorkingShift(r1Code)) continue; // locked with work shift → can't rest
       }
 
-      // Try assigning N on each Night Agent rest day sequentially
+      // Try assigning N on each Night Agent rest day
       const assignedDays: number[] = [];
       let allFeasible = true;
       for (const d of nightAgentRestDays) {
@@ -447,7 +441,7 @@ function assignNightCoverage(state: SolverState): void {
       }
 
       if (!allFeasible) {
-        // Rollback: undo partial assignments
+        // Rollback partial assignments
         for (const d of assignedDays) {
           state.grid[emp.id][d] = {
             code: "D", startTime: "00:00", endTime: "00:00",
@@ -457,72 +451,65 @@ function assignNightCoverage(state: SolverState): void {
         continue;
       }
 
-      // Assign rest day after the LAST night (N→non-N must be rest)
-      // N→N is allowed, so only the day after the last N needs forced rest
-      const lastNight = nightAgentRestDays[nightAgentRestDays.length - 1];
-      const restDay = lastNight + 1;
-      if (restDay <= state.input.period.totalDays && !state.grid[emp.id][restDay].locked) {
-        assignCell(state, emp.id, restDay, "D", "engine", true);
+      // === Assign 2 CONSECUTIVE rest days after the last night ===
+      // Day after last N = rest day 1 (mandatory: N→D)
+      if (restDay1 <= state.input.period.totalDays && !state.grid[emp.id][restDay1].locked) {
+        assignCell(state, emp.id, restDay1, "D", "engine", true);
+      }
+      // Day after rest day 1 = rest day 2 (to guarantee 2 consecutive)
+      if (restDay2 <= state.input.period.totalDays && !state.grid[emp.id][restDay2].locked) {
+        assignCell(state, emp.id, restDay2, "D", "engine", true);
       }
 
-      // Make rest days consecutive: move the pre-assigned Phase 2 rest to be
-      // adjacent to the post-night rest. After night coverage, the employee
-      // should get 2 consecutive rest days (e.g., N,N,D,D not N,N,D,T,D,T).
-      const postNightRest = restDay;
-      if (postNightRest <= state.input.period.totalDays) {
-        // Find which week this rest belongs to
-        const weekIdx = Math.floor((postNightRest - 1) / 7);
-        const wks = getWeeks(state.input.period.totalDays);
-        const weekOfRest = wks[weekIdx];
-        if (weekOfRest) {
-          // Find the other (Phase 2) rest day in this week that's NOT adjacent
-          const otherRests = weekOfRest.filter(d =>
-            d !== postNightRest &&
-            state.grid[emp.id][d]?.code === "D" &&
-            !nightAgentRestDays.includes(d) // exclude N days (they're now N, not D)
-          );
-          const secondRestDay = postNightRest + 1;
-          for (const otherD of otherRests) {
-            // If already adjacent, nothing to do
-            if (Math.abs(otherD - postNightRest) === 1) break;
-            // Move the pre-assigned rest to day after post-night rest
-            if (
-              secondRestDay <= state.input.period.totalDays &&
-              weekOfRest.includes(secondRestDay) &&
-              !state.grid[emp.id][secondRestDay].locked &&
-              isWorkingShift(state.grid[emp.id][secondRestDay].code) === false
-            ) {
-              // Clear the old pre-assigned rest (make it available for work)
-              state.grid[emp.id][otherD] = {
-                code: "D", startTime: "00:00", endTime: "00:00",
-                hours: 0, locked: false, source: "engine",
-              };
-              // Assign second consecutive rest
-              assignCell(state, emp.id, secondRestDay, "D", "engine", true);
-              break;
-            }
-            // If secondRestDay is already occupied with work, try the day before postNightRest
-            // (but only if that's not an N day we just assigned)
-            const beforeRest = postNightRest - 1;
-            if (
-              beforeRest >= 1 &&
-              weekOfRest.includes(beforeRest) &&
-              !state.grid[emp.id][beforeRest].locked &&
-              !nightAgentRestDays.includes(beforeRest)
-            ) {
-              state.grid[emp.id][otherD] = {
-                code: "D", startTime: "00:00", endTime: "00:00",
-                hours: 0, locked: false, source: "engine",
-              };
-              assignCell(state, emp.id, beforeRest, "D", "engine", true);
-              break;
+      // Clear any Phase 2 pre-assigned rest in this week that's now redundant
+      // (the employee already has their 2 rest days post-N)
+      const weekIdx = Math.floor((lastNight - 1) / 7);
+      const thisWeek = weeks[weekIdx];
+      if (thisWeek) {
+        const postNightRestDays = new Set([restDay1, restDay2]);
+        for (const d of thisWeek) {
+          if (postNightRestDays.has(d)) continue; // keep the post-N rests
+          if (nightAgentRestDays.includes(d)) continue; // keep the N assignments
+          if (state.grid[emp.id][d].code === "D" && state.grid[emp.id][d].locked) {
+            // This is a Phase 2 rest that's now redundant — unlock it for work
+            state.grid[emp.id][d] = {
+              code: "D", startTime: "00:00", endTime: "00:00",
+              hours: 0, locked: false, source: "engine",
+            };
+          }
+        }
+      }
+      // Also check if rest days spill into next week — clear redundant Phase 2 rests there
+      if (restDay2 > 0) {
+        const restWeekIdx = Math.floor((restDay2 - 1) / 7);
+        if (restWeekIdx !== weekIdx && restWeekIdx < weeks.length) {
+          const nextWeek = weeks[restWeekIdx];
+          if (nextWeek) {
+            const postNightRestDays = new Set([restDay1, restDay2]);
+            let clearedCount = 0;
+            for (const d of nextWeek) {
+              if (postNightRestDays.has(d)) continue;
+              if (state.grid[emp.id][d].code === "D" && state.grid[emp.id][d].locked && clearedCount < 1) {
+                // Clear at most 1 redundant rest in next week (keep at least 1)
+                const totalRestsInNextWeek = nextWeek.filter(nd =>
+                  state.grid[emp.id][nd].code === "D" && state.grid[emp.id][nd].locked
+                ).length;
+                // Only clear if we have post-N rests spilling into this week
+                const spilledRests = [restDay1, restDay2].filter(rd => nextWeek.includes(rd)).length;
+                if (spilledRests > 0 && totalRestsInNextWeek > (2 - spilledRests)) {
+                  state.grid[emp.id][d] = {
+                    code: "D", startTime: "00:00", endTime: "00:00",
+                    hours: 0, locked: false, source: "engine",
+                  };
+                  clearedCount++;
+                }
+              }
             }
           }
         }
       }
 
       // Update night coverage equity
-      nightCoverageCount.set(emp.id, (nightCoverageCount.get(emp.id) ?? 0) + nightAgentRestDays.length);
       const eq = state.equity.get(emp.id);
       if (eq) eq.nightCoverage += nightAgentRestDays.length;
 
@@ -530,10 +517,15 @@ function assignNightCoverage(state: SolverState): void {
       break;
     }
 
-    // If no single employee can cover all nights, split across employees
+    // Advance round-robin regardless of success (ensures strict rotation)
+    roundRobinIdx = (roundRobinIdx + 1) % rotaEmps.length;
+
+    // Fallback: if no single employee can cover all nights, split across employees
     if (!assigned) {
       for (const d of nightAgentRestDays) {
-        for (const emp of sorted) {
+        for (let attempt = 0; attempt < rotaEmps.length; attempt++) {
+          const empIdx = (roundRobinIdx + attempt) % rotaEmps.length;
+          const emp = rotaEmps[empIdx];
           const cell = state.grid[emp.id][d];
           if (cell.locked) continue;
           const feasible = ALL_HARD_CONSTRAINTS.every(hc => hc.isFeasible(state, emp.id, d, "N"));
@@ -545,7 +537,6 @@ function assignNightCoverage(state: SolverState): void {
           if (nextDay <= state.input.period.totalDays && !state.grid[emp.id][nextDay].locked) {
             assignCell(state, emp.id, nextDay, "D", "engine", true);
           }
-          nightCoverageCount.set(emp.id, (nightCoverageCount.get(emp.id) ?? 0) + 1);
           const eq = state.equity.get(emp.id);
           if (eq) eq.nightCoverage++;
           break;

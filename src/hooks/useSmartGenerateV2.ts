@@ -383,6 +383,11 @@ export function useSmartGenerateV2({
           const config = ROLE_CONFIGS[role];
           const wh = parseWeeklyHours(ce.workingHours);
           const prevEquity = equityByEmployee.get(ce.id);
+          // canCoverNights: true by default for ROTA_COMPLETO.
+          // Users can set can_cover_nights=false in colaboradores to exclude from night rotation.
+          const canCoverNights = config.rotationType === "ROTA_COMPLETO"
+            ? ((ce as any).can_cover_nights !== false)
+            : false;
           return {
             id: ce.id,
             name: ce.name,
@@ -393,6 +398,7 @@ export function useSmartGenerateV2({
             contractUnits: wh / 8,
             absences: [],
             petitions: petitionsByEmployee.get(ce.id) ?? [],
+            canCoverNights,
             equityBalance: prevEquity ?? {
               morningCount: 0,
               afternoonCount: 0,

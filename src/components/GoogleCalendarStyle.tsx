@@ -688,7 +688,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       // If we return early with only employees from localStorage, the filter will fail
       const { data, error } = await supabase
         .from('colaboradores')
-        .select('id, nombre, apellidos, avatar_url, email, tiempo_trabajo_semanal, tipo_contrato, fecha_inicio_contrato, fecha_fin_contrato, status, engine_role, jobs(job_titles(name))')
+        .select('id, nombre, apellidos, avatar_url, email, tiempo_trabajo_semanal, tipo_contrato, fecha_inicio_contrato, fecha_fin_contrato, status, engine_role, can_cover_nights, jobs(job_titles(name))')
         .eq('org_id', org.org_id)
         .or(`status.eq.activo,status.eq.active,fecha_fin_contrato.gte.${today}`)
         .order('nombre', { ascending: true }); // Mismo orden que en CalendarDay
@@ -722,6 +722,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
             startDate: colaborador.fecha_inicio_contrato || undefined,
             engine_role: (colaborador as any).engine_role || undefined,
             job_title: jobTitleName,
+            can_cover_nights: (colaborador as any).can_cover_nights,
           };
         });
 
