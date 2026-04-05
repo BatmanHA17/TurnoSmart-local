@@ -257,7 +257,7 @@ function RoleDialog({
 // ---------------------------------------------------------------------------
 
 export default function SectorConfigPage() {
-  const { organization } = useCurrentOrganization();
+  const { currentOrg, loading: orgLoading } = useCurrentOrganization();
   const { toast } = useToast();
 
   const [config, setConfig] = useState<OrgEngineConfig | null>(null);
@@ -272,7 +272,7 @@ export default function SectorConfigPage() {
   const [editingRole, setEditingRole] = useState<RoleConfigOverride | null>(null);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
-  const orgId = (organization as any)?.org_id ?? (organization as any)?.id;
+  const orgId = (currentOrg as any)?.org_id ?? (currentOrg as any)?.id;
 
   // Load config on mount
   useEffect(() => {
