@@ -20,6 +20,7 @@ import { useState, useMemo, Fragment } from "react";
 import { format, startOfMonth, addDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { buildGenerationPeriod } from "@/utils/engine/helpers";
+import { SHIFT_TIMES, ROLE_CONFIGS } from "@/utils/engine/constants";
 import { PlantillaCalculator } from "./PlantillaCalculator";
 import {
   Sheet,
@@ -712,24 +713,51 @@ function Step5Summary({
       }
     }
 
-    // 6. Staffing recommendation — ¿hay suficientes FDAs para 100% cobertura?
+    // 6. Staffing recommendation — generic formula for any shift configuration
     if (employees && employees.length > 0) {
-      const fdas = employees.filter(e => e.role === 'FRONT_DESK_AGENT');
-      // Simplified staffing calc (mirrors solver's calculateStaffingRecommendation)
-      // Coverage defaults M:2, T:2, N:1 — same as engine defaults
+      const getRotationType = (role?: string) =>
+        role && ROLE_CONFIGS[role as keyof typeof ROLE_CONFIGS]?.rotationType;
+      const rotaEmps = employees.filter(e => getRotationType(e.role) === 'ROTA_COMPLETO');
+      const nonRotaEmps = employees.filter(e => getRotationType(e.role) !== 'ROTA_COMPLETO');
+
+      // Coverage defaults M:2, T:2, N:1
       const mN = 2, tN = 2, nN = 1;
-      const fdaMNeeded = Math.max(0, mN * 7 - 5 - 1 - 5); // total - FOM(5) - AFOM(1 Sun M) - GEX(5)
-      const fdaTNeeded = Math.max(0, tN * 7 - 3); // total - AFOM(3 T/week)
-      const fdaNNeeded = Math.max(0, nN * 7 - 5); // total - Night Agent(5)
-      const minFDAs = Math.ceil((fdaMNeeded + fdaTNeeded + fdaNNeeded) / 5);
-      const isSufficient = fdas.length >= minFDAs;
+
+      // Total coverage slots per week
+      const totalSlotsPerWeek = ((mN as number) + (tN as number) + (nN as number)) * 7;
+
+      // Estimate non-rota contributions per week (~5 working days each)
+      const nonRotaShiftsPerWeek = nonRotaEmps.length * 5;
+      const rotaSlotsNeeded = Math.max(0, totalSlotsPerWeek - nonRotaShiftsPerWeek);
+
+      // Average shift hours from configured shifts
+      const shiftHours: number[] = [];
+      if ((mN as number) > 0) shiftHours.push(SHIFT_TIMES["M"]?.hours ?? 8);
+      if ((tN as number) > 0) shiftHours.push(SHIFT_TIMES["T"]?.hours ?? 8);
+      if ((nN as number) > 0) shiftHours.push(SHIFT_TIMES["N"]?.hours ?? 8);
+      const avgShiftH = shiftHours.length > 0
+        ? shiftHours.reduce((a, b) => a + b, 0) / shiftHours.length
+        : 8;
+      const maxWeeklyH = 40; // from SPAIN_LABOR_LAW
+      const shiftsPerEmployee = Math.floor(maxWeeklyH / avgShiftH);
+      const minRota = shiftsPerEmployee > 0 ? Math.ceil(rotaSlotsNeeded / shiftsPerEmployee) : 0;
+
+      const isSufficient = rotaEmps.length >= minRota;
+
+      // Build coverage label
+      const covParts: string[] = [];
+      if ((mN as number) > 0) covParts.push(`M:${mN}`);
+      if ((tN as number) > 0) covParts.push(`T:${tN}`);
+      if ((nN as number) > 0) covParts.push(`N:${nN}`);
+      const covLabel = covParts.join(", ");
+
       items.push({
         ok: isSufficient,
         label: isSufficient
-          ? `${fdas.length} Front Desk Agents — plantilla suficiente para 100% cobertura`
-          : `${fdas.length} Front Desk Agents — necesitas mínimo ${minFDAs} para 100% cobertura (faltan ${minFDAs - fdas.length})`,
+          ? `${rotaEmps.length} empleados rotativos — plantilla suficiente para 100% cobertura`
+          : `${rotaEmps.length} empleados rotativos — necesitas mínimo ${minRota} para 100% cobertura (faltan ${minRota - rotaEmps.length})`,
         detail: !isSufficient
-          ? `Con M:${mN}, T:${tN}, N:${nN} se requieren ${minFDAs} FDAs. Añade personal o reduce cobertura mínima.`
+          ? `Con ${covLabel} se requieren ${minRota} empleados rotativos. Añade personal o reduce cobertura mínima.`
           : '',
       });
     }
@@ -1117,7 +1145,7 @@ function Step7Choose({
           <div>
             <p className="font-medium">Plantilla insuficiente</p>
             <p className="mt-0.5 text-amber-700">
-              Necesitas mínimo {staffingRec.minRotaCompleto} Front Desk Agents para 100% cobertura.
+              Necesitas mínimo {staffingRec.minRotaCompleto} empleados rotativos para 100% cobertura.
               Actualmente tienes {staffingRec.currentRotaCompleto} — faltan {staffingRec.minRotaCompleto - staffingRec.currentRotaCompleto}.
             </p>
           </div>
@@ -1127,7 +1155,7 @@ function Step7Choose({
       {staffingRec && staffingRec.isSufficient && (
         <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-1.5 text-xs text-green-700">
           <CircleCheck className="h-3.5 w-3.5 shrink-0" />
-          <span>Plantilla suficiente: {staffingRec.currentRotaCompleto} FDAs cubren 100% cobertura (mín. {staffingRec.minRotaCompleto})</span>
+          <span>Plantilla suficiente: {staffingRec.currentRotaCompleto} empleados rotativos cubren 100% cobertura (mín. {staffingRec.minRotaCompleto})</span>
         </div>
       )}
 

@@ -24,7 +24,8 @@ import { ALL_VALIDATION_CHECKS } from "./validationChecks";
 import { ALL_HARD_CONSTRAINTS } from "./hardConstraints";
 import { ALL_SOFT_CONSTRAINTS } from "./softConstraints";
 import { isWorkingShift, getWeeks, weeklyHours } from "../helpers";
-import { countCoverageOnDay } from "./coverageHelper";
+import { SHIFT_TIMES } from "../constants";
+import { countCoverageOnDay, shiftToCoverageCategory } from "./coverageHelper";
 
 const ENGINE_VERSION = "3.0";
 
@@ -144,62 +145,90 @@ function computeScore(
 
 /**
  * Calculates the minimum number of ROTA_COMPLETO employees needed for 100%
- * coverage given the current coverage requirements and fixed roles.
+ * coverage. Generic formula — works for any shift configuration and schedule.
  *
- * Math:
- * - Each ROTA_COMPLETO works 5 days/week (40h ÷ 8h)
- * - Fixed roles (FOM, AFOM, Night Agent, GEX) cover some shifts
- * - Remaining T/M/N coverage must come from ROTA_COMPLETO
- * - Night coverage of Night Agent rest days = 2 slots/week per Night Agent
- * - Formula: ceil(total_FDA_slots_needed_per_week / 5)
+ * Algorithm:
+ * 1. Count total coverage slots needed per week (M×7 + T×7 + N×7)
+ * 2. Count what non-ROTA_COMPLETO employees actually contribute from the grid
+ * 3. Remaining slots must come from ROTA_COMPLETO
+ * 4. Each ROTA_COMPLETO provides maxWeeklyHours/shiftHours shifts per week
+ *
+ * This works for ANY configuration: 16h operations (M+T only), 24h, 12h shifts,
+ * custom hours — because it reads actual grid contributions, not hardcoded roles.
  */
 function calculateStaffingRecommendation(state: SolverState): StaffingRecommendation {
   const minCov = state.input.constraints.minCoveragePerShift;
-  const mNeeded = minCov.M ?? 2;
-  const tNeeded = minCov.T ?? 2;
-  const nNeeded = minCov.N ?? 1;
+  const mNeeded = minCov.M ?? 0;
+  const tNeeded = minCov.T ?? 0;
+  const nNeeded = minCov.N ?? 0;
 
-  // Weekly slots needed (7 days × coverage per day)
-  const totalMSlots = mNeeded * 7;
-  const totalTSlots = tNeeded * 7;
-  const totalNSlots = nNeeded * 7;
+  // Total coverage person-slots needed per week
+  const totalSlotsPerWeek = (mNeeded + tNeeded + nNeeded) * 7;
 
-  // Fixed role contributions per week:
-  // FOM: M on 5 weekdays + G/D on weekends (G counts as M coverage for guardia days)
-  const fomMPerWeek = 5; // M weekdays only (G is not M)
-  // AFOM mirror: ~3 T/week (Wed-Fri) + M on some days
-  const afomTPerWeek = 3;
-  const afomMPerWeek = 1; // Sunday M
-  // Night Agent: N on 5 days/week (rests 2)
-  const nightNPerWeek = 5;
-  // GEX: 5 shifts/week counting as M (9x17/12x20 → M coverage)
-  const gexMPerWeek = 5;
+  // Count actual contributions from non-ROTA_COMPLETO employees using the grid.
+  // Average over all complete weeks in the period for accuracy.
+  const totalDays = state.input.period.totalDays;
+  const fullWeeks = Math.floor(totalDays / 7);
+  if (fullWeeks === 0) {
+    return { minRotaCompleto: 0, currentRotaCompleto: 0, isSufficient: true, message: "Período demasiado corto para calcular." };
+  }
 
-  // Remaining coverage needed from FDAs
-  const fdaMNeeded = Math.max(0, totalMSlots - fomMPerWeek - afomMPerWeek - gexMPerWeek);
-  const fdaTNeeded = Math.max(0, totalTSlots - afomTPerWeek);
-  const fdaNNeeded = Math.max(0, totalNSlots - nightNPerWeek);
+  const nonRotaEmps = state.input.employees.filter(e => e.rotationType !== "ROTA_COMPLETO");
+  let nonRotaCoverageSlots = 0;
 
-  const totalFdaSlotsPerWeek = fdaMNeeded + fdaTNeeded + fdaNNeeded;
+  for (const emp of nonRotaEmps) {
+    for (let d = 1; d <= fullWeeks * 7; d++) {
+      const code = state.grid[emp.id]?.[d]?.code;
+      if (!code) continue;
+      // Count if this shift contributes to M, T, or N coverage
+      const cat = shiftToCoverageCategory(code);
+      if (cat === "M" && mNeeded > 0) nonRotaCoverageSlots++;
+      else if (cat === "T" && tNeeded > 0) nonRotaCoverageSlots++;
+      else if (cat === "N" && nNeeded > 0) nonRotaCoverageSlots++;
+    }
+  }
 
-  // Each FDA provides 5 shifts/week
-  const minFDAs = Math.ceil(totalFdaSlotsPerWeek / 5);
+  const nonRotaPerWeek = nonRotaCoverageSlots / fullWeeks;
+  const rotaSlotsNeeded = Math.max(0, totalSlotsPerWeek - nonRotaPerWeek);
 
-  const currentFDAs = state.input.employees.filter(
-    e => e.rotationType === "ROTA_COMPLETO"
-  ).length;
+  // How many shifts can each ROTA_COMPLETO provide per week?
+  // Use actual employee weekly hours and average shift duration
+  const rotaEmps = state.input.employees.filter(e => e.rotationType === "ROTA_COMPLETO");
+  const maxWeeklyH = state.input.constraints.law?.maxWeeklyHours ?? 40;
 
-  const isSufficient = currentFDAs >= minFDAs;
+  // Calculate average shift hours from the configured shifts (M, T, N)
+  const shiftHours: number[] = [];
+  if (mNeeded > 0) shiftHours.push(SHIFT_TIMES["M"]?.hours ?? 8);
+  if (tNeeded > 0) shiftHours.push(SHIFT_TIMES["T"]?.hours ?? 8);
+  if (nNeeded > 0) shiftHours.push(SHIFT_TIMES["N"]?.hours ?? 8);
+  const avgShiftH = shiftHours.length > 0
+    ? shiftHours.reduce((a, b) => a + b, 0) / shiftHours.length
+    : 8;
+
+  const shiftsPerEmployee = Math.floor(maxWeeklyH / avgShiftH);
+  const minRotaCompleto = shiftsPerEmployee > 0
+    ? Math.ceil(rotaSlotsNeeded / shiftsPerEmployee)
+    : 0;
+
+  const currentRotaCompleto = rotaEmps.length;
+  const isSufficient = currentRotaCompleto >= minRotaCompleto;
+
+  // Build coverage label (only show active shifts)
+  const covParts: string[] = [];
+  if (mNeeded > 0) covParts.push(`M:${mNeeded}`);
+  if (tNeeded > 0) covParts.push(`T:${tNeeded}`);
+  if (nNeeded > 0) covParts.push(`N:${nNeeded}`);
+  const covLabel = covParts.join(", ");
 
   let message: string;
   if (isSufficient) {
-    message = `Plantilla suficiente: ${currentFDAs} Front Desk Agents cubren el 100% de cobertura (mínimo requerido: ${minFDAs}).`;
+    message = `Plantilla suficiente: ${currentRotaCompleto} empleados rotativos cubren el 100% de cobertura (mínimo requerido: ${minRotaCompleto}).`;
   } else {
-    const deficit = minFDAs - currentFDAs;
-    message = `⚠️ Plantilla insuficiente: necesitas mínimo ${minFDAs} Front Desk Agents para cubrir 100% de cobertura (M:${mNeeded}, T:${tNeeded}, N:${nNeeded}). Actualmente tienes ${currentFDAs} — faltan ${deficit}.`;
+    const deficit = minRotaCompleto - currentRotaCompleto;
+    message = `Plantilla insuficiente: necesitas mínimo ${minRotaCompleto} empleados rotativos para cubrir 100% de cobertura (${covLabel}). Actualmente tienes ${currentRotaCompleto} — faltan ${deficit}.`;
   }
 
-  return { minRotaCompleto: minFDAs, currentRotaCompleto: currentFDAs, isSufficient, message };
+  return { minRotaCompleto, currentRotaCompleto, isSufficient, message };
 }
 
 // ---------------------------------------------------------------------------
