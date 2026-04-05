@@ -14,7 +14,7 @@
 
 import type {
   EngineInput, EngineOutput, ScoreBreakdown, AuditViolation,
-  DayAssignmentV2, TrafficLight,
+  DayAssignmentV2, TrafficLight, StaffingRecommendation,
 } from "../types";
 import type { SolverState, SolverConfig } from "./solverTypes";
 import { DEFAULT_SOLVER_CONFIG } from "./solverTypes";
@@ -139,6 +139,70 @@ function computeScore(
 }
 
 // ---------------------------------------------------------------------------
+// STAFFING RECOMMENDATION
+// ---------------------------------------------------------------------------
+
+/**
+ * Calculates the minimum number of ROTA_COMPLETO employees needed for 100%
+ * coverage given the current coverage requirements and fixed roles.
+ *
+ * Math:
+ * - Each ROTA_COMPLETO works 5 days/week (40h ÷ 8h)
+ * - Fixed roles (FOM, AFOM, Night Agent, GEX) cover some shifts
+ * - Remaining T/M/N coverage must come from ROTA_COMPLETO
+ * - Night coverage of Night Agent rest days = 2 slots/week per Night Agent
+ * - Formula: ceil(total_FDA_slots_needed_per_week / 5)
+ */
+function calculateStaffingRecommendation(state: SolverState): StaffingRecommendation {
+  const minCov = state.input.constraints.minCoveragePerShift;
+  const mNeeded = minCov.M ?? 2;
+  const tNeeded = minCov.T ?? 2;
+  const nNeeded = minCov.N ?? 1;
+
+  // Weekly slots needed (7 days × coverage per day)
+  const totalMSlots = mNeeded * 7;
+  const totalTSlots = tNeeded * 7;
+  const totalNSlots = nNeeded * 7;
+
+  // Fixed role contributions per week:
+  // FOM: M on 5 weekdays + G/D on weekends (G counts as M coverage for guardia days)
+  const fomMPerWeek = 5; // M weekdays only (G is not M)
+  // AFOM mirror: ~3 T/week (Wed-Fri) + M on some days
+  const afomTPerWeek = 3;
+  const afomMPerWeek = 1; // Sunday M
+  // Night Agent: N on 5 days/week (rests 2)
+  const nightNPerWeek = 5;
+  // GEX: 5 shifts/week counting as M (9x17/12x20 → M coverage)
+  const gexMPerWeek = 5;
+
+  // Remaining coverage needed from FDAs
+  const fdaMNeeded = Math.max(0, totalMSlots - fomMPerWeek - afomMPerWeek - gexMPerWeek);
+  const fdaTNeeded = Math.max(0, totalTSlots - afomTPerWeek);
+  const fdaNNeeded = Math.max(0, totalNSlots - nightNPerWeek);
+
+  const totalFdaSlotsPerWeek = fdaMNeeded + fdaTNeeded + fdaNNeeded;
+
+  // Each FDA provides 5 shifts/week
+  const minFDAs = Math.ceil(totalFdaSlotsPerWeek / 5);
+
+  const currentFDAs = state.input.employees.filter(
+    e => e.rotationType === "ROTA_COMPLETO"
+  ).length;
+
+  const isSufficient = currentFDAs >= minFDAs;
+
+  let message: string;
+  if (isSufficient) {
+    message = `Plantilla suficiente: ${currentFDAs} Front Desk Agents cubren el 100% de cobertura (mínimo requerido: ${minFDAs}).`;
+  } else {
+    const deficit = minFDAs - currentFDAs;
+    message = `⚠️ Plantilla insuficiente: necesitas mínimo ${minFDAs} Front Desk Agents para cubrir 100% de cobertura (M:${mNeeded}, T:${tNeeded}, N:${nNeeded}). Actualmente tienes ${currentFDAs} — faltan ${deficit}.`;
+  }
+
+  return { minRotaCompleto: minFDAs, currentRotaCompleto: currentFDAs, isSufficient, message };
+}
+
+// ---------------------------------------------------------------------------
 // CONVERT SOLVER STATE → ENGINE OUTPUT
 // ---------------------------------------------------------------------------
 
@@ -195,6 +259,7 @@ function stateToOutput(
       totalDays: state.input.period.totalDays,
     },
     dgAccumulated: Object.keys(dgAccumulated).length > 0 ? dgAccumulated : undefined,
+    staffingRecommendation: calculateStaffingRecommendation(state),
   };
 }
 

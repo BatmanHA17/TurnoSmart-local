@@ -437,31 +437,24 @@ function fillRemaining(
     emp.role !== "FOM" && emp.role !== "AFOM" && emp.role !== "NIGHT_SHIFT_AGENT"
   );
 
-  // Day-first loop: ensures coverage state is up-to-date when scoring each employee
+  // Simple day-by-day fill. ensureCoverage will fix remaining gaps via swaps.
   for (let d = 1; d <= totalDays; d++) {
-    // Pre-compute N coverage for this day — don't pile extra Ns when already met
     const nCoverage = countCoverageOnDay(state.grid, d, "N");
     const nNeeded = state.input.constraints.minCoveragePerShift.N ?? 1;
 
     for (const emp of fillableEmps) {
       const cell = state.grid[emp.id][d];
       if (cell.locked) continue;
-      if (isWorkingShift(cell.code)) continue; // already assigned a working shift
+      if (isWorkingShift(cell.code)) continue;
 
-      // Get candidate shifts for this role
       let candidates = getCandidateShifts(emp);
-
-      // Filter out N when night coverage is already met (night rotation handles N assignments)
       if (nCoverage >= nNeeded) {
         candidates = candidates.filter(c => c !== "N");
       }
-
       const best = pickBestShift(state, emp.id, d, candidates, hardConstraints, softConstraints);
-
       if (best) {
         assignCell(state, emp.id, d, best, "engine");
       }
-      // If no feasible shift found, stays as D (rest)
     }
   }
 }
@@ -612,6 +605,115 @@ function ensureCoverage(
         for (let i = 0; i < Math.min(remaining, lockedCandidates.length); i++) {
           state.grid[lockedCandidates[i].id][d].locked = false;
           assignCell(state, lockedCandidates[i].id, d, shift, "coverage");
+        }
+      }
+    }
+  }
+
+  // Pass 3: Rest-day swaps — for remaining gaps, move an FDA's rest from the gap day
+  // to a different day in the same week where there's excess coverage.
+  // This preserves weekly hours while fixing coverage distribution.
+  const weeks = getWeeks(state.input.period.totalDays);
+  const absenceCodes2 = new Set(["V", "E", "PM", "PC", "DB", "DG", "F"]);
+
+  for (let d = 1; d <= totalDays; d++) {
+    for (const shift of ["M", "T", "N"] as const) {
+      const needed = minCov[shift] ?? 1;
+      const current = countCoverageOnDay(state.grid, d, shift);
+      if (current >= needed) continue;
+
+      const gap = needed - current;
+      let filled = 0;
+
+      // Find which week this day belongs to
+      const weekIdx = Math.floor((d - 1) / 7);
+      const week = weeks[weekIdx];
+      if (!week) continue;
+
+      // Find FDAs resting on gap day whose rest can be moved
+      const swapCandidates = state.input.employees.filter(e => {
+        if (e.role === "FOM" || e.role === "AFOM" || e.role === "NIGHT_SHIFT_AGENT" || e.role === "GEX") return false;
+        const cell = state.grid[e.id][d];
+        if (cell.code !== "D") return false; // must be resting
+        if (absenceCodes2.has(cell.code)) return false;
+        if (cell.source === "petition_a") return false;
+        // Check if assigning the needed shift is HC-feasible (ignoring weekly hours
+        // since we'll swap, keeping total hours the same)
+        const feasible = hardConstraints.filter(hc => hc.id !== "HC_MAX_WEEKLY_HOURS" && hc.id !== "HC_LOCKED").every(hc =>
+          hc.isFeasible(state, e.id, d, shift)
+        );
+        return feasible;
+      });
+
+      for (const emp of swapCandidates) {
+        if (filled >= gap) break;
+
+        // Find a day in the same week where this employee works and coverage
+        // on that shift type exceeds minimum (so we can safely remove them)
+        let swapDay: number | null = null;
+        let bestExcess = 0;
+
+        for (const wd of week) {
+          if (wd === d) continue;
+          const wdCell = state.grid[emp.id][wd];
+          if (!isWorkingShift(wdCell.code)) continue;
+          if (wdCell.locked) continue;
+
+          // What shift type does this cell contribute to?
+          const wdShift = wdCell.code;
+          const wdCat: "M" | "T" | "N" | null =
+            (wdShift === "N") ? "N" :
+            (wdShift === "T" || wdShift === "12x20") ? "T" :
+            (wdShift === "M" || wdShift === "9x17" || wdShift === "11x19") ? "M" : null;
+
+          if (!wdCat) continue;
+          const wdCoverage = countCoverageOnDay(state.grid, wd, wdCat);
+          const wdNeeded = minCov[wdCat] ?? 1;
+          const excess = wdCoverage - wdNeeded;
+          if (excess <= 0) continue; // can't remove without creating a new gap
+
+          // Verify HC feasibility of the rest day at swap position
+          // (12h rest rule etc.)
+          const origCode = wdCell.code;
+          const origHours = wdCell.hours;
+          const origStart = wdCell.startTime;
+          const origEnd = wdCell.endTime;
+          const origSource = wdCell.source;
+          // Temporarily set to D to check feasibility of adjacent days
+          wdCell.code = "D";
+          wdCell.hours = 0;
+          wdCell.startTime = "00:00";
+          wdCell.endTime = "00:00";
+
+          // Check that making this day rest doesn't violate 12h for adjacent days
+          let restFeasible = true;
+          // No specific 12h check needed for rest days — they don't have end times
+          // But we should ensure the target gap day assignment is still feasible
+          const gapFeasible = hardConstraints.filter(hc => hc.id !== "HC_MAX_WEEKLY_HOURS" && hc.id !== "HC_LOCKED").every(hc =>
+            hc.isFeasible(state, emp.id, d, shift)
+          );
+
+          // Restore
+          wdCell.code = origCode;
+          wdCell.hours = origHours;
+          wdCell.startTime = origStart;
+          wdCell.endTime = origEnd;
+          wdCell.source = origSource;
+
+          if (!gapFeasible) continue;
+
+          if (excess > bestExcess) {
+            bestExcess = excess;
+            swapDay = wd;
+          }
+        }
+
+        if (swapDay !== null) {
+          // Execute the swap: employee rests on swapDay, works shift on gap day d
+          assignCell(state, emp.id, swapDay, "D", "engine", false);
+          state.grid[emp.id][d].locked = false;
+          assignCell(state, emp.id, d, shift, "coverage");
+          filled++;
         }
       }
     }

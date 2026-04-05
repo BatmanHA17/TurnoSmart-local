@@ -57,6 +57,11 @@ const employees: EngineEmployee[] = [
     seniorityLevel: 1, weeklyHours: 40, contractUnits: 1,
     absences: [], petitions: [], equityBalance: { ...emptyEquity },
   },
+  {
+    id: "fda-4", name: "FDA 4", role: "FRONT_DESK_AGENT", rotationType: "ROTA_COMPLETO",
+    seniorityLevel: 0, weeklyHours: 40, contractUnits: 1,
+    absences: [], petitions: [], equityBalance: { ...emptyEquity },
+  },
 ];
 
 const period = buildGenerationPeriod(2026, 4); // April 2026
@@ -185,6 +190,14 @@ for (const profile of WEIGHT_PROFILES) {
 
   console.log(`  Checks:`);
   for (const c of checks) console.log(`    ${c}`);
+
+  // Show staffing recommendation (only once, for first profile)
+  if (output.staffingRecommendation && profile === WEIGHT_PROFILES[0]) {
+    const rec = output.staffingRecommendation;
+    console.log(`\n  📊 Staffing Recommendation:`);
+    console.log(`    ${rec.message}`);
+    console.log(`    Min ROTA_COMPLETO: ${rec.minRotaCompleto} | Current: ${rec.currentRotaCompleto} | Sufficient: ${rec.isSufficient ? "✅" : "❌"}`);
+  }
   console.log();
 }
 

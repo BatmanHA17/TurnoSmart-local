@@ -403,6 +403,20 @@ export interface EngineOutput {
   meta: EngineMeta;
   /** DG acumulados en este período: employeeId → días de guardia trabajados */
   dgAccumulated?: Record<string, number>;
+  /** Recomendación de plantilla mínima para 100% cobertura */
+  staffingRecommendation?: StaffingRecommendation;
+}
+
+/** Recomendación de plantilla mínima calculada por el engine */
+export interface StaffingRecommendation {
+  /** Mínimo de empleados ROTA_COMPLETO necesarios */
+  minRotaCompleto: number;
+  /** Empleados ROTA_COMPLETO actuales */
+  currentRotaCompleto: number;
+  /** ¿La plantilla actual cubre 100% matemáticamente? */
+  isSufficient: boolean;
+  /** Mensaje para el manager */
+  message: string;
 }
 
 /** Metadata de la generación */
