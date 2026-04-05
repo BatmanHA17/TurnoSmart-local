@@ -688,7 +688,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       // If we return early with only employees from localStorage, the filter will fail
       const { data, error } = await supabase
         .from('colaboradores')
-        .select('id, nombre, apellidos, avatar_url, email, tiempo_trabajo_semanal, tipo_contrato, fecha_inicio_contrato, fecha_fin_contrato, status, engine_role')
+        .select('id, nombre, apellidos, avatar_url, email, tiempo_trabajo_semanal, tipo_contrato, fecha_inicio_contrato, fecha_fin_contrato, status, engine_role, jobs(job_titles(name))')
         .eq('org_id', org.org_id)
         .or(`status.eq.activo,status.eq.active,fecha_fin_contrato.gte.${today}`)
         .order('nombre', { ascending: true }); // Mismo orden que en CalendarDay
@@ -709,15 +709,21 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
 
       // Convertir colaboradores a formato Employee y actualizar el estado
       if (data && data.length > 0) {
-        const mappedEmployees: Employee[] = data.map(colaborador => ({
-          id: colaborador.id,
-          name: `${colaborador.nombre}${colaborador.apellidos ? ' ' + colaborador.apellidos : ''}`,
-          role: colaborador.tipo_contrato || 'Empleado',
-          department: 'General',
-          workingHours: colaborador.tiempo_trabajo_semanal ? `0h/${colaborador.tiempo_trabajo_semanal}h` : '0h/40h',
-          startDate: colaborador.fecha_inicio_contrato || undefined,
-          engine_role: (colaborador as any).engine_role || undefined,
-        }));
+        const mappedEmployees: Employee[] = data.map(colaborador => {
+          // Extract job_title from nested join: colaborador.jobs?.job_titles?.name
+          const jobData = (colaborador as any)?.jobs;
+          const jobTitleName = jobData?.job_titles?.name ?? undefined;
+          return {
+            id: colaborador.id,
+            name: `${colaborador.nombre}${colaborador.apellidos ? ' ' + colaborador.apellidos : ''}`,
+            role: colaborador.tipo_contrato || 'Empleado',
+            department: 'General',
+            workingHours: colaborador.tiempo_trabajo_semanal ? `0h/${colaborador.tiempo_trabajo_semanal}h` : '0h/40h',
+            startDate: colaborador.fecha_inicio_contrato || undefined,
+            engine_role: (colaborador as any).engine_role || undefined,
+            job_title: jobTitleName,
+          };
+        });
 
         // Recuperar orden manual si existe (scoped por org)
         const manualOrderKey = getManualOrderKey(org?.id);
