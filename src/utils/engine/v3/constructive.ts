@@ -388,6 +388,62 @@ function assignNightCoverage(state: SolverState): void {
         assignCell(state, emp.id, restDay, "D", "engine", true);
       }
 
+      // Make rest days consecutive: move the pre-assigned Phase 2 rest to be
+      // adjacent to the post-night rest. After night coverage, the employee
+      // should get 2 consecutive rest days (e.g., N,N,D,D not N,N,D,T,D,T).
+      const postNightRest = restDay;
+      if (postNightRest <= state.input.period.totalDays) {
+        // Find which week this rest belongs to
+        const weekIdx = Math.floor((postNightRest - 1) / 7);
+        const wks = getWeeks(state.input.period.totalDays);
+        const weekOfRest = wks[weekIdx];
+        if (weekOfRest) {
+          // Find the other (Phase 2) rest day in this week that's NOT adjacent
+          const otherRests = weekOfRest.filter(d =>
+            d !== postNightRest &&
+            state.grid[emp.id][d]?.code === "D" &&
+            !nightAgentRestDays.includes(d) // exclude N days (they're now N, not D)
+          );
+          const secondRestDay = postNightRest + 1;
+          for (const otherD of otherRests) {
+            // If already adjacent, nothing to do
+            if (Math.abs(otherD - postNightRest) === 1) break;
+            // Move the pre-assigned rest to day after post-night rest
+            if (
+              secondRestDay <= state.input.period.totalDays &&
+              weekOfRest.includes(secondRestDay) &&
+              !state.grid[emp.id][secondRestDay].locked &&
+              isWorkingShift(state.grid[emp.id][secondRestDay].code) === false
+            ) {
+              // Clear the old pre-assigned rest (make it available for work)
+              state.grid[emp.id][otherD] = {
+                code: "D", startTime: "00:00", endTime: "00:00",
+                hours: 0, locked: false, source: "engine",
+              };
+              // Assign second consecutive rest
+              assignCell(state, emp.id, secondRestDay, "D", "engine", true);
+              break;
+            }
+            // If secondRestDay is already occupied with work, try the day before postNightRest
+            // (but only if that's not an N day we just assigned)
+            const beforeRest = postNightRest - 1;
+            if (
+              beforeRest >= 1 &&
+              weekOfRest.includes(beforeRest) &&
+              !state.grid[emp.id][beforeRest].locked &&
+              !nightAgentRestDays.includes(beforeRest)
+            ) {
+              state.grid[emp.id][otherD] = {
+                code: "D", startTime: "00:00", endTime: "00:00",
+                hours: 0, locked: false, source: "engine",
+              };
+              assignCell(state, emp.id, beforeRest, "D", "engine", true);
+              break;
+            }
+          }
+        }
+      }
+
       // Update night coverage equity
       nightCoverageCount.set(emp.id, (nightCoverageCount.get(emp.id) ?? 0) + nightAgentRestDays.length);
       const eq = state.equity.get(emp.id);
