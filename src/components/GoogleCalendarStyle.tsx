@@ -1703,63 +1703,158 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     toast({ title: "Kit restaurado", description: msg });
   };
 
+  // --- Helpers internos para handleApplyAuditFix ---
+  const findShiftOnDate = (employeeId: string, dateStr: string) =>
+    shiftBlocks.find(s => s.employeeId === employeeId && format(s.date, 'yyyy-MM-dd') === dateStr);
+
+  const buildShiftBlock = (
+    base: ShiftBlock | undefined,
+    employeeId: string,
+    employeeName: string,
+    date: Date,
+    shiftName: string,
+    startTime: string | null,
+    endTime: string | null,
+    color: string,
+    isRest: boolean,
+  ): ShiftBlock => ({
+    id: base?.id || `fix-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    employeeId,
+    employeeName,
+    date,
+    shiftName,
+    startTime,
+    endTime,
+    color,
+    isAbsence: isRest,
+    absenceCode: isRest ? 'D' : undefined,
+    locked: false,
+  });
+
+  const persistShiftUpdate = (shift: ShiftBlock, existingId?: string) => {
+    const orgId = org?.id;
+    if (!orgId || !existingId || existingId.startsWith('fix-')) return;
+    supabase
+      .from('calendar_shifts')
+      .update({
+        shift_name: shift.shiftName,
+        start_time: shift.startTime,
+        end_time: shift.endTime,
+        color: shift.color,
+        is_absence: shift.isAbsence || false,
+        absence_code: shift.absenceCode || null,
+      } as any)
+      .eq('id', existingId)
+      .then(({ error }) => {
+        if (error) console.error('Error persistiendo fix:', error);
+      });
+  };
+
+  const upsertShiftInState = (newShift: ShiftBlock, existingId?: string) => {
+    setShiftBlocksWithHistory((prev) => {
+      if (existingId) {
+        return prev.map(s => s.id === existingId ? newShift : s);
+      }
+      return [...prev, newShift];
+    });
+  };
+
+  const reAuditWithCascadeFeedback = (fixLabel: string) => {
+    toast({ title: '🔧 Fix aplicado', description: fixLabel });
+    // Re-auditar y avisar si quedan violaciones accionables (cascada guiada)
+    setTimeout(() => {
+      runAudit();
+      // Dar tiempo a que el state se actualice, luego comprobar violaciones restantes
+      setTimeout(() => {
+        const remaining = auditResult?.violations?.filter(v => v.suggestedFix) || [];
+        if (remaining.length > 0) {
+          toast({
+            title: '⚠️ Efecto cascada',
+            description: `Quedan ${remaining.length} alerta${remaining.length > 1 ? 's' : ''} con fix disponible. Revisa las celdas marcadas.`,
+            duration: 5000,
+          });
+        }
+      }, 800);
+    }, 500);
+  };
+
   const handleApplyAuditFix = (fix: SuggestedFix, violation: AuditViolation) => {
+    const empName = violation.employeeName || fix.employeeId;
+
     if (fix.action === 'CHANGE_SHIFT' || fix.action === 'ADD_REST_DAY') {
       const fixDate = new Date(fix.date + 'T00:00:00');
-      const isRestDay = fix.action === 'ADD_REST_DAY';
+      const isRest = fix.action === 'ADD_REST_DAY';
+      const existing = findShiftOnDate(fix.employeeId, fix.date);
 
-      // Buscar shift existente del empleado en esa fecha
-      const existingShift = shiftBlocks.find(
-        (s) => s.employeeId === fix.employeeId && format(s.date, 'yyyy-MM-dd') === fix.date
+      const newShift = buildShiftBlock(
+        existing, fix.employeeId, empName, fixDate,
+        fix.toShift || 'Descanso',
+        fix.toShiftStartTime || (isRest ? '00:00' : null),
+        fix.toShiftEndTime || (isRest ? '00:00' : null),
+        fix.toShiftColor || (isRest ? '#94a3b8' : '#3b82f6'),
+        isRest,
       );
 
-      const newShift: ShiftBlock = {
-        id: existingShift?.id || `fix-${Date.now()}`,
-        employeeId: fix.employeeId,
-        employeeName: violation.employeeName || fix.employeeId,
-        date: fixDate,
-        shiftName: fix.toShift || 'Descanso',
-        startTime: fix.toShiftStartTime || null,
-        endTime: fix.toShiftEndTime || null,
-        color: fix.toShiftColor || (isRestDay ? '#94a3b8' : '#3b82f6'),
-        isAbsence: isRestDay,
-        absenceCode: isRestDay ? 'D' : undefined,
-        locked: false,
-      };
+      upsertShiftInState(newShift, existing?.id);
+      persistShiftUpdate(newShift, existing?.id);
+      reAuditWithCascadeFeedback(fix.label);
+    }
 
-      setShiftBlocksWithHistory((prev) => {
-        if (existingShift) {
-          return prev.map((s) => (s.id === existingShift.id ? newShift : s));
-        }
-        return [...prev, newShift];
-      });
+    else if (fix.action === 'MOVE_REST_DAY') {
+      // Mover un día libre de su posición actual a targetDate para hacerlos consecutivos
+      const targetDateStr = fix.targetDate || fix.date;
+      const existingRest = findShiftOnDate(fix.employeeId, fix.date);
+      const targetExisting = findShiftOnDate(fix.employeeId, targetDateStr);
 
-      // Persistir en DB
-      const orgId = org?.id;
-      if (orgId && existingShift?.id && !existingShift.id.startsWith('fix-')) {
-        supabase
-          .from('calendar_shifts')
-          .update({
-            shift_name: newShift.shiftName,
-            start_time: newShift.startTime,
-            end_time: newShift.endTime,
-            color: newShift.color,
-            is_absence: newShift.isAbsence || false,
-            absence_code: newShift.absenceCode || null,
-          } as any)
-          .eq('id', existingShift.id)
-          .then(({ error }) => {
-            if (error) console.error('Error aplicando fix:', error);
-          });
+      if (existingRest && targetExisting && fix.date !== targetDateStr) {
+        // Swap: el día libre va a targetDate, el turno de targetDate va a fix.date
+        const restShift = buildShiftBlock(
+          targetExisting, fix.employeeId, empName,
+          new Date(targetDateStr + 'T00:00:00'),
+          'Descanso', '00:00', '00:00', '#94a3b8', true,
+        );
+        const workShift = buildShiftBlock(
+          existingRest, fix.employeeId, empName,
+          new Date(fix.date + 'T00:00:00'),
+          targetExisting.shiftName,
+          targetExisting.startTime, targetExisting.endTime,
+          targetExisting.color || '#3b82f6', false,
+        );
+
+        setShiftBlocksWithHistory((prev) =>
+          prev.map(s => {
+            if (s.id === existingRest.id) return workShift;
+            if (s.id === targetExisting.id) return restShift;
+            return s;
+          })
+        );
+        persistShiftUpdate(restShift, targetExisting.id);
+        persistShiftUpdate(workShift, existingRest.id);
       }
+      reAuditWithCascadeFeedback(fix.label);
+    }
 
-      toast({
-        title: '🔧 Fix aplicado',
-        description: fix.label,
-      });
+    else if (fix.action === 'SWAP_SHIFTS') {
+      // Intercambiar turnos entre dos empleados
+      if (!fix.swapWithEmployeeId || !fix.swapWithDate) return;
 
-      // Re-ejecutar auditoría tras aplicar fix
-      setTimeout(() => runAudit(), 500);
+      const shiftA = findShiftOnDate(fix.employeeId, fix.date);
+      const shiftB = findShiftOnDate(fix.swapWithEmployeeId, fix.swapWithDate);
+      if (!shiftA || !shiftB) return;
+
+      const swappedA: ShiftBlock = { ...shiftA, shiftName: shiftB.shiftName, startTime: shiftB.startTime, endTime: shiftB.endTime, color: shiftB.color, isAbsence: shiftB.isAbsence, absenceCode: shiftB.absenceCode };
+      const swappedB: ShiftBlock = { ...shiftB, shiftName: shiftA.shiftName, startTime: shiftA.startTime, endTime: shiftA.endTime, color: shiftA.color, isAbsence: shiftA.isAbsence, absenceCode: shiftA.absenceCode };
+
+      setShiftBlocksWithHistory((prev) =>
+        prev.map(s => {
+          if (s.id === shiftA.id) return swappedA;
+          if (s.id === shiftB.id) return swappedB;
+          return s;
+        })
+      );
+      persistShiftUpdate(swappedA, shiftA.id);
+      persistShiftUpdate(swappedB, shiftB.id);
+      reAuditWithCascadeFeedback(fix.label);
     }
   };
 
