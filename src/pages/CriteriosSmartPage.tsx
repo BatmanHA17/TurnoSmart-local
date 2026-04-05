@@ -149,8 +149,8 @@ function CriteriaRow({
 }
 
 function CriteriosSmartPage() {
-  const { organization } = useCurrentOrganization();
-  const orgId = organization?.id;
+  const { currentOrg } = useCurrentOrganization();
+  const orgId = (currentOrg as any)?.org_id ?? (currentOrg as any)?.id;
   const { criteria, isLoading, fetchCriteria, upsertCriteria, seedDefaults } = useCriteria({ organizationId: orgId });
   const [search, setSearch] = useState("");
   const [seeding, setSeeding] = useState(false);
@@ -203,7 +203,11 @@ function CriteriosSmartPage() {
     );
   };
 
-  const implementedCount = criteria.filter((c) => c.enabled).length;
+  // Count active criteria: use DB record if exists, fallback to catalog default
+  const implementedCount = ALL_CRITERIA.filter((def) => {
+    const rec = recordMap.get(def.key);
+    return rec ? rec.enabled : def.defaultEnabled;
+  }).length;
 
   return (
     <div className="p-6 max-w-4xl">

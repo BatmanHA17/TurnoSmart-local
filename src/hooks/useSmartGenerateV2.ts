@@ -314,11 +314,14 @@ export function useSmartGenerateV2({
             .select("*")
             .eq("organization_id", orgId);
 
-          // Extraer cobertura mínima por turno de los criterios (boost = nº personas)
+          // Extraer cobertura mínima por turno de los criterios
           const criteriaByKey = new Map((dbCriteria ?? []).map((c: any) => [c.criteria_key, c]));
-          minCoverageM = criteriaByKey.get("MIN_COVERAGE_M")?.boost ?? 2;
-          minCoverageT = criteriaByKey.get("MIN_COVERAGE_T")?.boost ?? 2;
-          minCoverageN = criteriaByKey.get("MIN_COVERAGE_N")?.boost ?? 1;
+          // Support both separate keys (MIN_COVERAGE_M/T/N) and consolidated key (MIN_COVERAGE with config_json)
+          const minCovCriteria = criteriaByKey.get("MIN_COVERAGE");
+          const minCovConfig = minCovCriteria?.config_json as Record<string, number> | undefined;
+          minCoverageM = criteriaByKey.get("MIN_COVERAGE_M")?.boost ?? minCovConfig?.M ?? 2;
+          minCoverageT = criteriaByKey.get("MIN_COVERAGE_T")?.boost ?? minCovConfig?.T ?? 2;
+          minCoverageN = criteriaByKey.get("MIN_COVERAGE_N")?.boost ?? minCovConfig?.N ?? 1;
 
           optionalCriteria = (dbCriteria ?? [])
             .filter((c: any) => c.category === "optional" && c.enabled)
@@ -331,8 +334,8 @@ export function useSmartGenerateV2({
               boostNote: c.boost_note ?? undefined,
             }));
 
-          // FDS Largo: check if the criterion is enabled
-          const fdsLargoCriteria = criteriaByKey.get("FDS_LARGO");
+          // FDS Largo: check if the criterion is enabled (support both legacy and catalog keys)
+          const fdsLargoCriteria = criteriaByKey.get("FDS_LARGO") ?? criteriaByKey.get("LONG_WEEKEND_MONTHLY");
           fdsLargo = fdsLargoCriteria?.enabled ?? false;
         }
 
