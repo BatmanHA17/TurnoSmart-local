@@ -275,7 +275,6 @@ function assignFdsLargo(
 
 function assignWeeklyRest(state: SolverState, emp: EngineEmployee, weekDays: number[], weekIndex = 0): void {
   const schedule = state.grid[emp.id];
-  const isRotaCompleto = emp.rotationType === "ROTA_COMPLETO";
 
   // Count existing rest/absence days in this week
   const existingLockedRests = weekDays.filter(d => {
@@ -285,44 +284,41 @@ function assignWeeklyRest(state: SolverState, emp: EngineEmployee, weekDays: num
     return isRest && schedule[d]?.locked;
   });
 
-  // ROTA_COMPLETO: only pre-assign 1 rest (N→D provides the 2nd)
-  // Others: assign 2 consecutive rest days as before
-  const target = isRotaCompleto ? 1 : 2;
+  // ALL employees get 2 consecutive rest days per week (legal requirement).
+  // For ROTA_COMPLETO who cover nights: Phase 2b will reassign their rests
+  // to be post-N (N,N,D,D) and clear redundant Phase 2 rests.
+  const target = 2;
 
   if (existingLockedRests.length >= target) return;
   const needed = target - existingLockedRests.length;
   if (needed <= 0) return;
 
-  if (isRotaCompleto) {
-    // Assign 1 staggered rest day (N→D will provide the 2nd)
-    const candidates: Array<{ day: number; score: number }> = [];
-    for (const d of weekDays) {
-      if (schedule[d].locked) continue;
-      let score = 0;
-      // Stagger: penalize days where others have LOCKED rest (not init D)
-      for (const [id, grid] of Object.entries(state.grid)) {
-        if (id === emp.id) continue;
-        if (grid[d]?.code === "D" && grid[d]?.locked) score -= 10;
-      }
-      // Avoid days with soft petitions (type B)
-      const hasPetition = emp.petitions.some(p =>
-        p.type === "B" && p.status !== "rejected" && p.days.includes(d)
-      );
-      if (hasPetition) score -= 50;
-      // Slight weekend variety preference
-      const dow = periodDayOfWeekISO(state.input.period.startDate, d);
-      if (dow === 5 || dow === 6) score += 3;
-      candidates.push({ day: d, score });
+  // If 1 rest already exists, find a day adjacent to make them consecutive
+  if (needed === 1 && existingLockedRests.length === 1) {
+    const existingDay = existingLockedRests[0];
+    // Try day after, then day before
+    const adjacentCandidates = [existingDay + 1, existingDay - 1].filter(d =>
+      weekDays.includes(d) &&
+      d >= 1 && d <= state.input.period.totalDays &&
+      !schedule[d]?.locked
+    );
+    if (adjacentCandidates.length > 0) {
+      assignCell(state, emp.id, adjacentCandidates[0], "D", "engine", true);
+      return;
     }
-    candidates.sort((a, b) => b.score - a.score);
-    if (candidates.length > 0) {
-      assignCell(state, emp.id, candidates[0].day, "D", "engine", true);
+    // Fallback: any unlocked day in the week
+    for (const d of weekDays) {
+      if (!schedule[d].locked) {
+        assignCell(state, emp.id, d, "D", "engine", true);
+        return;
+      }
     }
     return;
   }
 
-  // Non-ROTA_COMPLETO: assign 2 consecutive rest days
-  // Use ROTATIVE offset so rest days advance each week (e.g., week0: M-X, week1: J-V, week2: S-D, week3: L-M)
+  // Assign 2 consecutive rest days with ROTATIVE offset
+  // Week 0: pair at index 0 (Mon-Tue), Week 1: index 2 (Wed-Thu),
+  // Week 2: index 4 (Fri-Sat), Week 3: index 6→0 (Sun-Mon wrap)
   const pairCandidates: Array<{ days: number[]; score: number }> = [];
 
   for (let i = 0; i < weekDays.length - 1; i++) {
@@ -339,12 +335,7 @@ function assignWeeklyRest(state: SolverState, emp: EngineEmployee, weekDays: num
       if (grid[d2]?.code === "D" && grid[d2]?.locked) score -= 10;
     }
 
-    // ROTATIVE REST: strongly prefer the pair at position (weekIndex * 2) % 7
-    // This makes rest days advance by 2 days each week:
-    // Week 0: pair starting at index 0 (Mon-Tue)
-    // Week 1: pair starting at index 2 (Wed-Thu)
-    // Week 2: pair starting at index 4 (Fri-Sat)
-    // Week 3: pair starting at index 6→0 (Sun-Mon wrap)
+    // ROTATIVE REST: strongly prefer the pair at target position
     const targetPairStart = (weekIndex * 2) % weekDays.length;
     const distFromTarget = Math.min(
       Math.abs(i - targetPairStart),
@@ -706,8 +697,13 @@ function ensureCoverage(
       }
 
       // Pass 2: if still short, try locked REST days (not absences/night coverage)
+      // SAFETY: never remove a rest day if it would leave the employee with < 2 rests in the week
       if (filled < gap) {
         const remaining = gap - filled;
+        const allWeeks = getWeeks(state.input.period.totalDays);
+        const weekIdx = Math.floor((d - 1) / 7);
+        const weekForDay = allWeeks[weekIdx] ?? [];
+
         const lockedCandidates = state.input.employees
           .filter(e => {
             if (e.role === "FOM" || e.role === "AFOM" || e.role === "NIGHT_SHIFT_AGENT" || e.role === "GEX") return false;
@@ -716,6 +712,12 @@ function ensureCoverage(
             if (absenceCodes.has(cell.code)) return false; // don't override absences
             if (cell.code !== "D") return false; // only override rest days
             if (cell.source === "petition_a") return false; // don't override hard petitions
+            // SAFETY: count how many rests this employee has in this week
+            const restsThisWeek = weekForDay.filter(wd => {
+              const c = state.grid[e.id][wd]?.code;
+              return c === "D" || c === "V" || c === "E" || c === "PM" || c === "PC" || c === "DB" || c === "DG";
+            }).length;
+            if (restsThisWeek <= 2) return false; // don't remove if at minimum
             // Temporarily unlock for feasibility check
             cell.locked = false;
             const feasible = hardConstraints.every(hc => hc.isFeasible(state, e.id, d, shift));

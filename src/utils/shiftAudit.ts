@@ -549,6 +549,31 @@ export function runFullAudit(
   if (options.employeeRestrictions && options.employeeRestrictions.length > 0) {
     allViolations.push(...checkEmployeeRestrictions(shifts, options.employeeRestrictions));
   }
+
+  // 6. Alerta de ratio vacaciones — si no hay nadie de V en el período
+  {
+    const uniqueEmployees = new Set(shifts.map(s => s.employeeId));
+    const employeesOnVacation = new Set(
+      shifts.filter(s => s.absenceCode === "V" || s.shiftName === "Vacaciones").map(s => s.employeeId)
+    );
+    const totalEmps = uniqueEmployees.size;
+    // Fórmula: cobertura vacaciones = plantilla × (48/365) ≈ 13% deberían estar de V
+    // Para un mes, al menos ~1 persona de cada 8 debería estar de vacaciones
+    const expectedOnVacation = Math.max(1, Math.round(totalEmps * 48 / 365));
+    if (totalEmps >= 4 && employeesOnVacation.size === 0) {
+      allViolations.push({
+        id: generateViolationId(),
+        type: "EXCESS_HOURS" as any, // reuse existing type as info
+        severity: "warning",
+        employeeId: "",
+        employeeName: "",
+        date: format(options.periodStart, "yyyy-MM-dd"),
+        message: `Sin vacaciones programadas este período`,
+        details: `Ningún empleado tiene vacaciones (V) asignadas. Para cumplir ratios de plantilla (48 días/año en hostelería), se recomienda que ~${expectedOnVacation} persona(s) estén de vacaciones en cada período mensual. Revisa las peticiones tipo A o asigna vacaciones manualmente.`,
+        suggestion: `Programa vacaciones para mantener la ratio de plantilla activa/presencial.`,
+      });
+    }
+  }
   
   // 6. Generate suggested fixes (Copilot Auditoría T2-1)
   for (const v of allViolations) {
