@@ -197,10 +197,12 @@ function calculateStaffingRecommendation(state: SolverState): StaffingRecommenda
   const maxWeeklyH = state.input.constraints.law?.maxWeeklyHours ?? 40;
 
   // Calculate average shift hours from the configured shifts (M, T, N)
+  // Use org-specific shiftConfig if provided, otherwise fall back to global SHIFT_TIMES
+  const shifts = state.input.shiftConfig ?? SHIFT_TIMES;
   const shiftHours: number[] = [];
-  if (mNeeded > 0) shiftHours.push(SHIFT_TIMES["M"]?.hours ?? 8);
-  if (tNeeded > 0) shiftHours.push(SHIFT_TIMES["T"]?.hours ?? 8);
-  if (nNeeded > 0) shiftHours.push(SHIFT_TIMES["N"]?.hours ?? 8);
+  if (mNeeded > 0) shiftHours.push(shifts["M"]?.hours ?? 8);
+  if (tNeeded > 0) shiftHours.push(shifts["T"]?.hours ?? 8);
+  if (nNeeded > 0) shiftHours.push(shifts["N"]?.hours ?? 8);
   const avgShiftH = shiftHours.length > 0
     ? shiftHours.reduce((a, b) => a + b, 0) / shiftHours.length
     : 8;

@@ -84,8 +84,9 @@ function tryShiftChange(
   if (cell.locked) return false;
   if (!isWorkingShift(cell.code) && cell.code !== "D") return false;
 
-  // Try alternative shifts
-  const config = ROLE_CONFIGS[emp.role];
+  // Try alternative shifts — use org-specific roleConfig if available
+  const roleOverride = state.input.roleConfig?.find(r => r.role === emp.role);
+  const config = roleOverride ?? ROLE_CONFIGS[emp.role];
   if (!config) return false;
   const candidates = config.allowedShifts.filter(s => isWorkingShift(s) && s !== cell.code);
   if (candidates.length === 0) return false;
@@ -181,8 +182,9 @@ function applyChange(state: SolverState, empId: string, day: number, newCode: st
     eq.weekendWorked--;
   }
 
-  // Update cell
-  const shift = SHIFT_TIMES[newCode];
+  // Update cell — use org-specific shiftConfig if available
+  const shifts = state.input.shiftConfig ?? SHIFT_TIMES;
+  const shift = shifts[newCode] ?? SHIFT_TIMES[newCode];
   cell.code = newCode;
   cell.startTime = shift?.startTime ?? "00:00";
   cell.endTime = shift?.endTime ?? "00:00";

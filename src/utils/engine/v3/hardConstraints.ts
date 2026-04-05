@@ -101,7 +101,8 @@ export const hcMaxWeeklyHours: HardConstraint = {
     const week = weeks[weekIdx];
     if (!week) return true;
 
-    const shiftInfo = SHIFT_TIMES[shiftCode];
+    const shifts = state.input.shiftConfig ?? SHIFT_TIMES;
+    const shiftInfo = shifts[shiftCode] ?? SHIFT_TIMES[shiftCode];
     const addHours = shiftInfo?.hours ?? 8;
     const currentHours = weeklyHours(schedule, week);
     const maxH = state.input.constraints.law.maxWeeklyHours;
@@ -131,7 +132,9 @@ export const hcRoleAllowedShifts: HardConstraint = {
   isFeasible(state, empId, _day, shiftCode) {
     const emp = state.employees.get(empId);
     if (!emp) return false;
-    const config = ROLE_CONFIGS[emp.role];
+    // Use org-specific roleConfig if provided, fallback to global ROLE_CONFIGS
+    const roleOverride = state.input.roleConfig?.find(r => r.role === emp.role);
+    const config = roleOverride ?? ROLE_CONFIGS[emp.role];
     if (!config) return true;
     // D is always allowed (rest)
     if (shiftCode === "D") return true;

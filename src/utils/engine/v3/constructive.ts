@@ -72,7 +72,8 @@ function assignCell(
   source: SolverCell["source"] = "engine",
   lock = false,
 ): void {
-  const shift = SHIFT_TIMES[code];
+  const shifts = state.input.shiftConfig ?? SHIFT_TIMES;
+  const shift = shifts[code] ?? SHIFT_TIMES[code];
   state.grid[empId][day] = {
     code,
     startTime: shift?.startTime ?? "00:00",
@@ -447,7 +448,7 @@ function fillRemaining(
       if (cell.locked) continue;
       if (isWorkingShift(cell.code)) continue;
 
-      let candidates = getCandidateShifts(emp);
+      let candidates = getCandidateShifts(emp, state);
       if (nCoverage >= nNeeded) {
         candidates = candidates.filter(c => c !== "N");
       }
@@ -459,8 +460,9 @@ function fillRemaining(
   }
 }
 
-function getCandidateShifts(emp: EngineEmployee): string[] {
-  const config = ROLE_CONFIGS[emp.role];
+function getCandidateShifts(emp: EngineEmployee, state: SolverState): string[] {
+  const roleOverride = state.input.roleConfig?.find(r => r.role === emp.role);
+  const config = roleOverride ?? ROLE_CONFIGS[emp.role];
   if (!config) return ["M", "T", "N"];
 
   // Only working shifts as candidates (not D, V, E, etc.)

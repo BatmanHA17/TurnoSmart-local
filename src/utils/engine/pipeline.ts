@@ -54,13 +54,25 @@ function lockSurvivingFixedShifts(ctx: PipelineContext): void {
 /**
  * Ejecuta el motor SMART.
  * v3.0: Constraint-based solver (default)
- * v2.0: Legacy pipeline (fallback si useV3=false)
+ * v2.0: Legacy pipeline (fallback automático si v3 falla, o explícito si useV3=false)
  */
 export function runPipeline(input: EngineInput, useV3 = true): EngineOutput {
-  if (useV3) {
-    return runSolverV3(input);
+  if (!useV3) {
+    return runPipelineV2(input);
   }
-  return runPipelineV2(input);
+
+  try {
+    const output = runSolverV3(input);
+    // Sanity check: if v3 produces a critically broken result, fall back to v2
+    if (!output.schedules || Object.keys(output.schedules).length === 0) {
+      console.warn("[Engine] v3 produced empty schedules — falling back to v2");
+      return runPipelineV2(input);
+    }
+    return output;
+  } catch (err) {
+    console.warn("[Engine] v3 solver failed — falling back to v2:", err);
+    return runPipelineV2(input);
+  }
 }
 
 /** Legacy v2.0 pipeline — 10 fases secuenciales */

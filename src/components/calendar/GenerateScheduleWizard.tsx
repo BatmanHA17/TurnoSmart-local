@@ -1033,10 +1033,21 @@ function Step6Generate({
 // STEP 7 — Elegir alternativa
 // ---------------------------------------------------------------------------
 
-/** T2-2: Copilot Pre-Generación — Resumen de criterios activos */
+/** Key optional criteria that can be toggled inline in the wizard */
+const INLINE_TOGGLEABLE_KEYS = [
+  "ERGONOMIC_ROTATION",
+  "LONG_WEEKEND_MONTHLY",
+  "NIGHT_EQUITY",
+  "WEEKEND_EQUITY",
+  "OCCUPANCY_STAFFING",
+  "MAX_CONSECUTIVE_NIGHTS",
+];
+
+/** T2-2: Copilot Pre-Generación — Resumen de criterios + override inline */
 function CriteriaSummaryCard({ onOpenCriteria }: { onOpenCriteria?: () => void }) {
   const { org } = useCurrentOrganization();
-  const { criteria, isLoading } = useCriteria({ organizationId: org?.id });
+  const { criteria, isLoading, upsertCriteria } = useCriteria({ organizationId: org?.id });
+  const [expanded, setExpanded] = useState(false);
 
   if (isLoading || criteria.length === 0) return null;
 
@@ -1044,6 +1055,16 @@ function CriteriaSummaryCard({ onOpenCriteria }: { onOpenCriteria?: () => void }
   const optional = criteria.filter(c => c.category === 'optional' && c.enabled);
   const disabled = criteria.filter(c => c.category === 'optional' && !c.enabled);
   const boosted = optional.filter(c => c.boost >= 3);
+
+  // Inline toggleable criteria
+  const toggleable = criteria.filter(c =>
+    c.category === 'optional' && INLINE_TOGGLEABLE_KEYS.includes(c.criteria_key)
+  );
+
+  const handleToggle = async (crit: CriteriaRecord) => {
+    if (!org?.id) return;
+    await upsertCriteria(crit.criteria_key, !crit.enabled, crit.boost, crit.boost_note ?? undefined);
+  };
 
   // Coverage minimums from mandatory criteria
   const coverageM = criteria.find(c => c.criteria_key === 'MIN_COVERAGE_M');
@@ -1058,11 +1079,21 @@ function CriteriaSummaryCard({ onOpenCriteria }: { onOpenCriteria?: () => void }
             <Sliders className="h-3.5 w-3.5" />
             Criterios SMART activos
           </h4>
-          {onOpenCriteria && (
-            <Button variant="link" size="sm" className="h-auto p-0 text-[10px]" onClick={onOpenCriteria}>
-              Ajustar
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-auto p-0 text-[10px]"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? "Ocultar ajustes" : "Ajustar para esta generación"}
             </Button>
-          )}
+            {onOpenCriteria && (
+              <Button variant="link" size="sm" className="h-auto p-0 text-[10px]" onClick={onOpenCriteria}>
+                Config completa
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Coverage minimums */}
@@ -1083,8 +1114,27 @@ function CriteriaSummaryCard({ onOpenCriteria }: { onOpenCriteria?: () => void }
           <span className="text-green-800">{mandatory.length} criterios legales activos</span>
         </div>
 
+        {/* Inline toggles for key optional criteria */}
+        {expanded && toggleable.length > 0 && (
+          <div className="border rounded-md p-2 space-y-1.5 bg-muted/30">
+            <span className="text-[10px] font-medium text-muted-foreground uppercase">
+              Ajustar para esta generación
+            </span>
+            {toggleable.map(c => (
+              <div key={c.id} className="flex items-center justify-between gap-2">
+                <span className="text-xs truncate">{c.criteria_name}</span>
+                <Checkbox
+                  checked={c.enabled}
+                  onCheckedChange={() => handleToggle(c)}
+                  className="h-3.5 w-3.5"
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Optional enabled */}
-        {optional.length > 0 && (
+        {!expanded && optional.length > 0 && (
           <div className="text-xs space-y-0.5">
             <span className="text-muted-foreground">{optional.length} opcionales activados:</span>
             <div className="flex flex-wrap gap-1 mt-1">

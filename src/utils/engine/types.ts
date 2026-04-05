@@ -381,6 +381,37 @@ export interface ContinuityHistory {
 // ENGINE INPUT / OUTPUT
 // ---------------------------------------------------------------------------
 
+/** Configuración de turno personalizable por organización/sector */
+export interface ShiftTimeConfig {
+  code: string;
+  startTime: string;   // "HH:MM"
+  endTime: string;     // "HH:MM"
+  hours: number;
+  label: string;
+}
+
+/** Configuración de rol personalizable por organización/sector */
+export interface RoleConfigOverride {
+  role: string;
+  rotationType: RotationType;
+  seniorityLevel: number;
+  allowedShifts: string[];
+  label: string;
+}
+
+/** Template de sector preconfigurado */
+export interface SectorTemplate {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  shifts: Record<string, ShiftTimeConfig>;
+  roles: RoleConfigOverride[];
+  defaultCoverage: { M: number; T: number; N: number };
+  defaultWeeklyHours: number;
+  laborLawPreset: string; // "spain_hospitality" | "spain_generic" | etc.
+}
+
 /** Input completo al motor */
 export interface EngineInput {
   period: GenerationPeriod;
@@ -392,6 +423,10 @@ export interface EngineInput {
   weights: WeightProfile;
   /** Días del período (1-based) donde FOM tiene Guardia (G/GT) — solo S/D */
   fomGuardiaDays?: number[];
+  /** Shift times override (if not set, uses SHIFT_TIMES from constants) */
+  shiftConfig?: Record<string, ShiftTimeConfig>;
+  /** Role config override (if not set, uses ROLE_CONFIGS from constants) */
+  roleConfig?: RoleConfigOverride[];
 }
 
 /** Output de una ejecución del motor */
