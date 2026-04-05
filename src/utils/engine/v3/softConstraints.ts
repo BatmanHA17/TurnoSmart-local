@@ -9,6 +9,7 @@
  */
 
 import type { SoftConstraint, SolverState, MutableEquity } from "./solverTypes";
+import type { OptionalCriteria } from "../types";
 import {
   SHIFT_UNDESIRABILITY, ERGONOMIC_SEQUENCE, FOM_AFOM_MIRROR,
 } from "../constants";
@@ -16,6 +17,62 @@ import {
   isWorkingShift, periodDayOfWeekISO, violates12hRest,
 } from "../helpers";
 import { countCoverageOnDay, shiftToCoverageCategory } from "./coverageHelper";
+
+// ---------------------------------------------------------------------------
+// Mapping: soft constraint ID → criteria catalog key (from schedule_criteria)
+// ---------------------------------------------------------------------------
+export const SC_TO_CRITERIA_KEY: Record<string, string> = {
+  "SC_ERGONOMIC":      "ERGONOMIC_ROTATION",
+  "SC_EQUITY_MTN":     "SHIFT_EQUITY_MTN",
+  "SC_COVERAGE":       "MIN_COVERAGE",
+  "SC_WEEKEND_EQUITY": "WEEKEND_EQUITY",
+  "SC_PETITIONS":      "SOFT_PETITIONS",
+  "SC_MIRROR":         "FOM_AFOM_MIRROR",
+  "SC_NIGHT_COVER":    "NIGHT_COVER_EQUITY",
+  "SC_UNDESIRABILITY": "UNDESIRABILITY_WEIGHT",
+  "SC_STAGGER_REST":   "ROTATING_REST_DAYS",
+};
+
+/**
+ * Apply criteria boost values from the database to soft constraints.
+ *
+ * Boost range is 1-3:
+ *   boost=1 → 0.5× weight (de-emphasize)
+ *   boost=2 → 1.0× weight (neutral, default)
+ *   boost=3 → 1.5× weight (emphasize)
+ *
+ * If a criterion is found but disabled → weight = 0.
+ * If a criterion is not found in optionalCriteria → keep original weight.
+ */
+export function applyCriteriaBoost(
+  softConstraints: SoftConstraint[],
+  optionalCriteria: OptionalCriteria[],
+): SoftConstraint[] {
+  if (!optionalCriteria || optionalCriteria.length === 0) return softConstraints;
+
+  // Build a lookup by criteria key for O(1) access
+  const criteriaByKey = new Map<string, OptionalCriteria>();
+  for (const oc of optionalCriteria) {
+    criteriaByKey.set(oc.id, oc);
+  }
+
+  return softConstraints.map((sc) => {
+    const criteriaKey = SC_TO_CRITERIA_KEY[sc.id];
+    if (!criteriaKey) return sc; // no mapping → keep as-is
+
+    const criterion = criteriaByKey.get(criteriaKey);
+    if (!criterion) return sc; // not in optionalCriteria → keep as-is
+
+    if (!criterion.enabled) {
+      // Criterion disabled → zero weight
+      return { ...sc, weight: 0 };
+    }
+
+    // Apply boost: boost/2 gives 0.5× for 1, 1× for 2, 1.5× for 3
+    const multiplier = criterion.boost / 2;
+    return { ...sc, weight: sc.weight * multiplier };
+  });
+}
 
 // ---------------------------------------------------------------------------
 // SC-01: Ergonomic rotation M→T→N (OP-02)

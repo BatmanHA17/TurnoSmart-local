@@ -381,6 +381,8 @@ export interface ContinuityHistory {
   equitySnapshot: Record<string, EquityBalance>;
   /** ID de la generación anterior (para trazabilidad) */
   previousGenerationId?: string;
+  /** Night coverage round-robin index from previous generation (cross-period equity) */
+  nightRotationIndex?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -444,6 +446,8 @@ export interface EngineOutput {
   meta: EngineMeta;
   /** DG acumulados en este período: employeeId → días de guardia trabajados */
   dgAccumulated?: Record<string, number>;
+  /** Night coverage round-robin index after this generation (persist for next period) */
+  nightRotationIndex?: number;
   /** Recomendación de plantilla mínima para 100% cobertura */
   staffingRecommendation?: StaffingRecommendation;
 }

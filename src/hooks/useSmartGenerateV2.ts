@@ -339,6 +339,23 @@ export function useSmartGenerateV2({
           fdsLargo = fdsLargoCriteria?.enabled ?? false;
         }
 
+        // --- Load night rotation index from org_engine_config ---
+        let nightRotationIndex = 0;
+        if (orgId) {
+          try {
+            const { data: configRow } = await supabase
+              .from("org_engine_config" as any)
+              .select("night_rotation_index")
+              .eq("org_id", orgId)
+              .maybeSingle();
+            if (configRow && typeof (configRow as any).night_rotation_index === "number") {
+              nightRotationIndex = (configRow as any).night_rotation_index;
+            }
+          } catch {
+            // Graceful degradation: column may not exist in production yet
+          }
+        }
+
         // --- Construir continuity desde equity + últimos días del período anterior ---
         let continuity: ContinuityHistory | undefined;
         const equitySnapshot: Record<string, EquityBalance> = {};
@@ -377,8 +394,8 @@ export function useSmartGenerateV2({
           }
         }
 
-        if (equityByEmployee.size > 0 || Object.keys(lastWeek).length > 0) {
-          continuity = { lastWeek, equitySnapshot };
+        if (equityByEmployee.size > 0 || Object.keys(lastWeek).length > 0 || nightRotationIndex > 0) {
+          continuity = { lastWeek, equitySnapshot, nightRotationIndex };
         }
 
         const engineEmployees: EngineEmployee[] = calEmployees.map((ce) => {
@@ -552,6 +569,17 @@ export function useSmartGenerateV2({
             });
           }
         }
+      }
+
+      // ── Persist night rotation index for cross-period equity ──
+      if (orgId && typeof alt.output.nightRotationIndex === "number") {
+        supabase
+          .from("org_engine_config" as any)
+          .update({ night_rotation_index: alt.output.nightRotationIndex } as any)
+          .eq("org_id", orgId)
+          .then(({ error }) => {
+            if (error) console.warn("Could not persist nightRotationIndex:", error.message);
+          });
       }
 
       setScoreResult(alt.output.score);

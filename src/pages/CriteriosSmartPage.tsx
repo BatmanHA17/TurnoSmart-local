@@ -1,7 +1,7 @@
 /**
- * CriteriosSmartPage — Configuración de los 92 criterios SMART
+ * CriteriosSmartPage — Configuración de los 98 criterios SMART
  *
- * 4 tabs: Obligatorios (18) | Opcionales (39) | Checks (25) | SMART+IA (10)
+ * 4 tabs: Obligatorios (18) | Opcionales (43) | Checks (27) | SMART+IA (10)
  * Cada criterio: toggle ON/OFF + boost slider (1-5) + config expandible.
  * Los obligatorios están siempre ON (toggle disabled).
  */
@@ -30,8 +30,6 @@ const BOOST_LABELS: Record<number, string> = {
   1: "Normal",
   2: "Moderado",
   3: "Enfatizado",
-  4: "Alto",
-  5: "Máximo",
 };
 
 const SEVERITY_COLORS: Record<CriteriaSeverity, string> = {
@@ -43,8 +41,8 @@ const SEVERITY_COLORS: Record<CriteriaSeverity, string> = {
 
 const TAB_CONFIG = [
   { id: "mandatory", label: "Obligatorios", icon: Shield, defaults: OBLIGATORIOS, count: 18 },
-  { id: "optional", label: "Opcionales", icon: Settings2, defaults: OPCIONALES, count: 39 },
-  { id: "check", label: "Checks", icon: CheckCircle2, defaults: CHECKS, count: 25 },
+  { id: "optional", label: "Opcionales", icon: Settings2, defaults: OPCIONALES, count: 43 },
+  { id: "check", label: "Checks", icon: CheckCircle2, defaults: CHECKS, count: 27 },
   { id: "smart_ia", label: "SMART+IA", icon: Brain, defaults: SMART_IA, count: 10 },
 ] as const;
 
@@ -101,14 +99,14 @@ function CriteriaRow({
               <Slider
                 value={[boost]}
                 min={1}
-                max={5}
+                max={3}
                 step={1}
                 onValueChange={([v]) => onBoostChange(def.key, v)}
                 className="flex-1 max-w-[180px]"
                 disabled={isMandatory}
               />
               <span className="text-[11px] font-medium text-gray-600 w-16">
-                {boost}/5 {BOOST_LABELS[boost]}
+                {boost}/3 {BOOST_LABELS[boost]}
               </span>
             </div>
           )}
@@ -214,7 +212,7 @@ function CriteriosSmartPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Criterios SMART</h1>
         <p className="text-sm text-gray-500 mt-1">
-          92 criterios que gobiernan la generación inteligente de turnos.
+          98 criterios que gobiernan la generación inteligente de turnos.
           Los obligatorios no se pueden desactivar.
         </p>
         <div className="flex items-center gap-3 mt-3">

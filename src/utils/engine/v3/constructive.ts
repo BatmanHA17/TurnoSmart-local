@@ -230,6 +230,9 @@ function assignFdsLargo(
   employees: EngineEmployee[],
   weeks: number[][],
 ): void {
+  // Track which employees successfully received FDS Largo
+  const assignedSet = new Set<string>();
+
   // Available bridge positions: between week i and week i+1
   // Bridge = last 2 days of week[i] (S-D) + first 2 days of week[i+1] (L-M)
   const bridgeSlots: number[] = []; // week indices where bridge starts
@@ -269,6 +272,21 @@ function assignFdsLargo(
       if (!state.grid[emp.id][d].locked) {
         assignCell(state, emp.id, d, "D", "engine", true);
       }
+    }
+    assignedSet.add(emp.id);
+  }
+
+  // Warn for employees who didn't get FDS Largo
+  for (const emp of employees) {
+    if (!assignedSet.has(emp.id)) {
+      state.violations.push({
+        employeeId: emp.id,
+        rule: "FDS_LARGO_MISSING",
+        severity: "warning",
+        description: `${emp.name}: no se pudo asignar FDS Largo este período (posición puente no disponible)`,
+        overridable: true,
+        category: "ergonomics",
+      });
     }
   }
 }
@@ -389,8 +407,10 @@ function assignNightCoverage(state: SolverState): void {
 
   if (rotaEmps.length === 0) return;
 
-  // Strict round-robin index: advances by 1 each week regardless of success
-  let roundRobinIdx = 0;
+  // Strict round-robin index: resumes from previous generation for cross-period equity
+  let roundRobinIdx = state.input.continuity?.nightRotationIndex ?? 0;
+  // Clamp to valid range in case employee roster changed between periods
+  if (rotaEmps.length > 0) roundRobinIdx = roundRobinIdx % rotaEmps.length;
 
   for (const week of weeks) {
     // Find days where Night Agent rests in this week
@@ -535,6 +555,9 @@ function assignNightCoverage(state: SolverState): void {
       }
     }
   }
+
+  // Persist final round-robin index for cross-period continuity
+  state.nightRotationIndexOut = roundRobinIdx;
 }
 
 // ---------------------------------------------------------------------------

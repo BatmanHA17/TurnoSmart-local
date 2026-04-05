@@ -195,6 +195,47 @@ export const hcGuardOnlyChief: HardConstraint = {
 };
 
 // ---------------------------------------------------------------------------
+// HC-09: Max consecutive working days (OB — Spain hospitality law, max 6)
+// ---------------------------------------------------------------------------
+export const MAX_CONSECUTIVE_WORK_DAYS = 6;
+
+export const hcMaxConsecutiveWorkDays: HardConstraint = {
+  id: "HC_MAX_CONSECUTIVE_WORK_DAYS",
+  name: "Máximo 6 días laborables consecutivos",
+  isFeasible(state, empId, day, shiftCode) {
+    if (!isWorkingShift(shiftCode)) return true;
+    const schedule = state.grid[empId];
+    const totalDays = state.input.period.totalDays;
+
+    // Count consecutive working days backward from (day - 1)
+    let consecBefore = 0;
+    for (let d = day - 1; d >= 1; d--) {
+      const cell = schedule[d];
+      if (cell && isWorkingShift(cell.code)) {
+        consecBefore++;
+      } else {
+        break;
+      }
+    }
+
+    // Count consecutive working days forward from (day + 1)
+    let consecAfter = 0;
+    for (let d = day + 1; d <= totalDays; d++) {
+      const cell = schedule[d];
+      if (cell && isWorkingShift(cell.code)) {
+        consecAfter++;
+      } else {
+        break;
+      }
+    }
+
+    // Total run including the candidate day
+    const totalRun = consecBefore + 1 + consecAfter;
+    return totalRun <= MAX_CONSECUTIVE_WORK_DAYS;
+  },
+};
+
+// ---------------------------------------------------------------------------
 // ALL HARD CONSTRAINTS
 // ---------------------------------------------------------------------------
 export const ALL_HARD_CONSTRAINTS: HardConstraint[] = [
@@ -206,4 +247,5 @@ export const ALL_HARD_CONSTRAINTS: HardConstraint[] = [
   hcRoleAllowedShifts,
   hcHardPetitions,
   hcGuardOnlyChief,
+  hcMaxConsecutiveWorkDays,
 ];

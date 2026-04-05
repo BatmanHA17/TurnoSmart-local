@@ -22,7 +22,7 @@ import { buildInitialSolution } from "./constructive";
 import { optimizeSolution } from "./optimizer";
 import { ALL_VALIDATION_CHECKS } from "./validationChecks";
 import { ALL_HARD_CONSTRAINTS } from "./hardConstraints";
-import { ALL_SOFT_CONSTRAINTS } from "./softConstraints";
+import { ALL_SOFT_CONSTRAINTS, applyCriteriaBoost } from "./softConstraints";
 import { isWorkingShift, getWeeks, weeklyHours } from "../helpers";
 import { SHIFT_TIMES } from "../constants";
 import { countCoverageOnDay, shiftToCoverageCategory } from "./coverageHelper";
@@ -290,6 +290,7 @@ function stateToOutput(
       totalDays: state.input.period.totalDays,
     },
     dgAccumulated: Object.keys(dgAccumulated).length > 0 ? dgAccumulated : undefined,
+    nightRotationIndex: state.nightRotationIndexOut,
     staffingRecommendation: calculateStaffingRecommendation(state),
   };
 }
@@ -308,11 +309,17 @@ export function runSolverV3(
 ): EngineOutput {
   const startTime = performance.now();
 
+  // Apply boost from criteria DB — adjusts soft constraint weights
+  const boostedSoftConstraints = applyCriteriaBoost(
+    ALL_SOFT_CONSTRAINTS,
+    input.constraints?.optionalCriteria || [],
+  );
+
   // 1. Build initial solution
-  const state = buildInitialSolution(input, ALL_HARD_CONSTRAINTS, ALL_SOFT_CONSTRAINTS);
+  const state = buildInitialSolution(input, ALL_HARD_CONSTRAINTS, boostedSoftConstraints);
 
   // 2. Optimize with local search
-  optimizeSolution(state, config, ALL_HARD_CONSTRAINTS, ALL_SOFT_CONSTRAINTS);
+  optimizeSolution(state, config, ALL_HARD_CONSTRAINTS, boostedSoftConstraints);
 
   // 3. Validate
   const violations: AuditViolation[] = [];

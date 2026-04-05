@@ -1,12 +1,13 @@
 // Tipos para el sistema de auditoría de turnos
 
-export type ViolationType = 
+export type ViolationType =
   | 'INSUFFICIENT_REST'      // < 12h entre turnos
   | 'MISSING_FREE_DAYS'      // < 2 días libres/semana
   | 'MISSING_COVERAGE'       // Sin cobertura mínima
   | 'VACATION_NO_FREE_DAYS'  // Vacaciones sin días libres concatenados
   | 'NON_CONSECUTIVE_FREE_DAYS' // Días libres no consecutivos
-  | 'EMPLOYEE_RESTRICTION';  // Viola restricción especial del empleado
+  | 'EMPLOYEE_RESTRICTION'   // Viola restricción especial del empleado
+  | 'EXCESSIVE_CONSECUTIVE_WORK'; // > 6 días laborables consecutivos
 
 export type ViolationSeverity = 'error' | 'warning' | 'info';
 
@@ -182,7 +183,8 @@ export const VIOLATION_TYPE_LABELS: Record<ViolationType, string> = {
   MISSING_COVERAGE: 'Cobertura insuficiente',
   VACATION_NO_FREE_DAYS: 'Vacaciones sin días libres',
   NON_CONSECUTIVE_FREE_DAYS: 'Días libres no consecutivos',
-  EMPLOYEE_RESTRICTION: 'Restricción de empleado'
+  EMPLOYEE_RESTRICTION: 'Restricción de empleado',
+  EXCESSIVE_CONSECUTIVE_WORK: 'Exceso días consecutivos trabajados',
 };
 
 // Iconos para tipos de violación
@@ -192,5 +194,6 @@ export const VIOLATION_TYPE_ICONS: Record<ViolationType, string> = {
   MISSING_COVERAGE: '👥',
   VACATION_NO_FREE_DAYS: '🏖️',
   NON_CONSECUTIVE_FREE_DAYS: '📆',
-  EMPLOYEE_RESTRICTION: '⚠️'
+  EMPLOYEE_RESTRICTION: '⚠️',
+  EXCESSIVE_CONSECUTIVE_WORK: '🔥',
 };

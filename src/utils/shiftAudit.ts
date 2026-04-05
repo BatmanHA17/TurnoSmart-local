@@ -502,6 +502,116 @@ export function checkEmployeeRestrictions(
 }
 
 /**
+ * 6. DETECTAR EXCESO DE DÍAS LABORABLES CONSECUTIVOS (> 6)
+ */
+const MAX_CONSECUTIVE_WORK_DAYS_AUDIT = 6;
+const ABSENCE_CODES = new Set(['D', 'V', 'E', 'P', 'F', 'H', 'S', 'C', 'PM', 'PC', 'DB', 'DG']);
+
+export function checkMaxConsecutiveWorkDays(
+  shifts: ShiftForAudit[]
+): AuditViolation[] {
+  const violations: AuditViolation[] = [];
+
+  const shiftsByEmployee = groupShiftsByEmployee(shifts);
+
+  for (const [employeeId, employeeShifts] of Object.entries(shiftsByEmployee)) {
+    const employeeName = employeeShifts[0]?.employeeName || 'Empleado';
+
+    // Build a map of date -> isWorking
+    const sortedShifts = [...employeeShifts].sort((a, b) => a.date.localeCompare(b.date));
+    if (sortedShifts.length === 0) continue;
+
+    // Get all dates in range
+    const firstDate = parseISO(sortedShifts[0].date);
+    const lastDate = parseISO(sortedShifts[sortedShifts.length - 1].date);
+    const allDays = eachDayOfInterval({ start: firstDate, end: lastDate });
+
+    // Build working-day map
+    const shiftMap = new Map<string, ShiftForAudit[]>();
+    for (const s of sortedShifts) {
+      const list = shiftMap.get(s.date) || [];
+      list.push(s);
+      shiftMap.set(s.date, list);
+    }
+
+    let runStart: string | null = null;
+    let runLength = 0;
+
+    for (const day of allDays) {
+      const dateStr = format(day, 'yyyy-MM-dd');
+      const dayShifts = shiftMap.get(dateStr) || [];
+
+      // Determine if this is a working day
+      const isRest = dayShifts.length === 0 ||
+        dayShifts.every(s =>
+          s.isAbsence ||
+          ABSENCE_CODES.has(s.absenceCode || '') ||
+          s.shiftName === 'Descanso' || s.shiftName === 'D'
+        );
+
+      if (!isRest) {
+        if (runLength === 0) runStart = dateStr;
+        runLength++;
+      } else {
+        if (runLength > MAX_CONSECUTIVE_WORK_DAYS_AUDIT && runStart) {
+          // Find the best day to insert rest (last day of the run)
+          const runEndDate = format(addDays(parseISO(runStart), runLength - 1), 'yyyy-MM-dd');
+          violations.push({
+            id: generateViolationId(),
+            type: 'EXCESSIVE_CONSECUTIVE_WORK',
+            severity: 'error',
+            employeeId,
+            employeeName,
+            date: runStart,
+            endDate: runEndDate,
+            message: `${runLength} días laborables consecutivos (máx ${MAX_CONSECUTIVE_WORK_DAYS_AUDIT})`,
+            details: `El empleado trabaja ${runLength} días consecutivos del ${formatDateShort(runStart)} al ${formatDateShort(runEndDate)}. La legislación laboral de hostelería en Espana limita a ${MAX_CONSECUTIVE_WORK_DAYS_AUDIT} días consecutivos.`,
+            suggestion: `Insertar un día de descanso (D) para romper la racha de ${runLength} días.`,
+            suggestedFix: {
+              action: 'ADD_REST_DAY',
+              label: `Asignar Descanso (D) el ${formatDateShort(runEndDate)}`,
+              employeeId,
+              date: runEndDate,
+              toShift: 'Descanso',
+              toShiftColor: '#94a3b8',
+            },
+          });
+        }
+        runLength = 0;
+        runStart = null;
+      }
+    }
+
+    // Check tail run
+    if (runLength > MAX_CONSECUTIVE_WORK_DAYS_AUDIT && runStart) {
+      const runEndDate = format(addDays(parseISO(runStart), runLength - 1), 'yyyy-MM-dd');
+      violations.push({
+        id: generateViolationId(),
+        type: 'EXCESSIVE_CONSECUTIVE_WORK',
+        severity: 'error',
+        employeeId,
+        employeeName,
+        date: runStart,
+        endDate: runEndDate,
+        message: `${runLength} días laborables consecutivos (máx ${MAX_CONSECUTIVE_WORK_DAYS_AUDIT})`,
+        details: `El empleado trabaja ${runLength} días consecutivos del ${formatDateShort(runStart)} al ${formatDateShort(runEndDate)}. La legislación laboral de hostelería en Espana limita a ${MAX_CONSECUTIVE_WORK_DAYS_AUDIT} días consecutivos.`,
+        suggestion: `Insertar un día de descanso (D) para romper la racha de ${runLength} días.`,
+        suggestedFix: {
+          action: 'ADD_REST_DAY',
+          label: `Asignar Descanso (D) el ${formatDateShort(runEndDate)}`,
+          employeeId,
+          date: runEndDate,
+          toShift: 'Descanso',
+          toShiftColor: '#94a3b8',
+        },
+      });
+    }
+  }
+
+  return violations;
+}
+
+/**
  * FUNCIÓN PRINCIPAL: Ejecutar todas las auditorías
  */
 export function runFullAudit(
@@ -549,6 +659,9 @@ export function runFullAudit(
   if (options.employeeRestrictions && options.employeeRestrictions.length > 0) {
     allViolations.push(...checkEmployeeRestrictions(shifts, options.employeeRestrictions));
   }
+
+  // 5b. Días laborables consecutivos > 6
+  allViolations.push(...checkMaxConsecutiveWorkDays(shifts));
 
   // 6. Alerta de ratio vacaciones — si no hay nadie de V en el período
   {
@@ -648,6 +761,15 @@ function generateSuggestedFix(violation: AuditViolation): SuggestedFix | undefin
         employeeId: violation.employeeId,
         date: violation.date,
         targetDate: violation.date,
+      };
+
+    case 'EXCESSIVE_CONSECUTIVE_WORK':
+      return {
+        action: 'ADD_REST_DAY',
+        label: `Añadir día de descanso para ${violation.employeeName}`,
+        employeeId: violation.employeeId,
+        date: violation.endDate || violation.date,
+        targetDate: violation.endDate || violation.date,
       };
 
     default:

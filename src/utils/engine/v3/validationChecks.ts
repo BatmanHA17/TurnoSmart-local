@@ -308,6 +308,115 @@ export const ckFomAfomMirror: ValidationCheck = {
 };
 
 // ---------------------------------------------------------------------------
+// CK-10: Max consecutive working days (max 6, Spain hospitality law)
+// ---------------------------------------------------------------------------
+const MAX_CONSECUTIVE_WORK_DAYS = 6;
+
+export const ckMaxConsecutiveWork: ValidationCheck = {
+  id: "CK_MAX_CONSECUTIVE_WORK",
+  name: "Máximo días laborables consecutivos",
+  severity: "error",
+  validate(state) {
+    const violations: AuditViolation[] = [];
+    const total = state.input.period.totalDays;
+
+    for (const emp of state.input.employees) {
+      let runStart = 0;
+      let runLength = 0;
+
+      for (let d = 1; d <= total; d++) {
+        const code = state.grid[emp.id][d]?.code;
+        if (code && isWorkingShift(code)) {
+          if (runLength === 0) runStart = d;
+          runLength++;
+        } else {
+          if (runLength > MAX_CONSECUTIVE_WORK_DAYS) {
+            violations.push({
+              employeeId: emp.id,
+              day: runStart,
+              rule: "MAX_CONSECUTIVE_WORK",
+              severity: "error",
+              description: `${runLength} días laborables consecutivos (días ${runStart}-${runStart + runLength - 1}, máx ${MAX_CONSECUTIVE_WORK_DAYS})`,
+              overridable: true,
+              category: "legal",
+            });
+          }
+          runLength = 0;
+        }
+      }
+      // Check tail run
+      if (runLength > MAX_CONSECUTIVE_WORK_DAYS) {
+        violations.push({
+          employeeId: emp.id,
+          day: runStart,
+          rule: "MAX_CONSECUTIVE_WORK",
+          severity: "error",
+          description: `${runLength} días laborables consecutivos (días ${runStart}-${total}, máx ${MAX_CONSECUTIVE_WORK_DAYS})`,
+          overridable: true,
+          category: "legal",
+        });
+      }
+    }
+
+    return violations;
+  },
+};
+
+// ---------------------------------------------------------------------------
+// CK-11: FDS Largo (long weekend) — at least one block of 4+ consecutive
+//        rest days per month for every non-FOM employee (OP-01 perk)
+// ---------------------------------------------------------------------------
+export const ckFdsLargo: ValidationCheck = {
+  id: "CK_FDS_LARGO",
+  name: "FDS Largo mensual",
+  severity: "warning",
+  validate(state) {
+    // Only check when the fdsLargo criterion is enabled
+    if (!state.input.constraints.fdsLargo) return [];
+
+    const violations: AuditViolation[] = [];
+    const total = state.input.period.totalDays;
+
+    for (const emp of state.input.employees) {
+      if (emp.role === "FOM") continue;
+
+      // Scan for any block of 4+ consecutive rest days
+      let maxConsecutiveRest = 0;
+      let currentRun = 0;
+
+      for (let d = 1; d <= total; d++) {
+        const code = state.grid[emp.id][d]?.code;
+        const isRest =
+          code === "D" || code === "V" || code === "E" ||
+          code === "PM" || code === "PC" || code === "DB" || code === "DG";
+
+        if (isRest) {
+          currentRun++;
+          if (currentRun > maxConsecutiveRest) {
+            maxConsecutiveRest = currentRun;
+          }
+        } else {
+          currentRun = 0;
+        }
+      }
+
+      if (maxConsecutiveRest < 4) {
+        violations.push({
+          employeeId: emp.id,
+          rule: "FDS_LARGO_MISSING",
+          severity: "warning",
+          description: `${emp.name}: sin FDS Largo (máx ${maxConsecutiveRest} días libres consecutivos, se requieren 4+)`,
+          overridable: true,
+          category: "ergonomics",
+        });
+      }
+    }
+
+    return violations;
+  },
+};
+
+// ---------------------------------------------------------------------------
 // ALL VALIDATION CHECKS
 // ---------------------------------------------------------------------------
 export const ALL_VALIDATION_CHECKS: ValidationCheck[] = [
@@ -318,4 +427,6 @@ export const ALL_VALIDATION_CHECKS: ValidationCheck[] = [
   ckNightRest,
   ckEquityDeviation,
   ckFomAfomMirror,
+  ckMaxConsecutiveWork,
+  ckFdsLargo,
 ];

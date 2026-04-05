@@ -42,6 +42,8 @@ export interface SolverState {
   equity: Map<string, MutableEquity>;
   /** Violations accumulated */
   violations: AuditViolation[];
+  /** Night coverage round-robin index after assignNightCoverage (for cross-period persistence) */
+  nightRotationIndexOut?: number;
 }
 
 export interface MutableEquity {

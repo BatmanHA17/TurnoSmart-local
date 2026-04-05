@@ -1,7 +1,7 @@
 /**
  * CriteriaConfigDialog — Configuración de criterios del motor SMART
  *
- * Secciones: Obligatorios (siempre ON), Opcionales (toggle + boost 1-5 + nota)
+ * Secciones: Obligatorios (siempre ON), Opcionales (toggle + boost 1-3 + nota)
  * Lee/escribe schedule_criteria via useCriteria hook.
  */
 
@@ -37,8 +37,6 @@ const BOOST_LABELS: Record<number, string> = {
   1: "Normal",
   2: "Moderado",
   3: "Enfatizado",
-  4: "Alto",
-  5: "Máximo",
 };
 
 export function CriteriaConfigDialog({
@@ -194,20 +192,20 @@ export function CriteriaConfigDialog({
               <Slider
                 value={[local.boost]}
                 min={1}
-                max={5}
+                max={3}
                 step={1}
                 className="flex-1"
                 onValueChange={([v]) => handleBoostChange(c.criteria_key, v)}
                 onValueCommit={() => handleBoostCommit(c)}
               />
               <Badge
-                variant={local.boost >= 4 ? "destructive" : local.boost >= 3 ? "default" : "secondary"}
+                variant={local.boost >= 3 ? "default" : "secondary"}
                 className="text-[9px] w-16 justify-center"
               >
                 {BOOST_LABELS[local.boost]}
               </Badge>
             </div>
-            {local.boost >= 3 && (
+            {local.boost >= 2 && (
               <Input
                 className="h-7 text-xs"
                 placeholder={BOOST_PLACEHOLDERS[c.criteria_key] || "Nota del boost (opcional)"}
