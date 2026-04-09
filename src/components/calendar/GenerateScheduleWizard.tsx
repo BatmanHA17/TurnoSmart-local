@@ -422,36 +422,46 @@ function Step3Guardias({
   const monthStart = startOfMonth(currentWeek);
   const year = monthStart.getFullYear();
   const month = monthStart.getMonth() + 1;
-  const period = buildGenerationPeriod(year, month, weeks || undefined);
+  // weeks >= 4 means "mes completo" — use auto-calculated period (no fixed weeks)
+  const effectiveWeeks = weeks >= 4 ? undefined : weeks;
+  const period = buildGenerationPeriod(year, month, effectiveWeeks || undefined);
   const periodStart = new Date(period.startDate + "T00:00:00");
   const totalWeeks = period.totalWeeks;
 
-  // Encontrar S+D agrupados por fin de semana, usando fechas reales del período
+  // Encontrar Vie+Sáb+Dom agrupados por fin de semana, usando fechas reales del período
   const weekends: Array<{
     weekNum: number;
+    friDay: number | null;
     satDay: number | null;
     sunDay: number | null;
+    friDate: string;
     satDate: string;
     sunDate: string;
   }> = [];
 
   for (let wi = 0; wi < totalWeeks; wi++) {
+    let friDay: number | null = null;
     let satDay: number | null = null;
     let sunDay: number | null = null;
 
     for (let di = 0; di < 7; di++) {
       const dayIndex = wi * 7 + di + 1; // 1-based dentro del período
       const realDate = addDays(periodStart, dayIndex - 1);
-      const dow = realDate.getDay(); // 0=dom, 6=sáb
+      const dow = realDate.getDay(); // 0=dom, 5=vie, 6=sáb
+      if (dow === 5) friDay = dayIndex;
       if (dow === 6) satDay = dayIndex;
       if (dow === 0) sunDay = dayIndex;
     }
 
-    if (satDay || sunDay) {
+    if (friDay || satDay || sunDay) {
       weekends.push({
         weekNum: wi + 1,
+        friDay,
         satDay,
         sunDay,
+        friDate: friDay
+          ? format(addDays(periodStart, friDay - 1), "d MMM", { locale: es })
+          : "",
         satDate: satDay
           ? format(addDays(periodStart, satDay - 1), "d MMM", { locale: es })
           : "",
@@ -472,6 +482,7 @@ function Step3Guardias({
 
   // Contar fines de semana con guardia (al menos 1 día del fds seleccionado)
   const weekendsWithGuardia = weekends.filter(w =>
+    (w.friDay && guardiaDays.includes(w.friDay)) ||
     (w.satDay && guardiaDays.includes(w.satDay)) ||
     (w.sunDay && guardiaDays.includes(w.sunDay))
   ).length;
@@ -483,7 +494,7 @@ function Step3Guardias({
         <Label className="text-sm font-medium">Guardias del FOM</Label>
       </div>
       <p className="text-xs text-muted-foreground">
-        ¿En qué fines de semana tiene Guardia (G/GT) el FOM este período?
+        ¿En qué días de fin de semana tiene Guardia (G) el FOM este período?
         <br />
         <span className="text-[10px]">
           Las semanas con guardia, el FOM librará 2 días entre semana. Máximo 2 fines de semana con guardia.
@@ -495,13 +506,28 @@ function Step3Guardias({
           <Card key={w.weekNum} className="overflow-hidden">
             <CardContent className="p-3 space-y-2">
               <span className="text-xs font-medium text-muted-foreground">Semana {w.weekNum}</span>
-              <div className="flex gap-3">
+              <div className="flex gap-3 flex-wrap">
+                {w.friDay && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={guardiaDays.includes(w.friDay)}
+                      onCheckedChange={() => toggleDay(w.friDay!)}
+                      disabled={weekendsWithGuardia >= 2 && !guardiaDays.includes(w.friDay) &&
+                        !(w.satDay && guardiaDays.includes(w.satDay)) &&
+                        !(w.sunDay && guardiaDays.includes(w.sunDay))}
+                    />
+                    <span className="text-sm">Vie {w.friDate}</span>
+                    <Badge variant="outline" className="text-[9px]">G</Badge>
+                  </label>
+                )}
                 {w.satDay && (
                   <label className="flex items-center gap-2 cursor-pointer">
                     <Checkbox
                       checked={guardiaDays.includes(w.satDay)}
                       onCheckedChange={() => toggleDay(w.satDay!)}
-                      disabled={weekendsWithGuardia >= 2 && !guardiaDays.includes(w.satDay)}
+                      disabled={weekendsWithGuardia >= 2 && !guardiaDays.includes(w.satDay) &&
+                        !(w.friDay && guardiaDays.includes(w.friDay)) &&
+                        !(w.sunDay && guardiaDays.includes(w.sunDay))}
                     />
                     <span className="text-sm">Sáb {w.satDate}</span>
                     <Badge variant="outline" className="text-[9px]">G</Badge>
@@ -512,7 +538,9 @@ function Step3Guardias({
                     <Checkbox
                       checked={guardiaDays.includes(w.sunDay)}
                       onCheckedChange={() => toggleDay(w.sunDay!)}
-                      disabled={weekendsWithGuardia >= 2 && !guardiaDays.includes(w.sunDay)}
+                      disabled={weekendsWithGuardia >= 2 && !guardiaDays.includes(w.sunDay) &&
+                        !(w.friDay && guardiaDays.includes(w.friDay)) &&
+                        !(w.satDay && guardiaDays.includes(w.satDay))}
                     />
                     <span className="text-sm">Dom {w.sunDate}</span>
                     <Badge variant="outline" className="text-[9px]">G</Badge>
