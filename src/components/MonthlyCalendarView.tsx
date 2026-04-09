@@ -238,7 +238,37 @@ export function MonthlyCalendarView() {
         return;
       }
 
-      
+      // Also load inactive employees who have historical shifts in this month
+      const monthStart = format(startOfMonth(currentDate), 'yyyy-MM-dd');
+      const monthEnd = format(endOfMonth(currentDate), 'yyyy-MM-dd');
+      try {
+        const { data: historicalShifts } = await supabase
+          .from('calendar_shifts')
+          .select('employee_id')
+          .eq('org_id', currentOrg.org_id)
+          .eq('is_historical', true)
+          .gte('date', monthStart)
+          .lte('date', monthEnd);
+
+        if (historicalShifts && historicalShifts.length > 0) {
+          const existingIds = new Set(data?.map(e => e.id) || []);
+          const missingIds = [...new Set(historicalShifts.map(s => s.employee_id).filter(id => id && !existingIds.has(id)))];
+
+          if (missingIds.length > 0) {
+            const { data: inactiveEmps } = await supabase
+              .from('colaboradores')
+              .select('id, nombre, apellidos, avatar_url, email, tiempo_trabajo_semanal, tipo_contrato, fecha_inicio_contrato, fecha_fin_contrato')
+              .in('id', missingIds);
+
+            if (inactiveEmps && data) {
+              data.push(...inactiveEmps);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Error loading historical employees:', e);
+      }
+
       if (data && data.length > 0) {
         const mappedEmployees: Employee[] = data.map(colaborador => ({
           id: colaborador.id,
@@ -280,7 +310,7 @@ export function MonthlyCalendarView() {
       console.error('Error en loadColaboradores:', error);
       setLoading(false);
     }
-  }, [currentOrg?.org_id]);
+  }, [currentOrg?.org_id, currentDate]);
 
   // Cargar colaboradores cuando currentOrg esté disponible
   useEffect(() => {
