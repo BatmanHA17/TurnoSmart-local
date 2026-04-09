@@ -33,6 +33,7 @@ const mainNavItems = [
   { title: "Turnos", url: "/turnos" },
   { title: "Equipo", url: "/equipo" },
   { title: "Peticiones", url: "/peticiones" },
+  { title: "Analítica", url: "/mi-actividad" },
 ];
 
 export function HorizontalNav() {
