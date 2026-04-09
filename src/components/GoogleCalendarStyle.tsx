@@ -699,6 +699,39 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         return;
       }
 
+      // ── Also load inactive employees who have historical shifts in this period ──
+      const weekStartStr = format(weekStart, 'yyyy-MM-dd');
+      const weekEndStr = format(addDays(weekStart, 6), 'yyyy-MM-dd');
+
+      const { data: historicalShiftRows } = await supabase
+        .from('calendar_shifts')
+        .select('employee_id')
+        .eq('org_id', org.org_id)
+        .eq('is_historical', true)
+        .gte('date', weekStartStr)
+        .lte('date', weekEndStr);
+
+      const historicalEmpIds = [
+        ...new Set(
+          (historicalShiftRows ?? [])
+            .map((s: any) => s.employee_id)
+            .filter(Boolean)
+        ),
+      ];
+      const loadedIds = new Set((data ?? []).map((e: any) => e.id));
+      const missingIds = historicalEmpIds.filter((id) => !loadedIds.has(id));
+
+      if (missingIds.length > 0) {
+        const { data: inactiveEmps } = await supabase
+          .from('colaboradores')
+          .select('id, nombre, apellidos, avatar_url, email, tiempo_trabajo_semanal, tipo_contrato, fecha_inicio_contrato, fecha_fin_contrato, status, engine_role, can_cover_nights, vacation_rest_preference, jobs!colaborador_id(job_titles!job_title_id(name))')
+          .in('id', missingIds);
+
+        if (inactiveEmps && data) {
+          data.push(...inactiveEmps);
+        }
+      }
+
       // ✅ CRITICAL: Always set colaboradores even if we have filtered employees
       // This ensures shouldShowColaborador() can find the contract dates
       setColaboradores(data || []);
@@ -1170,11 +1203,13 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       }
       
       // 1. Eliminar todos los turnos de la organización actual desde Supabase
+      // 🛡️ PROTECCIÓN: Never delete historical (imported) shifts
       if (orgId) {
         const { error } = await supabase
           .from('calendar_shifts')
           .delete()
-          .eq('org_id', orgId);
+          .eq('org_id', orgId)
+          .or('is_historical.eq.false,is_historical.is.null');
         
         if (error) {
           console.error('Error eliminando turnos de Supabase:', error);
@@ -1496,6 +1531,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       
       for (const shift of uniqueShifts) {
         // Eliminar turnos duplicados existentes (por empleado, fecha y nombre de turno)
+        // 🛡️ PROTECCIÓN: Never delete historical (imported) shifts
         await supabase
           .from('calendar_shifts')
           .delete()
@@ -1503,7 +1539,8 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
             employee_id: shift.employeeId,
             date: format(shift.date, 'yyyy-MM-dd'),
             shift_name: shift.name
-          });
+          })
+          .or('is_historical.eq.false,is_historical.is.null');
 
         // Insertar el turno actualizado con toda la información sincronizada
         const { error } = await supabase
@@ -1916,8 +1953,9 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       // Contar EMPLEADOS ÚNICOS trabajando por día (máximo 1 por empleado/día), excluyendo ausencias
       const workingShifts = shiftsForDay.filter(shift => {
         // Solo contar turnos de empleados que deberían estar activos en esta fecha
+        // Also count shifts from inactive employees (historical data)
         const colaborador = colaboradores.find(c => c.id === shift.employeeId);
-        if (!shouldShowColaborador(colaborador, day)) {
+        if (!shouldShowColaborador(colaborador, day) && !colaborador) {
           return false;
         }
         return shouldCountHours(shift);
@@ -2757,7 +2795,12 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     const colaborador = colaboradores.find(c => c.id === employee.id);
 
     // Mostrar empleado si cumple fechas de contrato (no requiere shifts esta semana)
-    return shouldShowColaborador(colaborador, currentWeek);
+    if (shouldShowColaborador(colaborador, currentWeek)) return true;
+
+    // Also show inactive employees who have shifts in the current week
+    // (e.g. historical imports for past months when navigating backwards)
+    const hasShiftsThisWeek = shiftBlocks.some(s => s.employeeId === employee.id);
+    return hasShiftsThisWeek;
   });
 
   // 🆕 Usar hook global para sincronizar ordenamiento entre TODAS las vistas

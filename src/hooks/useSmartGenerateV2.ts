@@ -538,9 +538,10 @@ export function useSmartGenerateV2({
 
         // Solo borrar los que NO tendrán reemplazo (días de descanso)
         // Los que SÍ tienen bloque se actualizarán via upsert
+        // 🛡️ PROTECCIÓN: Never delete historical (imported) shifts
         supabase
           .from("calendar_shifts")
-          .select("id, employee_id, date")
+          .select("id, employee_id, date, is_historical")
           .eq("org_id", orgId)
           .gte("date", startStr)
           .lte("date", endStr)
@@ -548,8 +549,8 @@ export function useSmartGenerateV2({
           .then(({ data: existing }) => {
             if (!existing) return;
             const idsToDelete = existing
-              .filter((row) => !coveredKeys.has(`${row.employee_id}|${row.date}`))
-              .map((row) => row.id);
+              .filter((row: any) => !row.is_historical && !coveredKeys.has(`${row.employee_id}|${row.date}`))
+              .map((row: any) => row.id);
             if (idsToDelete.length > 0) {
               supabase
                 .from("calendar_shifts")
