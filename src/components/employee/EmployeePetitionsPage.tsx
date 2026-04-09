@@ -5,7 +5,8 @@
  * El empleado solo ve/crea sus propias peticiones (RLS endurecido)
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -89,9 +90,24 @@ export function EmployeePetitionsPage() {
     periodEnd,
   });
 
-  // Filter to only this employee's petitions
+  // Load employees for Manager view (when colaboradorId is null)
+  const [employeesList, setEmployeesList] = useState<Array<{ id: string; name: string }>>([]);
+  useEffect(() => {
+    if (!org?.id || colaboradorId) return; // Only load for manager (no colaboradorId)
+    supabase
+      .from('colaboradores')
+      .select('id, nombre, apellidos')
+      .eq('org_id', org.id)
+      .eq('status', 'activo')
+      .order('nombre')
+      .then(({ data }) => {
+        if (data) setEmployeesList(data.map(c => ({ id: c.id, name: `${c.nombre} ${c.apellidos || ''}`.trim() })));
+      });
+  }, [org?.id, colaboradorId]);
+
+  // Filter to only this employee's petitions (or all for manager)
   const myPetitions = useMemo(
-    () => petitions.filter((p) => p.employee_id === colaboradorId),
+    () => colaboradorId ? petitions.filter((p) => p.employee_id === colaboradorId) : petitions,
     [petitions, colaboradorId]
   );
 
@@ -181,6 +197,7 @@ export function EmployeePetitionsPage() {
         periodStart={periodStart}
         periodEnd={periodEnd}
         totalDays={endOfMonth(selectedMonth).getDate()}
+        employees={employeesList}
         onCreate={async (data) => {
           await createPetition(data);
           refresh();
@@ -286,6 +303,7 @@ function NewPetitionDialog({
   periodEnd,
   totalDays,
   onCreate,
+  employees,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -295,6 +313,7 @@ function NewPetitionDialog({
   periodEnd: string;
   totalDays: number;
   onCreate: (data: Omit<PetitionRecord, "id" | "created_at" | "updated_at" | "employee_name">) => Promise<void>;
+  employees?: Array<{ id: string; name: string }>;
 }) {
   const [type, setType] = useState<PetitionType>("B");
   const [daysInput, setDaysInput] = useState("");
@@ -303,6 +322,10 @@ function NewPetitionDialog({
   const [priority, setPriority] = useState(3);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(colaboradorId || "");
+
+  // Use colaboradorId if available (employee view), otherwise use selected (manager view)
+  const effectiveEmployeeId = colaboradorId || selectedEmployeeId;
 
   const parsedDays = useMemo(() => {
     return daysInput
@@ -311,14 +334,14 @@ function NewPetitionDialog({
       .filter((n) => !isNaN(n) && n >= 1 && n <= totalDays);
   }, [daysInput, totalDays]);
 
-  const canSubmit = parsedDays.length > 0 && colaboradorId && organizationId;
+  const canSubmit = parsedDays.length > 0 && effectiveEmployeeId && organizationId;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
     try {
       await onCreate({
-        employee_id: colaboradorId!,
+        employee_id: effectiveEmployeeId!,
         organization_id: organizationId!,
         type,
         status: "pending" as PetitionStatus,
@@ -377,6 +400,23 @@ function NewPetitionDialog({
               {TYPE_LABELS[type]?.description}
             </p>
           </div>
+
+          {/* Employee selector (Manager view when colaboradorId is null) */}
+          {!colaboradorId && employees && employees.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Empleado</Label>
+              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Seleccionar empleado" />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Days */}
           <div className="space-y-1.5">
