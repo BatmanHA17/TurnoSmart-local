@@ -111,18 +111,10 @@ function anchorFixed(state: SolverState): void {
     // 2. Lock hard petitions (type A)
     for (const p of emp.petitions) {
       if (p.type !== "A" || p.status === "rejected") continue;
-      console.log(`[anchorFixed] Petition A for ${emp.name}: days=${JSON.stringify(p.days)}, requestedShift=${p.requestedShift}, reason=${(p as any).reason}, totalDays=${totalDays}`);
       for (const day of p.days) {
-        if (day < 1 || day > totalDays) {
-          console.log(`[anchorFixed]   → day ${day} OUT OF RANGE (1-${totalDays}), SKIPPED`);
-          continue;
-        }
-        if (state.grid[emp.id][day].locked) {
-          console.log(`[anchorFixed]   → day ${day} ALREADY LOCKED (code=${state.grid[emp.id][day].code}), SKIPPED`);
-          continue;
-        }
+        if (day < 1 || day > totalDays) continue;
+        if (state.grid[emp.id][day].locked) continue;
         if (p.requestedShift) {
-          console.log(`[anchorFixed]   → anchoring day ${day} = ${p.requestedShift}`);
           assignCell(state, emp.id, day, p.requestedShift, "petition_a", true);
         } else {
           // Hard petition without specific shift (vacations, holidays, sick leave)
@@ -136,7 +128,6 @@ function anchorFixed(state: SolverState): void {
           else if (reason.includes("permiso") || reason.includes("mudanza")) absCode = "PM";
           else if (reason.includes("curso") || reason.includes("formacion")) absCode = "PC";
           else if (reason.includes("licencia")) absCode = "L";
-          console.log(`[anchorFixed]   → reason-based: reason="${reason}" → absCode=${absCode}, anchoring day ${day}`);
           assignCell(state, emp.id, day, absCode, "petition_a", true);
         }
       }

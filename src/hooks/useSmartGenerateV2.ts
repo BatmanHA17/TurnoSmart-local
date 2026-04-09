@@ -245,11 +245,9 @@ export function useSmartGenerateV2({
             .lte("period_start", periodEnd)
             .gte("period_end", periodStart);
 
-          console.log(`[useSmartGenerateV2] Loaded ${dbPetitions?.length ?? 0} petitions for period ${periodStart}→${periodEnd} (dayOffset=${petitionDayOffset})`);
           for (const row of dbPetitions ?? []) {
             const rawDays = row.days ?? [];
             const convertedDays = rawDays.map((d: number) => d + petitionDayOffset).filter((d: number) => d >= 1 && d <= period.totalDays);
-            console.log(`[useSmartGenerateV2]   petition: type=${row.type}, status=${row.status}, rawDays=${JSON.stringify(rawDays)}, convertedDays=${JSON.stringify(convertedDays)}, requested_shift=${row.requested_shift}, emp=...${row.employee_id?.slice(-4)}`);
             const p: Petition = {
               id: row.id,
               employeeId: row.employee_id,
