@@ -790,9 +790,13 @@ function Step5Summary({
       });
     }
 
-    // 7. Equidad — desequilibrio previo grande
+    // 7. Equidad — desequilibrio previo grande (excluir Night Agent fijo)
     if (previousPeriod && previousPeriod.length > 0) {
-      const rotating = previousPeriod.filter(p => p.nightCount !== undefined);
+      // Only compare rotating employees (ROTA_COMPLETO), exclude NIGHT_SHIFT_AGENT and other fixed roles
+      const nightAgentIds = new Set(
+        employees?.filter(e => (e as any).engineRole === 'NIGHT_SHIFT_AGENT' || (e as any).engine_role === 'NIGHT_SHIFT_AGENT').map(e => e.id) || []
+      );
+      const rotating = previousPeriod.filter(p => p.nightCount !== undefined && !nightAgentIds.has(p.employeeId));
       if (rotating.length >= 2) {
         const nightCounts = rotating.map(p => p.nightCount);
         const maxN = Math.max(...nightCounts);
