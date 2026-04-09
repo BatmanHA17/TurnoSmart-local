@@ -812,12 +812,12 @@ function Step5Summary({
       }
     }
 
-    // 8. Guardias FOM — máximo 2 por período
-    if (guardiaDays.length > 2) {
+    // 8. Guardias FOM — informativo (sin límite legal)
+    if (guardiaDays.length > 0) {
       items.push({
-        ok: false,
-        label: `${guardiaDays.length} guardias FOM seleccionadas (máximo recomendado: 2)`,
-        detail: 'El convenio permite máximo 2 fines de semana con guardia por período.',
+        ok: true,
+        label: `${guardiaDays.length} día${guardiaDays.length > 1 ? 's' : ''} de guardia FOM seleccionado${guardiaDays.length > 1 ? 's' : ''}`,
+        detail: '',
       });
     }
 
