@@ -111,21 +111,32 @@ function anchorFixed(state: SolverState): void {
     // 2. Lock hard petitions (type A)
     for (const p of emp.petitions) {
       if (p.type !== "A" || p.status === "rejected") continue;
+      console.log(`[anchorFixed] Petition A for ${emp.name}: days=${JSON.stringify(p.days)}, requestedShift=${p.requestedShift}, reason=${(p as any).reason}, totalDays=${totalDays}`);
       for (const day of p.days) {
-        if (day < 1 || day > totalDays) continue;
-        if (state.grid[emp.id][day].locked) continue;
+        if (day < 1 || day > totalDays) {
+          console.log(`[anchorFixed]   → day ${day} OUT OF RANGE (1-${totalDays}), SKIPPED`);
+          continue;
+        }
+        if (state.grid[emp.id][day].locked) {
+          console.log(`[anchorFixed]   → day ${day} ALREADY LOCKED (code=${state.grid[emp.id][day].code}), SKIPPED`);
+          continue;
+        }
         if (p.requestedShift) {
+          console.log(`[anchorFixed]   → anchoring day ${day} = ${p.requestedShift}`);
           assignCell(state, emp.id, day, p.requestedShift, "petition_a", true);
         } else {
           // Hard petition without specific shift (vacations, holidays, sick leave)
           // Determine absence code from reason or default to V
           const reason = (p as any).reason?.toLowerCase() || "";
           let absCode = "V"; // default: vacation
-          if (reason.includes("festivo") || reason.includes("holiday")) absCode = "F";
+          if (reason.includes("festivo") || reason.includes("holiday") || reason.includes("festiv")) absCode = "F";
+          else if (reason === "dg" || reason.includes("debido guardia") || reason.includes("guardia")) absCode = "DG";
+          else if (reason === "db" || reason.includes("día debido") || reason.includes("dia debido")) absCode = "DB";
           else if (reason.includes("enferm") || reason.includes("baja") || reason.includes("sick")) absCode = "E";
           else if (reason.includes("permiso") || reason.includes("mudanza")) absCode = "PM";
           else if (reason.includes("curso") || reason.includes("formacion")) absCode = "PC";
           else if (reason.includes("licencia")) absCode = "L";
+          console.log(`[anchorFixed]   → reason-based: reason="${reason}" → absCode=${absCode}, anchoring day ${day}`);
           assignCell(state, emp.id, day, absCode, "petition_a", true);
         }
       }
@@ -272,8 +283,8 @@ function assignFdsLargo(
       weekB[1],                // Tuesday (or 2nd day)
     ].filter(d => d != null && d >= 1 && d <= state.input.period.totalDays);
 
-    // Check feasibility: hard absences (V, E, PM, PC) block; other locks can be cleared
-    const hardAbsences = new Set(["V", "E", "PM", "PC"]);
+    // Check feasibility: hard absences block FDS Largo; other locks can be cleared
+    const hardAbsences = new Set(["V", "F", "E", "PM", "PC", "DG", "DB", "L"]);
     const canAssign = fdsLargoDays.every(d => {
       const cell = state.grid[emp.id][d];
       if (!cell) return false;
@@ -286,7 +297,7 @@ function assignFdsLargo(
     // Assign the 4 FDS Largo rest days, clearing any existing assignments
     for (const d of fdsLargoDays) {
       const cell = state.grid[emp.id][d];
-      // Clear locked non-absence cells to make room for FDS Largo
+      // Clear locked non-absence cells to make room for FDS Largo (never touch hard absences)
       if (cell.locked && cell.code !== "D" && !hardAbsences.has(cell.code)) {
         state.grid[emp.id][d] = {
           code: "D", startTime: "00:00", endTime: "00:00",

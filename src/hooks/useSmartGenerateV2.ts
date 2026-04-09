@@ -7,7 +7,7 @@
  * Fase 2: Genera 3 alternativas, el FOM elige cuál aplicar.
  */
 import { useState, useCallback } from "react";
-import { startOfMonth, addDays, endOfMonth, format } from "date-fns";
+import { startOfMonth, addDays, endOfMonth, format, differenceInDays } from "date-fns";
 import type { ShiftBlock } from "@/utils/calendarShiftUtils";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -228,6 +228,14 @@ export function useSmartGenerateV2({
         const periodEnd = period.endDate;
 
         // --- Cargar peticiones desde DB ---
+        // Day offset: petitions store calendar day-of-month (1-31) for the target month,
+        // but the engine uses period-relative days (1-35 where day 1 = period start Monday).
+        // Convert: periodDay = calendarDay + dayOffset
+        // e.g., for May 2026 with period starting Apr 27: dayOffset = 4
+        const periodStartDate = new Date(periodStart + "T00:00:00");
+        const monthFirstDay = new Date(year, month - 1, 1); // First day of target month
+        const petitionDayOffset = differenceInDays(monthFirstDay, periodStartDate);
+
         const petitionsByEmployee = new Map<string, Petition[]>();
         if (orgId) {
           const { data: dbPetitions } = await supabase
@@ -237,12 +245,16 @@ export function useSmartGenerateV2({
             .lte("period_start", periodEnd)
             .gte("period_end", periodStart);
 
+          console.log(`[useSmartGenerateV2] Loaded ${dbPetitions?.length ?? 0} petitions for period ${periodStart}→${periodEnd} (dayOffset=${petitionDayOffset})`);
           for (const row of dbPetitions ?? []) {
+            const rawDays = row.days ?? [];
+            const convertedDays = rawDays.map((d: number) => d + petitionDayOffset).filter((d: number) => d >= 1 && d <= period.totalDays);
+            console.log(`[useSmartGenerateV2]   petition: type=${row.type}, status=${row.status}, rawDays=${JSON.stringify(rawDays)}, convertedDays=${JSON.stringify(convertedDays)}, requested_shift=${row.requested_shift}, emp=...${row.employee_id?.slice(-4)}`);
             const p: Petition = {
               id: row.id,
               employeeId: row.employee_id,
               type: row.type as Petition["type"],
-              days: row.days ?? [],
+              days: convertedDays,
               requestedShift: row.requested_shift ?? undefined,
               avoidShift: (row.avoid_shift as Petition["avoidShift"]) ?? undefined,
               exchangeWithEmployeeId: row.exchange_with_employee_id ?? undefined,
@@ -502,7 +514,7 @@ export function useSmartGenerateV2({
 
   // Aplica una alternativa elegida al calendario
   const applyAlternative = useCallback(
-    (index: number) => {
+    async (index: number) => {
       if (!generation) return;
       const alt = generation.alternatives[index];
       if (!alt) return;
