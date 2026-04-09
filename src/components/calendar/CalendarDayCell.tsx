@@ -176,10 +176,11 @@ export const CalendarDayCell: React.FC<CalendarDayCellProps> = React.memo(({
                   className={`${shifts.length > 1 ? 'h-8' : 'h-full'} w-full relative`}
                   onContextMenu={(e) => (canEdit || isManager) ? onToggleLock(shift, e) : e.preventDefault()}
                 >
-                  {/* Lock icon */}
-                  {shift.locked && (
+                  {/* Lock icon — manual lock (amber) or historical protection (blue) */}
+                  {(shift.locked || shift.isHistorical) && (
                     <div className="absolute top-0.5 right-0.5 z-30 pointer-events-none">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 text-amber-500 drop-shadow">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
+                        className={`w-3 h-3 drop-shadow ${shift.isHistorical ? 'text-blue-500' : 'text-amber-500'}`}>
                         <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clipRule="evenodd" />
                       </svg>
                     </div>
@@ -224,7 +225,7 @@ export const CalendarDayCell: React.FC<CalendarDayCellProps> = React.memo(({
                       onDeleteShift(s);
                     }}
                     onAddShift={onAddShift ? () => onAddShift(employee, day, {} as React.MouseEvent) : undefined}
-                    readOnly={(isEmployee && !isManager && !isAdmin && !isOwner) || isPublished}
+                    readOnly={(isEmployee && !isManager && !isAdmin && !isOwner) || isPublished || !!shift.isHistorical}
                   />
                 </div>
               ))}

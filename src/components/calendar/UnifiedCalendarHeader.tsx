@@ -15,6 +15,8 @@ import {
   Wand2,
   Copy,
   Sparkles,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import { format, addDays, subDays, addWeeks, subWeeks, startOfWeek, addMonths, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
@@ -65,6 +67,10 @@ interface UnifiedCalendarHeaderProps {
   
   // Clean
   onClean?: () => void;
+
+  // Lock all
+  onLockAll?: () => void;
+  allLocked?: boolean;
   
   // Settings/Delete
   onOpenSettings?: () => void;
@@ -138,6 +144,8 @@ export function UnifiedCalendarHeader({
   onShowHistory,
   onShowBackups,
   onClean,
+  onLockAll,
+  allLocked,
   onOpenSettings,
   onOpenPetitions,
   onOpenOccupancy,
@@ -513,6 +521,19 @@ export function UnifiedCalendarHeader({
               onViolationClick={onViolationClick}
             />
             </span>
+          )}
+
+          {/* Bloquear todo / Desbloquear todo */}
+          {onLockAll && (
+            <Button
+              variant={allLocked ? "default" : "outline"}
+              size="sm"
+              onClick={onLockAll}
+              className={cn("h-8 gap-1.5", allLocked && "bg-blue-600 hover:bg-blue-700 text-white")}
+            >
+              {allLocked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
+              {allLocked ? "Bloqueado" : "Bloquear todo"}
+            </Button>
           )}
 
           {/* Limpiar - al lado de auditoría */}

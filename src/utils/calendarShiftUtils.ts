@@ -20,6 +20,8 @@ export interface ShiftBlock {
   notes?: string;
   /** true si el FOM ha bloqueado este turno — el motor no lo sobreescribe al regenerar */
   locked?: boolean;
+  /** true si es un turno importado del Excel histórico — protegido contra borrado */
+  isHistorical?: boolean;
 }
 
 // Tipos de ausencias disponibles

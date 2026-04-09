@@ -220,9 +220,13 @@ export function useSmartGenerateV2({
         const year = refDate.getFullYear();
         const month = refDate.getMonth() + 1;
 
-        // Auto-calcula semanas completas L-D para cubrir todo el mes
-        const period = weeks
-          ? buildGenerationPeriod(year, month, weeks)
+        // weeks >= 4 = "mes completo" → auto-calcular período completo del mes
+        // (el wizard usa weeks>=4 como señal de mes completo, pero pasaba el valor
+        // literal al hook, causando que meses de 5 semanas como mayo 2026 perdieran
+        // la última semana)
+        const effectiveWeeks = weeks && weeks >= 4 ? undefined : weeks;
+        const period = effectiveWeeks
+          ? buildGenerationPeriod(year, month, effectiveWeeks)
           : buildGenerationPeriod(year, month);
         const periodStart = period.startDate;
         const periodEnd = period.endDate;

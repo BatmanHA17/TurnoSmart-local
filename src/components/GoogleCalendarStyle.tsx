@@ -477,6 +477,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showOperationBackups, setShowOperationBackups] = useState(false);
   const [showCleanDialog, setShowCleanDialog] = useState(false);
+  const [allShiftsLocked, setAllShiftsLocked] = useState(false);
   const [showPetitions, setShowPetitions] = useState(false);
   const [showPetitionForm, setShowPetitionForm] = useState(false);
   const [showOccupancyImport, setShowOccupancyImport] = useState(false);
@@ -890,6 +891,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
             breaks: savedShift?.breaks || [],
             totalBreakTime: savedShift?.totalBreakTime || (shift.break_duration ? parseInt(shift.break_duration) : 0),
             locked: (shift as any).locked ?? false,
+            isHistorical: (shift as any).is_historical ?? false,
           };
         });
 
@@ -2647,19 +2649,24 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
       // Si es un turno del calendario
       if (dragData.shift && dragData.type === 'calendar') {
         const { shift } = dragData;
-        
+
         // Verificar que el turno existe en el array
         const shiftExists = shiftBlocks.find(s => s.id === shift.id);
-        
+
         if (!shiftExists) {
-          // toast({
-          //   title: "Error",
-          //   description: "El turno no existe en el calendario",
-          //   variant: "destructive",
-          // });
           return;
         }
-        
+
+        // 🛡️ PROTECCIÓN: No permitir eliminar turnos históricos (importados)
+        if (shiftExists.isHistorical) {
+          toast({
+            title: "Turno protegido",
+            description: "Los turnos históricos (importados) no se pueden eliminar. Desactiva el candado primero.",
+            variant: "destructive",
+          });
+          return;
+        }
+
         // Eliminar de Supabase primero
         deleteShiftFromSupabase(shift.id);
         
@@ -2907,6 +2914,44 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
     pendingCount: smartPendingCount,
   } = useSmartSuggestions({ savedShiftCodes, employees: employeesForIA, occupancy: occupancyForWizard });
 
+  // Lock all / Unlock all shifts
+  const handleLockAll = async () => {
+    const newLocked = !allShiftsLocked;
+
+    // Update local state
+    setShiftBlocksWithHistory(prev =>
+      prev.map(s => ({ ...s, isHistorical: newLocked }))
+    );
+    setAllShiftsLocked(newLocked);
+
+    // Persist to Supabase
+    if (org?.org_id) {
+      const weekStartStr = format(weekStart, 'yyyy-MM-dd');
+      const weekEndStr = format(addDays(weekStart, 6), 'yyyy-MM-dd');
+      await supabase
+        .from('calendar_shifts')
+        .update({ is_historical: newLocked } as any)
+        .eq('org_id', org.org_id)
+        .gte('date', weekStartStr)
+        .lte('date', weekEndStr);
+    }
+
+    toast({
+      title: newLocked ? "Turnos bloqueados" : "Turnos desbloqueados",
+      description: newLocked
+        ? "Todos los turnos visibles están protegidos contra eliminación."
+        : "Los turnos ya se pueden editar y eliminar.",
+    });
+  };
+
+  // Sync allShiftsLocked state when shifts load
+  useEffect(() => {
+    if (shiftBlocks.length > 0) {
+      const allHistorical = shiftBlocks.every(s => s.isHistorical);
+      setAllShiftsLocked(allHistorical);
+    }
+  }, [shiftBlocks]);
+
   const handleOpenGenerateSheet = () => setShowWizard(true);
   const handleGenerate = (config: GenerateConfig) => {
     // Legacy: redirigir al wizard
@@ -3090,6 +3135,8 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
               }, 3000);
             }
           }}
+          onLockAll={handleLockAll}
+          allLocked={allShiftsLocked}
           onClean={() => setShowCleanDialog(true)}
           employeeCount={sortedEmployees.length}
           scheduledToday={shiftBlocks.filter(s => format(s.date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd') && !s.isAbsence).length}
@@ -3927,8 +3974,22 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           if (showDeleteConfirmation) {
              if (showDeleteConfirmation.type === 'bulk') {
                // Bulk delete con backup
-                const shiftsToDelete = showDeleteConfirmation.shifts;
-                
+                const allShiftsToDelete = showDeleteConfirmation.shifts;
+
+                // 🛡️ PROTECCIÓN: Filtrar turnos históricos del bulk delete
+                const historicalCount = allShiftsToDelete.filter((s: any) => s.isHistorical).length;
+                const shiftsToDelete = allShiftsToDelete.filter((s: any) => !s.isHistorical);
+                if (historicalCount > 0) {
+                  toast({
+                    title: "Turnos históricos protegidos",
+                    description: `${historicalCount} turno(s) importado(s) no se eliminaron. Solo se borran los ${shiftsToDelete.length} turnos generados.`,
+                  });
+                }
+                if (shiftsToDelete.length === 0) {
+                  setShowDeleteConfirmation(null);
+                  return;
+                }
+
                 // 🛡️ PROTECCIÓN: Crear backup antes de bulk delete
                 if (shiftsToDelete.length >= 5) { // Solo para 5+ turnos
                   await createBackupBeforeOperation(
@@ -3963,7 +4024,18 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
             } else {
               // Single delete
               const shiftToDelete = showDeleteConfirmation;
-              
+
+              // 🛡️ PROTECCIÓN: No permitir eliminar históricos
+              if (shiftToDelete.isHistorical) {
+                toast({
+                  title: "Turno protegido",
+                  description: "Los turnos históricos (importados) no se pueden eliminar.",
+                  variant: "destructive",
+                });
+                setShowDeleteConfirmation(null);
+                return;
+              }
+
               // Eliminar de Supabase primero
               await deleteShiftFromSupabase(shiftToDelete.id);
               

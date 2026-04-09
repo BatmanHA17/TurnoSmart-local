@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
+import { useDataProtection } from "@/hooks/useDataProtection";
 import { toast } from "sonner";
 import { 
   format, 
@@ -44,14 +45,15 @@ export function CleanShiftsDialog({
   onSuccess 
 }: CleanShiftsDialogProps) {
   const { org: currentOrg } = useCurrentOrganization();
-  
+  const { createBackupBeforeOperation } = useDataProtection();
+
   const [cleanMode, setCleanMode] = useState<CleanMode>("month");
   const [selectedMonth, setSelectedMonth] = useState<Date>(currentDate);
   const [selectedWeeks, setSelectedWeeks] = useState<number[]>([]);
   const [selectedDays, setSelectedDays] = useState<Date[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("all");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [preview, setPreview] = useState<{ count: number } | null>(null);
+  const [preview, setPreview] = useState<{ count: number; historicalCount: number } | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
 
   // Generar semanas del mes seleccionado
@@ -114,10 +116,12 @@ export function CleanShiftsDialog({
     }
 
     try {
+      // Count deletable shifts (non-historical only)
       let query = supabase
         .from('calendar_shifts')
         .select('id', { count: 'exact', head: true })
-        .eq('org_id', currentOrg.org_id);
+        .eq('org_id', currentOrg.org_id)
+        .or('is_historical.eq.false,is_historical.is.null');
 
       if ('start' in range && 'end' in range) {
         query = query.gte('date', range.start).lte('date', range.end);
@@ -131,12 +135,31 @@ export function CleanShiftsDialog({
 
       const { count, error } = await query;
 
+      // Count protected historical shifts
+      let histQuery = supabase
+        .from('calendar_shifts')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', currentOrg.org_id)
+        .eq('is_historical', true);
+
+      if ('start' in range && 'end' in range) {
+        histQuery = histQuery.gte('date', range.start).lte('date', range.end);
+      } else if ('dates' in range) {
+        histQuery = histQuery.in('date', range.dates);
+      }
+
+      if (selectedEmployeeId !== "all") {
+        histQuery = histQuery.eq('employee_id', selectedEmployeeId);
+      }
+
+      const { count: histCount } = await histQuery;
+
       if (error) {
         console.error('Error calculating preview:', error);
         return;
       }
 
-      setPreview({ count: count || 0 });
+      setPreview({ count: count || 0, historicalCount: histCount || 0 });
     } catch (error) {
       console.error('Error in calculatePreview:', error);
     }
@@ -153,12 +176,46 @@ export function CleanShiftsDialog({
     }
 
     setIsProcessing(true);
-    
+
     try {
+      // 🛡️ Backup antes de borrar — recuperable desde panel de backups
+      // Solo turnos no-históricos (los históricos están protegidos)
+      let backupQuery = supabase
+        .from('calendar_shifts')
+        .select('*')
+        .eq('org_id', currentOrg.org_id)
+        .or('is_historical.eq.false,is_historical.is.null');
+
+      if ('start' in range && 'end' in range) {
+        backupQuery = backupQuery.gte('date', range.start).lte('date', range.end);
+      } else if ('dates' in range) {
+        backupQuery = backupQuery.in('date', range.dates);
+      }
+
+      if (selectedEmployeeId !== "all") {
+        backupQuery = backupQuery.eq('employee_id', selectedEmployeeId);
+      }
+
+      const { data: shiftsToBackup } = await backupQuery;
+
+      if (shiftsToBackup && shiftsToBackup.length > 0) {
+        const modeLabel = cleanMode === "month" ? format(selectedMonth, 'MMMM yyyy', { locale: es })
+          : cleanMode === "weeks" ? `${selectedWeeks.length} semanas`
+          : `${selectedDays.length} días`;
+        await createBackupBeforeOperation(
+          'clean_shifts',
+          { shifts: shiftsToBackup },
+          `Limpiar turnos: ${modeLabel} (${shiftsToBackup.length} turnos)`,
+          shiftsToBackup.length
+        );
+      }
+
+      // Ahora sí borrar (NUNCA históricos)
       let query = supabase
         .from('calendar_shifts')
         .delete()
-        .eq('org_id', currentOrg.org_id);
+        .eq('org_id', currentOrg.org_id)
+        .or('is_historical.eq.false,is_historical.is.null');
 
       if ('start' in range && 'end' in range) {
         query = query.gte('date', range.start).lte('date', range.end);
@@ -363,14 +420,23 @@ export function CleanShiftsDialog({
 
             {/* Preview */}
             {preview && (
-              <div className={cn(
-                "p-3 rounded-md border",
-                preview.count > 0 ? "bg-destructive/10 border-destructive/30" : "bg-muted"
-              )}>
-                <p className="text-sm flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-destructive" />
-                  Se eliminarán <strong>{preview.count}</strong> turnos
-                </p>
+              <div className="space-y-2">
+                <div className={cn(
+                  "p-3 rounded-md border",
+                  preview.count > 0 ? "bg-destructive/10 border-destructive/30" : "bg-muted"
+                )}>
+                  <p className="text-sm flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-destructive" />
+                    Se eliminarán <strong>{preview.count}</strong> turnos
+                  </p>
+                </div>
+                {preview.historicalCount > 0 && (
+                  <div className="p-3 rounded-md border bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <strong>{preview.historicalCount}</strong> turnos históricos (importados) están protegidos y NO se eliminarán.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
