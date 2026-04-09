@@ -2946,7 +2946,7 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
         const periodStart = format(currentWeek, 'yyyy-MM-dd');
         const { data } = await supabase
           .from('employee_equity')
-          .select('employee_id, morning_count, afternoon_count, night_count, period_end')
+          .select('employee_id, morning_count, afternoon_count, night_count, weekend_worked_count, period_start, period_end')
           .eq('organization_id', org.id)
           .lt('period_end', periodStart)
           .order('period_end', { ascending: false });
@@ -2954,11 +2954,17 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
           // Take most recent per employee
           const seen = new Set<string>();
           const summaries: PreviousPeriodSummary[] = [];
+          const today = new Date();
           for (const row of data) {
             if (seen.has(row.employee_id)) continue;
             seen.add(row.employee_id);
             const emp = employees.find(e => e.id === row.employee_id);
             if (!emp) continue;
+            // Calculate days active from contract start
+            const startDate = (emp as any).startDate || (emp as any).fecha_inicio_contrato;
+            const daysActive = startDate ? Math.max(1, Math.floor((today.getTime() - new Date(startDate).getTime()) / 86400000)) : undefined;
+            // Get engine role from employee
+            const engineRole = (emp as any).engineRole || (emp as any).engine_role || '';
             summaries.push({
               employeeId: row.employee_id,
               employeeName: emp.name,
@@ -2966,6 +2972,9 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
               morningCount: row.morning_count ?? 0,
               afternoonCount: row.afternoon_count ?? 0,
               nightCount: row.night_count ?? 0,
+              weekendWorkedCount: row.weekend_worked_count ?? 0,
+              daysActive,
+              engineRole,
             });
           }
           if (summaries.length > 0) { setPreviousPeriodSummary(summaries); return; }

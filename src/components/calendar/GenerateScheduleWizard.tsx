@@ -82,6 +82,9 @@ export interface PreviousPeriodSummary {
   morningCount: number;     // Mañanas acumuladas
   afternoonCount: number;   // Tardes acumuladas
   nightCount: number;       // Noches acumuladas
+  weekendWorkedCount?: number;  // FDS trabajados
+  daysActive?: number;      // Días en contrato activo
+  engineRole?: string;      // Rol del motor
 }
 
 interface WizardProps {
@@ -872,33 +875,71 @@ function Step5Summary({
       )}
 
       {/* Historial acumulado de equidad */}
-      {previousPeriod && previousPeriod.length > 0 && (
+      {previousPeriod && previousPeriod.length > 0 && (() => {
+        const active = previousPeriod.filter((p) =>
+          (p.morningCount > 0 || p.afternoonCount > 0 || p.nightCount > 0) &&
+          p.engineRole !== 'NIGHT_SHIFT_AGENT'
+        );
+        if (active.length === 0) return null;
+
+        // Calculate monthly averages
+        const withRatios = active.map(p => {
+          const months = p.daysActive ? Math.max(1, p.daysActive / 30) : 1;
+          return {
+            ...p,
+            mPerMonth: Math.round((p.morningCount / months) * 10) / 10,
+            tPerMonth: Math.round((p.afternoonCount / months) * 10) / 10,
+            nPerMonth: Math.round((p.nightCount / months) * 10) / 10,
+            fdsPerMonth: p.weekendWorkedCount ? Math.round((p.weekendWorkedCount / months) * 10) / 10 : 0,
+            monthsActive: Math.round(months * 10) / 10,
+          };
+        });
+
+        // Find max/min for highlighting desequilibrios
+        const nRatios = withRatios.map(p => p.nPerMonth);
+        const maxNRatio = Math.max(...nRatios);
+        const minNRatio = Math.min(...nRatios);
+        const nImbalance = maxNRatio - minNRatio > 2;
+
+        return (
         <Card>
           <CardContent className="pt-3 pb-2 space-y-2">
             <h4 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
               <Info className="h-3.5 w-3.5" />
               Historial acumulado de equidad
             </h4>
-            <p className="text-[10px] text-muted-foreground">Turnos M/T/N acumulados por empleado desde el inicio del historial. El motor usa estos datos para equilibrar la asignación.</p>
-            <div className="text-[10px] grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-0.5">
+            <p className="text-[10px] text-muted-foreground">Ratio mensual M/T/N por empleado. El motor equilibra para que todos tengan ratios similares.</p>
+
+            {nImbalance && (
+              <p className="text-[10px] text-amber-600 font-medium">⚠️ Desequilibrio noches: ratio va de {minNRatio}/mes a {maxNRatio}/mes. El motor compensará.</p>
+            )}
+
+            <div className="text-[10px] grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto] gap-x-2 gap-y-0.5">
               <span className="font-medium text-muted-foreground">Empleado</span>
-              <span className="font-medium text-muted-foreground text-center">M</span>
-              <span className="font-medium text-muted-foreground text-center">T</span>
-              <span className="font-medium text-muted-foreground text-center">N</span>
-              {previousPeriod
-                .filter((p) => p.morningCount > 0 || p.afternoonCount > 0 || p.nightCount > 0)
-                .map((p) => (
+              <span className="font-medium text-muted-foreground text-center">Meses</span>
+              <span className="font-medium text-muted-foreground text-center">M/mes</span>
+              <span className="font-medium text-muted-foreground text-center">T/mes</span>
+              <span className="font-medium text-muted-foreground text-center">N/mes</span>
+              <span className="font-medium text-muted-foreground text-center">FDS/mes</span>
+              <span className="font-medium text-muted-foreground text-center">Total</span>
+              {withRatios.map((p) => (
                 <Fragment key={p.employeeId}>
                   <span className="truncate">{p.employeeName}</span>
-                  <span className="text-center">{p.morningCount}</span>
-                  <span className="text-center">{p.afternoonCount}</span>
-                  <span className="text-center">{p.nightCount}</span>
+                  <span className="text-center text-muted-foreground">{p.monthsActive}</span>
+                  <span className="text-center">{p.mPerMonth}</span>
+                  <span className="text-center">{p.tPerMonth}</span>
+                  <span className={`text-center ${p.nPerMonth === maxNRatio && nImbalance ? 'text-amber-600 font-bold' : ''} ${p.nPerMonth === minNRatio && nImbalance ? 'text-blue-600 font-bold' : ''}`}>
+                    {p.nPerMonth}
+                  </span>
+                  <span className="text-center">{p.fdsPerMonth}</span>
+                  <span className="text-center text-muted-foreground">{p.morningCount + p.afternoonCount + p.nightCount}</span>
                 </Fragment>
               ))}
             </div>
           </CardContent>
         </Card>
-      )}
+        );
+      })()}
 
       <Card>
         <CardContent className="pt-4 space-y-3">
