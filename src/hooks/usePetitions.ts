@@ -50,6 +50,7 @@ interface UsePetitionsResult {
   isLoading: boolean;
   error: string | null;
   createPetition: (petition: Omit<PetitionRecord, "id" | "created_at" | "updated_at" | "employee_name">) => Promise<void>;
+  updatePetition: (id: string, data: Partial<PetitionRecord>) => Promise<void>;
   updatePetitionStatus: (petitionId: string, status: PetitionStatus) => Promise<void>;
   deletePetition: (petitionId: string) => Promise<void>;
   refresh: () => void;
@@ -170,6 +171,24 @@ export function usePetitions({
     [fetchPetitions, toast]
   );
 
+  const updatePetition = useCallback(
+    async (id: string, data: Partial<PetitionRecord>) => {
+      try {
+        const { error: dbError } = await supabase
+          .from("schedule_petitions" as any)
+          .update({ ...data, updated_at: new Date().toISOString() } as any)
+          .eq("id", id);
+        if (dbError) throw dbError;
+        toast({ title: "Petición actualizada" });
+        fetchPetitions();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Error actualizando petición";
+        toast({ title: "Error", description: msg, variant: "destructive" });
+      }
+    },
+    [fetchPetitions, toast]
+  );
+
   const updatePetitionStatus = useCallback(
     async (petitionId: string, status: PetitionStatus) => {
       try {
@@ -211,6 +230,7 @@ export function usePetitions({
     isLoading,
     error,
     createPetition,
+    updatePetition,
     updatePetitionStatus,
     deletePetition,
     refresh: fetchPetitions,

@@ -39,6 +39,7 @@ import {
   XCircle,
   Loader2,
   Trash2,
+  Pencil,
   FileText,
   ChevronLeft,
   ChevronRight,
@@ -85,7 +86,7 @@ export function EmployeePetitionsPage() {
   const periodStart = format(selectedMonth, "yyyy-MM-dd");
   const periodEnd = format(endOfMonth(selectedMonth), "yyyy-MM-dd");
 
-  const { petitions, isLoading, createPetition, deletePetition, refresh } = usePetitions({
+  const { petitions, isLoading, createPetition, updatePetition, deletePetition, refresh } = usePetitions({
     organizationId: org?.id,
     periodStart,
     periodEnd,
@@ -113,6 +114,7 @@ export function EmployeePetitionsPage() {
   );
 
   const [showNewForm, setShowNewForm] = useState(false);
+  const [editingPetition, setEditingPetition] = useState<PetitionRecord | null>(null);
 
   // Navigation
   const goToPrevMonth = () => setSelectedMonth((m) => addMonths(m, -1));
@@ -179,6 +181,10 @@ export function EmployeePetitionsPage() {
             <PetitionCard
               key={petition.id}
               petition={petition}
+              onEdit={(p) => {
+                setEditingPetition(p);
+                setShowNewForm(true);
+              }}
               onCancel={async () => {
                 await deletePetition(petition.id);
                 refresh();
@@ -188,20 +194,30 @@ export function EmployeePetitionsPage() {
         </div>
       )}
 
-      {/* New petition dialog */}
+      {/* New / Edit petition dialog */}
       <NewPetitionDialog
         open={showNewForm}
-        onOpenChange={setShowNewForm}
+        onOpenChange={(open) => {
+          setShowNewForm(open);
+          if (!open) setEditingPetition(null);
+        }}
         colaboradorId={colaboradorId}
         organizationId={org?.id}
         periodStart={periodStart}
         periodEnd={periodEnd}
         totalDays={endOfMonth(selectedMonth).getDate()}
         employees={employeesList}
+        editingPetition={editingPetition}
         onCreate={async (data) => {
           await createPetition(data);
           refresh();
           setShowNewForm(false);
+        }}
+        onUpdate={async (id, data) => {
+          await updatePetition(id, data);
+          refresh();
+          setShowNewForm(false);
+          setEditingPetition(null);
         }}
       />
     </div>
@@ -211,9 +227,11 @@ export function EmployeePetitionsPage() {
 // ─── PetitionCard ────────────────────────────────────────────────────────────
 function PetitionCard({
   petition,
+  onEdit,
   onCancel,
 }: {
   petition: PetitionRecord;
+  onEdit: (petition: PetitionRecord) => void;
   onCancel: () => Promise<void>;
 }) {
   const [cancelling, setCancelling] = useState(false);
@@ -268,23 +286,33 @@ function PetitionCard({
             </p>
           </div>
 
-          {/* Delete button (always visible) */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-destructive hover:text-destructive text-xs"
-            disabled={cancelling}
-            onClick={async () => {
-              setCancelling(true);
-              try {
-                await onCancel();
-              } finally {
+          {/* Edit + Delete buttons (always visible) */}
+          <div className="flex flex-col gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground text-xs"
+              onClick={() => onEdit(petition)}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive text-xs"
+              disabled={cancelling}
+              onClick={async () => {
+                setCancelling(true);
+                try {
+                  await onCancel();
+                } finally {
                   setCancelling(false);
                 }
               }}
             >
               {cancelling ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
             </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -301,7 +329,9 @@ function NewPetitionDialog({
   periodEnd,
   totalDays,
   onCreate,
+  onUpdate,
   employees,
+  editingPetition,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -311,8 +341,12 @@ function NewPetitionDialog({
   periodEnd: string;
   totalDays: number;
   onCreate: (data: Omit<PetitionRecord, "id" | "created_at" | "updated_at" | "employee_name">) => Promise<void>;
+  onUpdate?: (id: string, data: Partial<PetitionRecord>) => Promise<void>;
   employees?: Array<{ id: string; name: string }>;
+  editingPetition?: PetitionRecord | null;
 }) {
+  const isEditing = !!editingPetition;
+
   const [type, setType] = useState<PetitionType>("B");
   const [daysInput, setDaysInput] = useState("");
   const [requestedShift, setRequestedShift] = useState<string>("");
@@ -321,6 +355,19 @@ function NewPetitionDialog({
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(colaboradorId || "");
+
+  // Pre-fill form when editing
+  useEffect(() => {
+    if (editingPetition && open) {
+      setType(editingPetition.type);
+      setDaysInput(editingPetition.days.sort((a, b) => a - b).join(", "));
+      setRequestedShift(editingPetition.requested_shift || "");
+      setAvoidShift(editingPetition.avoid_shift || "");
+      setPriority(editingPetition.priority);
+      setReason(editingPetition.reason || "");
+      setSelectedEmployeeId(editingPetition.employee_id || colaboradorId || "");
+    }
+  }, [editingPetition, open, colaboradorId]);
 
   // Use colaboradorId if available (employee view), otherwise use selected (manager view)
   const effectiveEmployeeId = colaboradorId || selectedEmployeeId;
@@ -334,35 +381,52 @@ function NewPetitionDialog({
 
   const canSubmit = parsedDays.length > 0 && effectiveEmployeeId && organizationId;
 
+  const resetForm = () => {
+    setType("B");
+    setDaysInput("");
+    setRequestedShift("");
+    setAvoidShift("");
+    setPriority(3);
+    setReason("");
+  };
+
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
     try {
-      await onCreate({
-        employee_id: effectiveEmployeeId!,
-        organization_id: organizationId!,
-        type,
-        status: "pending" as PetitionStatus,
-        days: parsedDays,
-        requested_shift: requestedShift || null,
-        avoid_shift: avoidShift || null,
-        exchange_with_employee_id: null,
-        exchange_day: null,
-        priority,
-        reason: reason.trim() || null,
-        period_start: periodStart,
-        period_end: periodEnd,
-      });
-      // Reset form
-      setType("B");
-      setDaysInput("");
-      setRequestedShift("");
-      setAvoidShift("");
-      setPriority(3);
-      setReason("");
-      toast({ title: "Petición enviada", description: "Tu responsable la revisará pronto." });
+      if (isEditing && onUpdate) {
+        await onUpdate(editingPetition!.id, {
+          type,
+          days: parsedDays,
+          requested_shift: requestedShift || null,
+          avoid_shift: avoidShift || null,
+          priority,
+          reason: reason.trim() || null,
+          employee_id: effectiveEmployeeId!,
+        });
+        resetForm();
+        toast({ title: "Petición actualizada", description: "Los cambios se han guardado." });
+      } else {
+        await onCreate({
+          employee_id: effectiveEmployeeId!,
+          organization_id: organizationId!,
+          type,
+          status: "pending" as PetitionStatus,
+          days: parsedDays,
+          requested_shift: requestedShift || null,
+          avoid_shift: avoidShift || null,
+          exchange_with_employee_id: null,
+          exchange_day: null,
+          priority,
+          reason: reason.trim() || null,
+          period_start: periodStart,
+          period_end: periodEnd,
+        });
+        resetForm();
+        toast({ title: "Petición enviada", description: "Tu responsable la revisará pronto." });
+      }
     } catch (err) {
-      toast({ title: "Error", description: "No se pudo crear la petición.", variant: "destructive" });
+      toast({ title: "Error", description: isEditing ? "No se pudo actualizar la petición." : "No se pudo crear la petición.", variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
@@ -372,9 +436,11 @@ function NewPetitionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Nueva petición</DialogTitle>
+          <DialogTitle>{isEditing ? "Editar petición" : "Nueva petición"}</DialogTitle>
           <DialogDescription>
-            Crea una solicitud de vacaciones, preferencia de turno o intercambio.
+            {isEditing
+              ? "Modifica los datos de tu petición."
+              : "Crea una solicitud de vacaciones, preferencia de turno o intercambio."}
           </DialogDescription>
         </DialogHeader>
 
@@ -511,7 +577,7 @@ function NewPetitionDialog({
           </Button>
           <Button onClick={handleSubmit} disabled={!canSubmit || submitting}>
             {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Enviar petición
+            {isEditing ? "Guardar cambios" : "Enviar petición"}
           </Button>
         </DialogFooter>
       </DialogContent>
