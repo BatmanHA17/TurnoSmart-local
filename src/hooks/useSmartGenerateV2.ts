@@ -511,13 +511,42 @@ export function useSmartGenerateV2({
       const periodStartDate = new Date(alt.output.meta.period.startDate + "T00:00:00");
       const totalDays = alt.output.meta.totalDays;
 
-      const blocks = engineOutputToBlocks(
+      let blocks = engineOutputToBlocks(
         alt.output.schedules,
         calEmployees,
         periodStartDate,
         totalDays,
         orgId
       );
+
+      // 🛡️ Filter out blocks that overlap with historical shifts (e.g., late April when generating May)
+      if (orgId) {
+        try {
+          const periodEndDate2 = addDays(periodStartDate, totalDays - 1);
+          const { data: historicalDates } = await supabase
+            .from("calendar_shifts")
+            .select("employee_id, date")
+            .eq("org_id", orgId)
+            .eq("is_historical", true)
+            .gte("date", format(periodStartDate, "yyyy-MM-dd"))
+            .lte("date", format(periodEndDate2, "yyyy-MM-dd"));
+
+          if (historicalDates && historicalDates.length > 0) {
+            const historicalKeys = new Set(
+              historicalDates.map((h: any) => `${h.employee_id}|${h.date}`)
+            );
+            const beforeCount = blocks.length;
+            blocks = blocks.filter(
+              (b) => !historicalKeys.has(`${b.employeeId}|${format(b.date, "yyyy-MM-dd")}`)
+            );
+            if (blocks.length < beforeCount) {
+              console.log(`[applyAlternative] Filtered ${beforeCount - blocks.length} blocks overlapping with historical shifts`);
+            }
+          }
+        } catch (e) {
+          console.warn("Error checking historical overlap:", e);
+        }
+      }
 
       // ---------------------------------------------------------------
       // Limpiar turnos viejos del período en DB que no tendrán reemplazo.
