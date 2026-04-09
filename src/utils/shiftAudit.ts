@@ -662,6 +662,23 @@ export function checkVacationAnnualRatio(
         details: `${empName} ha disfrutado ${vDays} de ${daysPerYear} días de vacaciones. Al ritmo actual, llegará a diciembre con ~${Math.round(projectedTotal)} días (${Math.round(projectedTotal / daysPerYear * 100)}%). Objetivo: ≥90%.`,
         suggestion: `Programa vacaciones adicionales para ${empName} antes de fin de año.`,
       });
+
+      // Informational suggestion: calculate how many V days are needed and suggest scheduling
+      const neededByDecember = daysPerYear - vDays;
+      const monthsRemaining = 12 - monthsElapsed;
+      if (neededByDecember > 0 && monthsRemaining > 0) {
+        violations.push({
+          id: generateViolationId(),
+          type: 'VACATION_SUGGESTION' as any,
+          severity: 'info',
+          employeeId: empId,
+          employeeName: empName,
+          date: format(periodStart, 'yyyy-MM-dd'),
+          message: `Programar ${neededByDecember} dias de vacaciones para ${empName}`,
+          details: `${empName} necesita ${neededByDecember} dias de vacaciones antes de diciembre (${vDays}/${daysPerYear} disfrutados). Quedan ${monthsRemaining} meses para programarlos.`,
+          suggestion: `Considerar programar ${neededByDecember} dias de vacaciones para ${empName} en los proximos 2 meses.`,
+        });
+      }
     }
   }
 

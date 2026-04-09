@@ -2866,8 +2866,13 @@ export function GoogleCalendarStyle({ approvedRequests = [] }: GoogleCalendarSty
 
       // Desbloquear después de que la persistencia tenga tiempo de completar.
       // El batch upsert tarda ~1-2s; damos 5s de margen.
+      // Bug fix: After the guard expires, force a reload from DB so the calendar
+      // reflects the persisted shifts (fixes blank screen after applying alternative).
       setTimeout(() => {
         skipDbReloadRef.current = false;
+        if (employees.length > 0) {
+          loadShiftsFromSupabase(employees.map(e => e.id));
+        }
       }, 5000);
     },
   });

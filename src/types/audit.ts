@@ -8,7 +8,8 @@ export type ViolationType =
   | 'NON_CONSECUTIVE_FREE_DAYS' // Días libres no consecutivos
   | 'EMPLOYEE_RESTRICTION'   // Viola restricción especial del empleado
   | 'EXCESSIVE_CONSECUTIVE_WORK' // > 6 días laborables consecutivos
-  | 'VACATION_RATIO_LOW';        // Proyección anual vacaciones < 90%
+  | 'VACATION_RATIO_LOW'         // Proyección anual vacaciones < 90%
+  | 'VACATION_SUGGESTION';       // Sugerencia informativa de programar vacaciones
 
 export type ViolationSeverity = 'error' | 'warning' | 'info';
 
@@ -187,6 +188,7 @@ export const VIOLATION_TYPE_LABELS: Record<ViolationType, string> = {
   EMPLOYEE_RESTRICTION: 'Restricción de empleado',
   EXCESSIVE_CONSECUTIVE_WORK: 'Exceso días consecutivos trabajados',
   VACATION_RATIO_LOW: 'Ratio vacaciones anual bajo',
+  VACATION_SUGGESTION: 'Sugerencia de vacaciones',
 };
 
 // Iconos para tipos de violación
@@ -199,4 +201,5 @@ export const VIOLATION_TYPE_ICONS: Record<ViolationType, string> = {
   EMPLOYEE_RESTRICTION: '⚠️',
   EXCESSIVE_CONSECUTIVE_WORK: '🔥',
   VACATION_RATIO_LOW: '🏖️',
+  VACATION_SUGGESTION: '📋',
 };

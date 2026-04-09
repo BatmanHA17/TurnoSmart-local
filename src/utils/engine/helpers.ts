@@ -115,17 +115,23 @@ export function buildGenerationPeriod(
   const firstDay = new Date(year, month - 1, 1);
   const lastDay = new Date(year, month, 0); // último día del mes
 
-  // Start: primer lunes >= día 1 del mes
+  // Start: lunes <= día 1 del mes (retroceder al lunes anterior si no es lunes)
+  // Esto asegura que el período cubre todo el mes, incluyendo los días iniciales
+  // que caen antes del primer lunes. Ej: Mayo 2026 (viernes 1) → retrocede al lunes 28 abril.
+  // Los turnos de días del mes anterior que ya existen se respetan (locked/historical).
   const firstDow = firstDay.getDay(); // 0=dom, 1=lun, ..., 6=sáb
   let startDate: Date;
   if (firstDow === 1) {
     // Ya es lunes
     startDate = new Date(firstDay);
-  } else {
-    // Avanzar al próximo lunes
-    const daysUntilMonday = firstDow === 0 ? 1 : 8 - firstDow;
+  } else if (firstDow === 0) {
+    // Domingo: retroceder 6 días al lunes anterior
     startDate = new Date(firstDay);
-    startDate.setDate(startDate.getDate() + daysUntilMonday);
+    startDate.setDate(startDate.getDate() - 6);
+  } else {
+    // Mar-Sáb: retroceder al lunes anterior
+    startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() - (firstDow - 1));
   }
 
   if (weeks) {

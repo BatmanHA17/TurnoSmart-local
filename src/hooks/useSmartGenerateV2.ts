@@ -651,11 +651,28 @@ function engineOutputToBlocks(
 
       const code = assignment.code;
 
-      // Skip rest/absence days — solo generar bloques para turnos de trabajo
-      if (code === "D" || assignment.hours === 0) continue;
-
       // day es 1-based dentro del período → fecha real = periodStart + (day - 1)
       const date = addDays(periodStartDate, day - 1);
+
+      // Rest days (D): include explicit "D" blocks so the calendar shows "D"
+      // instead of empty cells. Historical imports have "D" records; generated
+      // schedules should match that behavior.
+      if (code === "D" || (assignment.hours === 0 && !code)) {
+        blocks.push({
+          id: `smart-v2-${emp.id}-${day}`,
+          employeeId: emp.id,
+          date,
+          startTime: undefined,
+          endTime: undefined,
+          type: "absence" as ShiftBlock["type"],
+          color: SHIFT_COLORS["D"] ?? "#6b7280",
+          name: "D",
+          organization_id: orgId,
+          absenceCode: "D",
+        });
+        continue;
+      }
+
       const type = SHIFT_TYPE_MAP[code] ?? (code.match(/^\d/) ? "morning" : "absence");
       const color = SHIFT_COLORS[code] ?? "#6b7280";
 
