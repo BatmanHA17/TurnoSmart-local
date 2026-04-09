@@ -38,6 +38,7 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  Trash2,
   FileText,
   ChevronLeft,
   ChevronRight,
@@ -179,7 +180,6 @@ export function EmployeePetitionsPage() {
               key={petition.id}
               petition={petition}
               onCancel={async () => {
-                if (petition.status !== "pending") return;
                 await deletePetition(petition.id);
                 refresh();
               }}
@@ -268,25 +268,23 @@ function PetitionCard({
             </p>
           </div>
 
-          {/* Cancel button (only for pending) */}
-          {petition.status === "pending" && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:text-destructive text-xs"
-              disabled={cancelling}
-              onClick={async () => {
-                setCancelling(true);
-                try {
-                  await onCancel();
-                } finally {
+          {/* Delete button (always visible) */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:text-destructive text-xs"
+            disabled={cancelling}
+            onClick={async () => {
+              setCancelling(true);
+              try {
+                await onCancel();
+              } finally {
                   setCancelling(false);
                 }
               }}
             >
-              {cancelling ? <Loader2 className="h-3 w-3 animate-spin" /> : "Cancelar"}
+              {cancelling ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
             </Button>
-          )}
         </div>
       </CardContent>
     </Card>
