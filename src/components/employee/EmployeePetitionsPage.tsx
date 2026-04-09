@@ -54,8 +54,8 @@ import type { PetitionType, PetitionStatus } from "@/utils/engine";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const TYPE_LABELS: Record<string, { label: string; description: string; color: string }> = {
-  A: { label: "Vacaciones / Ausencia", description: "Obligatoria (aprobada por RRHH)", color: "bg-red-100 text-red-800" },
-  B: { label: "Preferencia", description: "El motor intentará respetarla", color: "bg-blue-100 text-blue-800" },
+  A: { label: "Vacaciones / Ausencia", description: "Petición dura — se respeta al 100%", color: "bg-red-100 text-red-800" },
+  B: { label: "Preferencia", description: "Petición blanda — el motor intentará respetarla", color: "bg-blue-100 text-blue-800" },
   C: { label: "Intercambio", description: "Acuerdo con otro compañero", color: "bg-purple-100 text-purple-800" },
   D: { label: "Recurrente", description: "Petición que se repite cada período (SMART detecta patrones)", color: "bg-emerald-100 text-emerald-800" },
 };
@@ -74,6 +74,112 @@ const SHIFT_OPTIONS = [
   { value: "D", label: "Descanso (D)" },
   { value: "11x19", label: "Transición (11×19)" },
 ];
+
+// ─── Request type options for the new "¿Qué solicitas?" dropdown ────────────
+type RequestOption = {
+  value: string;
+  label: string;
+  autoType: "A" | "B";
+  autoPriority: number;
+  /** For Tipo B, this is the requested_shift value */
+  shiftCode?: string;
+};
+
+const REQUEST_OPTIONS: RequestOption[] = [
+  // Tipo A (Dura) — priority 1
+  { value: "V",  label: "Vacaciones (V)",        autoType: "A", autoPriority: 1 },
+  { value: "D",  label: "Descanso (D)",          autoType: "A", autoPriority: 1 },
+  { value: "F",  label: "Festivo (F)",           autoType: "A", autoPriority: 1 },
+  { value: "DB", label: "Día Debido (DB)",       autoType: "A", autoPriority: 1 },
+  { value: "DG", label: "Debido Guardia (DG)",   autoType: "A", autoPriority: 1 },
+  { value: "PM", label: "Permiso Mudanza (PM)",  autoType: "A", autoPriority: 1 },
+  { value: "PC", label: "Permiso Curso (PC)",    autoType: "A", autoPriority: 1 },
+  { value: "E",  label: "Enfermedad (E)",        autoType: "A", autoPriority: 1 },
+  { value: "L",  label: "Licencia (L)",          autoType: "A", autoPriority: 1 },
+  // Tipo B (Blanda) — priority 3
+  { value: "pref_M",     label: "Preferir Mañana (M)",       autoType: "B", autoPriority: 3, shiftCode: "M" },
+  { value: "pref_T",     label: "Preferir Tarde (T)",        autoType: "B", autoPriority: 3, shiftCode: "T" },
+  { value: "pref_N",     label: "Preferir Noche (N)",        autoType: "B", autoPriority: 3, shiftCode: "N" },
+  { value: "pref_9x17",  label: "Preferir 9×17",            autoType: "B", autoPriority: 3, shiftCode: "9x17" },
+  { value: "pref_12x20", label: "Preferir 12×20",           autoType: "B", autoPriority: 3, shiftCode: "12x20" },
+  { value: "pref_11x19", label: "Preferir 11×19",           autoType: "B", autoPriority: 3, shiftCode: "11x19" },
+];
+
+// ─── Mini-calendar helper ───────────────────────────────────────────────────
+function MiniCalendarPicker({
+  totalDays,
+  selectedDays,
+  onToggleDay,
+  periodStart,
+}: {
+  totalDays: number;
+  selectedDays: number[];
+  onToggleDay: (day: number, shiftHeld: boolean) => void;
+  periodStart: string;
+}) {
+  const weekDayLabels = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+  // Calculate which weekday the 1st falls on (0=Mon ... 6=Sun)
+  const firstDate = new Date(periodStart + "T00:00:00");
+  // JS getDay: 0=Sun, 1=Mon... convert to 0=Mon format
+  const jsDay = firstDate.getDay();
+  const startOffset = jsDay === 0 ? 6 : jsDay - 1;
+
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < startOffset; i++) cells.push(null);
+  for (let d = 1; d <= totalDays; d++) cells.push(d);
+  // pad to complete last row
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <div className="space-y-1.5">
+      {/* Weekday header */}
+      <div className="grid grid-cols-7 gap-0.5">
+        {weekDayLabels.map((wd) => (
+          <div key={wd} className="text-[10px] text-muted-foreground text-center font-medium py-0.5">
+            {wd}
+          </div>
+        ))}
+      </div>
+      {/* Day cells */}
+      <div className="grid grid-cols-7 gap-0.5">
+        {cells.map((day, idx) => {
+          if (day === null) {
+            return <div key={`empty-${idx}`} className="h-8" />;
+          }
+          const isSelected = selectedDays.includes(day);
+          return (
+            <button
+              key={day}
+              type="button"
+              className={cn(
+                "h-8 w-full rounded text-xs font-medium transition-colors",
+                "hover:bg-accent hover:text-accent-foreground",
+                "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                isSelected
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "bg-muted/40 text-foreground"
+              )}
+              onClick={(e) => onToggleDay(day, e.shiftKey)}
+            >
+              {day}
+            </button>
+          );
+        })}
+      </div>
+      {/* Count */}
+      {selectedDays.length > 0 && (
+        <p className="text-[10px] text-muted-foreground">
+          {selectedDays.length} día{selectedDays.length > 1 ? "s" : ""} seleccionado{selectedDays.length > 1 ? "s" : ""}:{" "}
+          {[...selectedDays].sort((a, b) => a - b).join(", ")}
+        </p>
+      )}
+      <p className="text-[10px] text-muted-foreground/60">
+        Clic = seleccionar/deseleccionar. Shift+clic = seleccionar rango.
+      </p>
+    </div>
+  );
+}
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export function EmployeePetitionsPage() {
@@ -347,60 +453,93 @@ function NewPetitionDialog({
 }) {
   const isEditing = !!editingPetition;
 
-  const [type, setType] = useState<PetitionType>("B");
-  const [daysInput, setDaysInput] = useState("");
-  const [requestedShift, setRequestedShift] = useState<string>("");
+  // The main "what are you requesting?" selector value
+  const [requestOption, setRequestOption] = useState<string>("");
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [lastClickedDay, setLastClickedDay] = useState<number | null>(null);
   const [avoidShift, setAvoidShift] = useState<string>("");
-  const [priority, setPriority] = useState(3);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(colaboradorId || "");
 
+  // Derived values from the selected request option
+  const currentOption = REQUEST_OPTIONS.find((o) => o.value === requestOption);
+  const autoType: PetitionType = currentOption?.autoType ?? "B";
+  const autoPriority = currentOption?.autoPriority ?? 3;
+  const autoRequestedShift = currentOption?.shiftCode ?? null;
+
   // Pre-fill form when editing
   useEffect(() => {
     if (editingPetition && open) {
-      setType(editingPetition.type);
-      setDaysInput(editingPetition.days.sort((a, b) => a - b).join(", "));
-      setRequestedShift(editingPetition.requested_shift || "");
+      // Try to match to a request option
+      const matchedOpt = REQUEST_OPTIONS.find((o) => {
+        if (editingPetition.type === "A") {
+          return o.autoType === "A" && o.value === editingPetition.requested_shift;
+        }
+        // For Tipo B, match by shiftCode
+        return o.autoType === "B" && o.shiftCode === editingPetition.requested_shift;
+      });
+      setRequestOption(matchedOpt?.value ?? "");
+      setSelectedDays([...editingPetition.days].sort((a, b) => a - b));
       setAvoidShift(editingPetition.avoid_shift || "");
-      setPriority(editingPetition.priority);
       setReason(editingPetition.reason || "");
       setSelectedEmployeeId(editingPetition.employee_id || colaboradorId || "");
+      setLastClickedDay(null);
     }
   }, [editingPetition, open, colaboradorId]);
 
   // Use colaboradorId if available (employee view), otherwise use selected (manager view)
   const effectiveEmployeeId = colaboradorId || selectedEmployeeId;
 
-  const parsedDays = useMemo(() => {
-    return daysInput
-      .split(/[,\s]+/)
-      .map((s) => parseInt(s.trim(), 10))
-      .filter((n) => !isNaN(n) && n >= 1 && n <= totalDays);
-  }, [daysInput, totalDays]);
-
-  const canSubmit = parsedDays.length > 0 && effectiveEmployeeId && organizationId;
+  const canSubmit = selectedDays.length > 0 && effectiveEmployeeId && organizationId && requestOption;
 
   const resetForm = () => {
-    setType("B");
-    setDaysInput("");
-    setRequestedShift("");
+    setRequestOption("");
+    setSelectedDays([]);
+    setLastClickedDay(null);
     setAvoidShift("");
-    setPriority(3);
     setReason("");
+  };
+
+  // Mini-calendar toggle handler with shift+click range support
+  const handleToggleDay = (day: number, shiftHeld: boolean) => {
+    setSelectedDays((prev) => {
+      if (shiftHeld && lastClickedDay !== null) {
+        // Range selection: select all days between lastClickedDay and day
+        const lo = Math.min(lastClickedDay, day);
+        const hi = Math.max(lastClickedDay, day);
+        const range: number[] = [];
+        for (let d = lo; d <= hi; d++) range.push(d);
+        // Merge with existing, dedupe
+        const merged = new Set([...prev, ...range]);
+        return [...merged].sort((a, b) => a - b);
+      }
+      // Simple toggle
+      if (prev.includes(day)) {
+        return prev.filter((d) => d !== day);
+      }
+      return [...prev, day].sort((a, b) => a - b);
+    });
+    setLastClickedDay(day);
   };
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
     try {
+      // For Tipo A, the requested_shift is the absence/leave code (V, D, F, etc.)
+      // For Tipo B, the requested_shift is the preferred shift code (M, T, N, etc.)
+      const resolvedRequestedShift = autoType === "A"
+        ? requestOption  // The absence code itself (V, D, F, DB, etc.)
+        : (autoRequestedShift || null);
+
       if (isEditing && onUpdate) {
         await onUpdate(editingPetition!.id, {
-          type,
-          days: parsedDays,
-          requested_shift: requestedShift || null,
-          avoid_shift: avoidShift || null,
-          priority,
+          type: autoType,
+          days: selectedDays,
+          requested_shift: resolvedRequestedShift,
+          avoid_shift: (autoType === "B" && avoidShift && avoidShift !== "_none") ? avoidShift : null,
+          priority: autoPriority,
           reason: reason.trim() || null,
           employee_id: effectiveEmployeeId!,
         });
@@ -410,14 +549,14 @@ function NewPetitionDialog({
         await onCreate({
           employee_id: effectiveEmployeeId!,
           organization_id: organizationId!,
-          type,
+          type: autoType,
           status: "pending" as PetitionStatus,
-          days: parsedDays,
-          requested_shift: requestedShift || null,
-          avoid_shift: avoidShift || null,
+          days: selectedDays,
+          requested_shift: resolvedRequestedShift,
+          avoid_shift: (autoType === "B" && avoidShift && avoidShift !== "_none") ? avoidShift : null,
           exchange_with_employee_id: null,
           exchange_day: null,
-          priority,
+          priority: autoPriority,
           reason: reason.trim() || null,
           period_start: periodStart,
           period_end: periodEnd,
@@ -434,37 +573,17 @@ function NewPetitionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Editar petición" : "Nueva petición"}</DialogTitle>
           <DialogDescription>
             {isEditing
               ? "Modifica los datos de tu petición."
-              : "Crea una solicitud de vacaciones, preferencia de turno o intercambio."}
+              : "Selecciona lo que necesitas y los días del mes."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Type */}
-          <div className="space-y-1.5">
-            <Label className="text-xs">Tipo de petición</Label>
-            <Select value={type} onValueChange={(v) => setType(v as PetitionType)}>
-              <SelectTrigger className="h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(TYPE_LABELS).map(([key, val]) => (
-                  <SelectItem key={key} value={key}>
-                    <span className="font-medium">Tipo {key}</span> — {val.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-[10px] text-muted-foreground">
-              {TYPE_LABELS[type]?.description}
-            </p>
-          </div>
-
           {/* Employee selector (Manager view when colaboradorId is null) */}
           {!colaboradorId && employees && employees.length > 0 && (
             <div className="space-y-1.5">
@@ -482,77 +601,83 @@ function NewPetitionDialog({
             </div>
           )}
 
-          {/* Days */}
+          {/* What are you requesting? (replaces old Type + Shift preference) */}
           <div className="space-y-1.5">
-            <Label className="text-xs">Días del mes (1-{totalDays})</Label>
-            <Input
-              placeholder="Ej: 5, 6, 7, 12"
-              value={daysInput}
-              onChange={(e) => setDaysInput(e.target.value)}
-              className="h-9"
-            />
-            {parsedDays.length > 0 && (
-              <p className="text-[10px] text-muted-foreground">
-                {parsedDays.length} día{parsedDays.length > 1 ? "s" : ""} seleccionado{parsedDays.length > 1 ? "s" : ""}:{" "}
-                {parsedDays.sort((a, b) => a - b).join(", ")}
-              </p>
+            <Label className="text-xs">¿Qué solicitas?</Label>
+            <Select value={requestOption} onValueChange={setRequestOption}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Seleccionar tipo de solicitud" />
+              </SelectTrigger>
+              <SelectContent>
+                {/* Group A: Absences */}
+                <SelectItem value="__separator_a" disabled>
+                  ── Ausencias / Permisos ──
+                </SelectItem>
+                {REQUEST_OPTIONS.filter((o) => o.autoType === "A").map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+                {/* Group B: Preferences */}
+                <SelectItem value="__separator_b" disabled>
+                  ── Preferencias de turno ──
+                </SelectItem>
+                {REQUEST_OPTIONS.filter((o) => o.autoType === "B").map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {/* Auto-detected type badge */}
+            {requestOption && currentOption && (
+              <div className="flex items-center gap-2 mt-1">
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-[10px]",
+                    currentOption.autoType === "A"
+                      ? "bg-red-50 text-red-700 border-red-200"
+                      : "bg-blue-50 text-blue-700 border-blue-200"
+                  )}
+                >
+                  Tipo {currentOption.autoType} — {currentOption.autoType === "A" ? "Dura" : "Blanda"}
+                </Badge>
+                <span className="text-[10px] text-muted-foreground">
+                  {currentOption.autoType === "A"
+                    ? "Se respeta al 100%"
+                    : "El motor intentará respetarla"}
+                </span>
+              </div>
             )}
           </div>
 
-          {/* Shift preference (only for type B) */}
-          {type === "B" && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Turno preferido</Label>
-                <Select value={requestedShift} onValueChange={setRequestedShift}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Opcional" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_none">Ninguno</SelectItem>
-                    {SHIFT_OPTIONS.map((s) => (
-                      <SelectItem key={s.value} value={s.value}>
-                        {s.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Evitar turno</Label>
-                <Select value={avoidShift} onValueChange={setAvoidShift}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Opcional" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_none">Ninguno</SelectItem>
-                    {SHIFT_OPTIONS.map((s) => (
-                      <SelectItem key={s.value} value={s.value}>
-                        {s.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          {/* Mini-calendar day picker */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Días del mes</Label>
+            <MiniCalendarPicker
+              totalDays={totalDays}
+              selectedDays={selectedDays}
+              onToggleDay={handleToggleDay}
+              periodStart={periodStart}
+            />
+          </div>
+
+          {/* Avoid shift (only for Tipo B) */}
+          {autoType === "B" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Evitar turno (opcional)</Label>
+              <Select value={avoidShift} onValueChange={setAvoidShift}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Ninguno" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">Ninguno</SelectItem>
+                  {SHIFT_OPTIONS.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
-
-          {/* Priority */}
-          <div className="space-y-1.5">
-            <Label className="text-xs">Prioridad</Label>
-            <Select value={String(priority)} onValueChange={(v) => setPriority(Number(v))}>
-              <SelectTrigger className="h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">1 — Urgente</SelectItem>
-                <SelectItem value="2">2 — Alta</SelectItem>
-                <SelectItem value="3">3 — Normal</SelectItem>
-                <SelectItem value="4">4 — Baja</SelectItem>
-                <SelectItem value="5">5 — Si es posible</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
 
           {/* Reason */}
           <div className="space-y-1.5">
