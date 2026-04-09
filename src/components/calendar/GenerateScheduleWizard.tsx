@@ -871,24 +871,25 @@ function Step5Summary({
         </Card>
       )}
 
-      {/* Período anterior */}
+      {/* Historial acumulado de equidad */}
       {previousPeriod && previousPeriod.length > 0 && (
         <Card>
           <CardContent className="pt-3 pb-2 space-y-2">
             <h4 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
               <Info className="h-3.5 w-3.5" />
-              Período anterior
+              Historial acumulado de equidad
             </h4>
-            <div className="text-[10px] grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-3 gap-y-0.5">
+            <p className="text-[10px] text-muted-foreground">Turnos M/T/N acumulados por empleado desde el inicio del historial. El motor usa estos datos para equilibrar la asignación.</p>
+            <div className="text-[10px] grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-0.5">
               <span className="font-medium text-muted-foreground">Empleado</span>
-              <span className="font-medium text-muted-foreground text-center">Último</span>
               <span className="font-medium text-muted-foreground text-center">M</span>
               <span className="font-medium text-muted-foreground text-center">T</span>
               <span className="font-medium text-muted-foreground text-center">N</span>
-              {previousPeriod.map((p) => (
+              {previousPeriod
+                .filter((p) => p.morningCount > 0 || p.afternoonCount > 0 || p.nightCount > 0)
+                .map((p) => (
                 <Fragment key={p.employeeId}>
                   <span className="truncate">{p.employeeName}</span>
-                  <span className="text-center font-mono font-medium">{p.lastShift}</span>
                   <span className="text-center">{p.morningCount}</span>
                   <span className="text-center">{p.afternoonCount}</span>
                   <span className="text-center">{p.nightCount}</span>
