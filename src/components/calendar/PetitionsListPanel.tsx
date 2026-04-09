@@ -166,38 +166,40 @@ export function PetitionsListPanel({
                       <p>Prioridad: {pet.priority} / 5</p>
                     </div>
 
-                    {/* Acciones (solo para pending) */}
-                    {pet.status === "pending" && (
-                      <div className="flex gap-2 pt-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs text-green-700 border-green-300 hover:bg-green-50"
-                          onClick={() => onApprove(pet.id)}
-                        >
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Aprobar
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs text-red-700 border-red-300 hover:bg-red-50"
-                          onClick={() => onReject(pet.id)}
-                        >
-                          <XCircle className="h-3 w-3 mr-1" />
-                          Rechazar
-                        </Button>
-                        <div className="flex-1" />
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 text-xs text-muted-foreground"
-                          onClick={() => onDelete(pet.id)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    )}
+                    {/* Acciones */}
+                    <div className="flex gap-2 pt-1">
+                      {pet.status === "pending" && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs text-green-700 border-green-300 hover:bg-green-50"
+                            onClick={() => onApprove(pet.id)}
+                          >
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Aprobar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs text-red-700 border-red-300 hover:bg-red-50"
+                            onClick={() => onReject(pet.id)}
+                          >
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Rechazar
+                          </Button>
+                        </>
+                      )}
+                      <div className="flex-1" />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs text-muted-foreground hover:text-red-600"
+                        onClick={() => onDelete(pet.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
                 );
               })}
