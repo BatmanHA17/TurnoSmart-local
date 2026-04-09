@@ -3,10 +3,12 @@ import { KPICard } from "@/components/mi-actividad/KPICard";
 import { WeeklyHoursChart } from "@/components/mi-actividad/WeeklyHoursChart";
 import { UpcomingAbsencesCard } from "@/components/mi-actividad/UpcomingAbsencesCard";
 import { RemindersCard } from "@/components/mi-actividad/RemindersCard";
+import { EmployeeEquityCard } from "@/components/analytics/EmployeeEquityCard";
 import { useEmployeeWeeklyHours } from "@/hooks/useEmployeeWeeklyHours";
 import { useEmployeeUpcomingAbsences } from "@/hooks/useEmployeeUpcomingAbsences";
 import { useEmployeeReminders } from "@/hooks/useEmployeeReminders";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useTurnoSmartRole } from "@/hooks/useTurnoSmartRole";
 import { useNavigate } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -15,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export const MiActividadEmployeeDashboard = () => {
   const navigate = useNavigate();
   const { displayName } = useUserProfile();
+  const { colaboradorId } = useTurnoSmartRole();
   const { data: weeklyData, loading: loadingHours } = useEmployeeWeeklyHours();
   const { absences, loading: loadingAbsences } = useEmployeeUpcomingAbsences();
   const { reminders, loading: loadingReminders } = useEmployeeReminders();
@@ -105,6 +108,13 @@ export const MiActividadEmployeeDashboard = () => {
               dailyHours={weeklyData.dailyHours}
               targetHours={weeklyData.targetHours}
             />
+          </div>
+        )}
+
+        {/* Equidad de turnos */}
+        {colaboradorId && (
+          <div className="mb-8 lg:mb-10 animate-fade-in" style={{ animationDelay: '450ms' } as any}>
+            <EmployeeEquityCard colaboradorId={colaboradorId} />
           </div>
         )}
 
