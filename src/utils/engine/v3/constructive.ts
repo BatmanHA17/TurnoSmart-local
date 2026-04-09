@@ -116,6 +116,17 @@ function anchorFixed(state: SolverState): void {
         if (state.grid[emp.id][day].locked) continue;
         if (p.requestedShift) {
           assignCell(state, emp.id, day, p.requestedShift, "petition_a", true);
+        } else {
+          // Hard petition without specific shift (vacations, holidays, sick leave)
+          // Determine absence code from reason or default to V
+          const reason = (p as any).reason?.toLowerCase() || "";
+          let absCode = "V"; // default: vacation
+          if (reason.includes("festivo") || reason.includes("holiday")) absCode = "F";
+          else if (reason.includes("enferm") || reason.includes("baja") || reason.includes("sick")) absCode = "E";
+          else if (reason.includes("permiso") || reason.includes("mudanza")) absCode = "PM";
+          else if (reason.includes("curso") || reason.includes("formacion")) absCode = "PC";
+          else if (reason.includes("licencia")) absCode = "L";
+          assignCell(state, emp.id, day, absCode, "petition_a", true);
         }
       }
     }
